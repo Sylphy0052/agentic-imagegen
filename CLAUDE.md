@@ -70,10 +70,33 @@ presets:
 新しいpresetを作るときは軸の責務を混ぜない。解像度とseedは再現性に直結するため
 presetには書かず、Spec側で指定する。
 
+## LoRAを使う
+
+`model.loras` に指定する。同時に3件まで。
+
+```yaml
+model:
+  checkpoint: meinamix_v12Final.safetensors
+  loras:
+    - name: add_detail.safetensors
+      strength_model: 0.8
+      strength_clip: 0.8
+```
+
+- LoRAを指定すると、Workflowテンプレートが `txt2img_lora` へ自動的に切り替わる
+  (`uv run imagegen validate` の `Workflow:` 行で確認できる)
+- `strength_model` / `strength_clip` は省略時1.0、範囲は ±10.0
+- 同じLoRAを重複指定できない。二重に積むと意図しない強度になるため
+- 拡張子は `.safetensors` / `.pt` / `.ckpt`
+- 配置先は `~/ComfyUI/models/loras/`。実在しない名前を指定するとComfyUI側で拒否される
+
 ## 禁止事項
 
-- **`workflows/*.json` を勝手に書き換えない。** Workflowは人間がComfyUI GUIで作成しAPI形式で書き出す
-- **ComfyUI workflowをLLMで動的生成しない。** ノードや接続を組み立てる設計は採らない
+- **`workflows/*.json` を勝手に書き換えない。** Workflowは人間がComfyUI GUIで作成しAPI形式で書き出す。
+  既存テンプレートへ定型のノードを挟むだけの場合に限り、ユーザーの指示があれば機械的に組み立ててよいが、
+  `object_info` での仕様確認・参照整合性の検査・実機での生成成功確認をすべて満たすこと
+  (手順: [workflows/README.md](workflows/README.md))
+- **ComfyUI workflowを実行時に組み立てない。** テンプレートは静的ファイルとして固定する
 - **未知のcheckpointを勝手に使用しない。** ComfyUIに実在するファイル名だけを指定する
 - **validationを迂回しない。** `validate` をスキップしたり、検証を緩めて通したりしない
 - **巨大解像度・大量batchを実行しない。** CPU推論のため負荷が直接時間に跳ね返る

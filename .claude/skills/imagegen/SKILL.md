@@ -34,6 +34,7 @@ cd ~/ComfyUI && ./.venv/bin/python main.py --listen 127.0.0.1 --port 8188
 
 ```bash
 ls ~/ComfyUI/models/checkpoints/
+ls ~/ComfyUI/models/loras/
 ls presets/characters presets/scenes presets/styles
 ```
 
@@ -91,6 +92,20 @@ output:
 
 presetで足りない要素だけ `prompt.positive` に足す。preset側と重複するトークンは
 自動で除去されるので、重複を気にして削る必要はない。
+
+LoRAを使う場合は `model.loras` に足す (同時3件まで)。
+
+```yaml
+model:
+  checkpoint: meinamix_v12Final.safetensors
+  loras:
+    - name: add_detail.safetensors
+      strength_model: 0.8
+      strength_clip: 0.8
+```
+
+指定するとWorkflowテンプレートが `txt2img_lora` へ自動的に切り替わる。
+使えるLoRAは `ls ~/ComfyUI/models/loras/` で確認する。強度は省略時1.0。
 
 パラメータの目安 (CPU推論では時間が跳ね返るため控えめにする):
 

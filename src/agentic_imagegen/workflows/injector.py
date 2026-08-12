@@ -14,6 +14,7 @@ from typing import Any, Final
 
 from agentic_imagegen.adapters.comfyui.workflow import (
     TXT2IMG_BINDING,
+    TXT2IMG_LORA_BINDING,
     WorkflowBinding,
     build_workflow,
     resolve_seed,
@@ -27,7 +28,19 @@ WORKFLOWS_DIR: Final = Path(__file__).resolve().parents[3] / "workflows"
 #: 実行を許可するworkflow。ユーザー入力から任意のJSONを実行させないための allowlist。
 ALLOWED_WORKFLOWS: Final[dict[str, WorkflowBinding]] = {
     "txt2img": TXT2IMG_BINDING,
+    "txt2img_lora": TXT2IMG_LORA_BINDING,
 }
+
+
+def resolve_workflow_name(spec: GenerationSpec) -> str:
+    """Specに対して実際に使うWorkflowテンプレート名を決める。
+
+    `task` は論理的なタスク名であり、テンプレートはそれとLoRA指定の有無で決まる。
+    LoRA未指定でLoRA用テンプレートを使う意味はないため、素のテンプレートを選ぶ。
+    """
+    if spec.task == "txt2img" and spec.model.loras:
+        return "txt2img_lora"
+    return spec.task
 
 
 def get_binding(name: str) -> WorkflowBinding:
@@ -88,6 +101,7 @@ class PreparedWorkflow:
     workflow: dict[str, Any]
     seed: int
     template_hash: str
+    workflow_name: str
 
 
 def prepare_workflow(
@@ -97,10 +111,16 @@ def prepare_workflow(
 
     seedが -1 の場合はここでランダム値へ解決し、metadataへ記録できるよう返す。
     """
-    template = load_workflow_template(spec.task, workflows_dir=workflows_dir)
+    name = resolve_workflow_name(spec)
+    template = load_workflow_template(name, workflows_dir=workflows_dir)
     seed = resolve_seed(spec.generation.seed)
-    workflow = build_workflow(template, spec, seed=seed, binding=get_binding(spec.task))
-    return PreparedWorkflow(workflow=workflow, seed=seed, template_hash=template_digest(template))
+    workflow = build_workflow(template, spec, seed=seed, binding=get_binding(name))
+    return PreparedWorkflow(
+        workflow=workflow,
+        seed=seed,
+        template_hash=template_digest(template),
+        workflow_name=name,
+    )
 
 
 __all__ = [

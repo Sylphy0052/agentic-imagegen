@@ -7,6 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from agentic_imagegen import cli
+from agentic_imagegen.domain.models import MAX_LORAS
 from agentic_imagegen.domain.results import GenerationResult, HealthStatus
 from agentic_imagegen.errors import (
     ComfyUIUnavailable,
@@ -121,6 +122,49 @@ def test_validate_ok(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "OK" in result.output
     assert "512x768" in result.output
+
+
+def test_validate_reports_plain_workflow_without_loras(tmp_path: Path) -> None:
+    result = runner.invoke(cli.app, ["validate", str(_write_spec(tmp_path))])
+
+    assert "Workflow: txt2img" in result.output
+    assert "LoRA:" not in result.output
+
+
+def test_validate_reports_lora_workflow(tmp_path: Path) -> None:
+    """LoRAを指定するとテンプレートが切り替わり、その旨が出力される。"""
+    spec = _write_spec(
+        tmp_path,
+        VALID_SPEC.replace(
+            "  checkpoint: v1-5-pruned-emaonly.safetensors",
+            "  checkpoint: v1-5-pruned-emaonly.safetensors\n"
+            "  loras:\n"
+            "    - name: add_detail.safetensors\n"
+            "      strength_model: 0.8",
+        ),
+    )
+
+    result = runner.invoke(cli.app, ["validate", str(spec)])
+
+    assert result.exit_code == 0
+    assert "Workflow: txt2img_lora" in result.output
+    assert "LoRA: add_detail.safetensors" in result.output
+    assert "model=0.8" in result.output
+
+
+def test_validate_rejects_too_many_loras(tmp_path: Path) -> None:
+    entries = "\n".join(f"    - name: lora{index}.safetensors" for index in range(MAX_LORAS + 1))
+    spec = _write_spec(
+        tmp_path,
+        VALID_SPEC.replace(
+            "  checkpoint: v1-5-pruned-emaonly.safetensors",
+            f"  checkpoint: v1-5-pruned-emaonly.safetensors\n  loras:\n{entries}",
+        ),
+    )
+
+    result = runner.invoke(cli.app, ["validate", str(spec)])
+
+    assert result.exit_code == 2
 
 
 def test_validate_missing_file(tmp_path: Path) -> None:
