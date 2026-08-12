@@ -6,14 +6,23 @@
 
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 from typing import Any
 
 import pytest
+from mcp.server.mcpserver.exceptions import ToolError
 
 from agentic_imagegen import mcp_server
 
-EXPECTED_TOOLS = {"validate_generation", "list_models", "list_loras", "list_workflows"}
+EXPECTED_TOOLS = {
+    "validate_generation",
+    "generate_image",
+    "get_generation_status",
+    "list_models",
+    "list_loras",
+    "list_workflows",
+}
 
 
 async def test_registers_expected_tools() -> None:
@@ -37,6 +46,44 @@ async def test_validate_generation_schema_takes_spec() -> None:
 
     assert "spec" in schema["properties"]
     assert schema["required"] == ["spec"]
+
+
+async def test_generate_image_schema_takes_spec() -> None:
+    tools = {tool.name: tool for tool in await mcp_server.server.list_tools()}
+
+    schema = tools["generate_image"].input_schema
+
+    assert "spec" in schema["properties"]
+    assert schema["required"] == ["spec"]
+
+
+async def test_get_generation_status_schema_takes_job_id() -> None:
+    tools = {tool.name: tool for tool in await mcp_server.server.list_tools()}
+
+    schema = tools["get_generation_status"].input_schema
+
+    assert "job_id" in schema["properties"]
+    assert schema["required"] == ["job_id"]
+
+
+def test_generate_image_tool_is_async() -> None:
+    """生成を投入するtoolは非同期にしておく。
+
+    同期関数として登録すると、実行中のイベントループが無い文脈で呼ばれ、
+    asyncio.create_task が `no running event loop` で失敗する。
+    ユニットテストはasync文脈から呼ぶため気づけず、実サーバー経路でだけ壊れる。
+    """
+    assert inspect.iscoroutinefunction(mcp_server.generate_image)
+
+
+async def test_get_generation_status_rejects_unknown_job() -> None:
+    """未知のjob_idはエラーにする (黙って running を返さない)。
+
+    サーバーを直接呼ぶと例外がそのまま上がる。クライアント経由では
+    これが isError の応答へ変換される。
+    """
+    with pytest.raises(ToolError, match="job_id"):
+        await mcp_server.server.call_tool("get_generation_status", {"job_id": "does-not-exist"})
 
 
 async def test_list_workflows_returns_allowlist() -> None:

@@ -344,9 +344,14 @@ uv run imagegen-mcp   # stdioで待ち受ける (通常はクライアントが�
 | tool | 用途 |
 | --- | --- |
 | `validate_generation` | GenerationSpecを検証する (生成はしない) |
+| `generate_image` | 生成を開始し `job_id` を返す (完了は待たない) |
+| `get_generation_status` | 生成の状態と結果 (出力パス / seed / exit_code) を返す |
 | `list_models` | 利用可能なcheckpoint名 |
 | `list_loras` | 利用可能なLoRA名 |
 | `list_workflows` | 実行を許可しているWorkflowテンプレート名 |
+
+生成は数十秒から数分かかるため、`generate_image` は完了を待たずに `job_id` を返し、
+`get_generation_status` で結果を受け取る。失敗時はCLIと同じ exit code を返す。
 
 MCP層は薄いアダプタで、検証も生成もCLIと同じ Service / Domain を通る。
 MCP経由で検証を迂回できる経路は作っていない。
