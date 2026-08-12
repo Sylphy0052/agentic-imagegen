@@ -116,6 +116,11 @@ def validate(spec_path: SpecArgument, verbose: VerboseOption = False) -> None:
                 f"ControlNet: {spec.control.image} "
                 f"(model={spec.control.model}, strength={spec.control.strength})"
             )
+        if spec.reference is not None:
+            typer.echo(
+                f"IPAdapter: {spec.reference.image} "
+                f"(model={spec.reference.model}, weight={spec.reference.weight})"
+            )
         for lora in spec.model.loras:
             typer.echo(
                 f"LoRA: {lora.name} (model={lora.strength_model}, clip={lora.strength_clip})"

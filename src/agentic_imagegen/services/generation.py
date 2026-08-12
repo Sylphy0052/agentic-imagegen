@@ -81,11 +81,19 @@ async def generate(
         project_root,
         label="control",
     )
+    reference_image_name = await _upload_image(
+        spec.reference.image if spec.reference is not None else None,
+        settings,
+        backend,
+        project_root,
+        label="reference",
+    )
     prepared = prepare_workflow(
         spec,
         workflows_dir=workflows_dir,
         source_image_name=source_image_name,
         control_image_name=control_image_name,
+        reference_image_name=reference_image_name,
     )
     seed = prepared.seed
     logger.info(
@@ -241,7 +249,8 @@ async def _upload_image(
     """入力画像を検証し、ComfyUIへアップロードして参照名を返す。
 
     LoadImageが参照できるのはComfyUIのinput配下だけなので、リポジトリ内の画像は
-    そのままでは使えない。img2imgの入力画像とControlNetのcontrol画像で共通の手順。
+    そのままでは使えない。img2imgの入力画像・ControlNetのcontrol画像・
+    IPAdapterの参照画像で共通の手順。
     """
     if relative_path is None:
         return None

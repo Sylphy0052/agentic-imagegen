@@ -29,6 +29,14 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `txt2img_lora_controlnet.json` | LoRA + ControlNet |
 | `img2img_controlnet.json` | ControlNet付き image-to-image |
 | `img2img_lora_controlnet.json` | LoRA + ControlNet (img2img) |
+| `txt2img_ipadapter.json` | IPAdapter付き text-to-image |
+| `txt2img_lora_ipadapter.json` | LoRA + IPAdapter |
+| `img2img_ipadapter.json` | IPAdapter付き image-to-image |
+| `img2img_lora_ipadapter.json` | LoRA + IPAdapter (img2img) |
+| `txt2img_controlnet_ipadapter.json` | ControlNet + IPAdapter |
+| `txt2img_lora_controlnet_ipadapter.json` | LoRA + ControlNet + IPAdapter |
+| `img2img_controlnet_ipadapter.json` | ControlNet + IPAdapter (img2img) |
+| `img2img_lora_controlnet_ipadapter.json` | LoRA + ControlNet + IPAdapter (img2img) |
 
 どれを使うかは `task` と `model.loras` の有無で自動的に決まる。定義は
 [src/agentic_imagegen/workflows/injector.py](../src/agentic_imagegen/workflows/injector.py)
@@ -102,10 +110,14 @@ txt2img.json  (手書きベース)
   ├─ img2img            EmptyLatentImage -> LoadImage + VAEEncode
   ├─ *_lora             CheckpointLoader の後に LoraLoader を3段
   ├─ *_hires            KSampler の後に LatentUpscaleBy + 2段目 KSampler
-  └─ *_controlnet       CLIPTextEncode と KSampler の間に ControlNet
+  ├─ *_controlnet       CLIPTextEncode と KSampler の間に ControlNet
+  └─ *_ipadapter        MODEL の経路に IPAdapterAdvanced
 ```
 
-組み合わせが8種になっても手で書かないのは、ノード参照を間違えたときに
+`*_ipadapter` はKSamplerのMODEL入力だけを差し替えるため、positive / negative を
+差し替える `*_controlnet` と同時にかけられる。
+
+組み合わせが20種になっても手で書かないのは、ノード参照を間違えたときに
 **形は正しいまま意味だけ壊れる**ためである (実際に一度踏んでいる)。
 スクリプトは生成後に次を検査する。
 
@@ -121,9 +133,13 @@ txt2img.json  (手書きベース)
 | 20-22 | img2img系のLoRA |
 | 30-31 | hires fix (LatentUpscaleBy / 2段目KSampler) |
 | 40-43 | ControlNet (LoadImage / Canny / ControlNetLoader / ControlNetApplyAdvanced) |
+| 50-53 | IPAdapter (LoadImage / IPAdapterModelLoader / CLIPVisionLoader / IPAdapterAdvanced) |
 
-ControlNet と hires fix の組み合わせは作っていない。両方かけると生成時間が現実的でなく、
-必要になってから足せばよい (Specの検証で同時指定を拒否している)。
+hires fix と ControlNet / IPAdapter の組み合わせは作っていない。両方かけると生成時間が
+現実的でなく、必要になってから足せばよい (Specの検証で同時指定を拒否している)。
+
+`*_ipadapter` は [ComfyUI_IPAdapter_plus](https://github.com/cubiq/ComfyUI_IPAdapter_plus)
+のノードを使う。未導入のComfyUIでは投入が拒否される。
 
 ## GUIから書き出す手順
 

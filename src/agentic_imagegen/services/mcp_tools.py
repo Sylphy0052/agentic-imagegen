@@ -50,6 +50,21 @@ async def list_controlnets(settings: Settings) -> list[str]:
         return list(await client.available_controlnets())
 
 
+async def list_ipadapters(settings: Settings) -> list[str]:
+    """ComfyUIが持っているIPAdapterモデル名を返す。
+
+    カスタムノードが未導入なら空になる。その場合 reference は使えない。
+    """
+    async with ComfyUIClient(settings) as client:
+        return list(await client.available_ipadapters())
+
+
+async def list_clip_visions(settings: Settings) -> list[str]:
+    """ComfyUIが持っているCLIP Visionモデル名を返す。"""
+    async with ComfyUIClient(settings) as client:
+        return list(await client.available_clip_visions())
+
+
 async def _default_runner(
     spec: GenerationSpec, *, settings: Settings, project_root: Path
 ) -> GenerationResult:
@@ -342,6 +357,7 @@ def _failure(errors: list[str]) -> dict[str, Any]:
         "prompt": None,
         "source": None,
         "control": None,
+        "reference": None,
         "upscale": None,
         "text": None,
     }
@@ -376,6 +392,9 @@ def _success(spec: GenerationSpec) -> dict[str, Any]:
         "source": spec.source.model_dump(mode="json") if spec.source is not None else None,
         # workflow名だけでは、どのパラメータで効いているのかまでは分からない
         "control": spec.control.model_dump(mode="json") if spec.control is not None else None,
+        "reference": (
+            spec.reference.model_dump(mode="json") if spec.reference is not None else None
+        ),
         "upscale": (params.upscale.model_dump(mode="json") if params.upscale is not None else None),
         # 合成の有無と使うフォントだけを返す。レイヤ定義そのものは呼び出し側が持っている
         "text": (
@@ -393,7 +412,9 @@ __all__ = [
     "Runner",
     "get_batch_status",
     "get_generation_status",
+    "list_clip_visions",
     "list_controlnets",
+    "list_ipadapters",
     "list_loras",
     "list_models",
     "list_workflows",
