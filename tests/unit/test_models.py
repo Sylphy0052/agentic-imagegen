@@ -149,6 +149,9 @@ def test_checkpoint_path_traversal_rejected(checkpoint: str) -> None:
         "v1-5-pruned-emaonly.safetensors",
         "sd15/anything.safetensors",
         "model.ckpt",
+        # 実在ファイル名は大文字混じりのことがある。拡張子の大小で弾かない
+        "Model.SafeTensors",
+        "sd15/Anything.CKPT",
     ],
 )
 def test_checkpoint_allowed(checkpoint: str) -> None:
