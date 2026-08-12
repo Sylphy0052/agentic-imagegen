@@ -2,7 +2,8 @@
 
 - 対象: Phase 1 (Claude Code -> GenerationSpec -> Python CLI -> ComfyUI API -> 画像生成)
 - 作成日: 2026-08-12
-- ステータス: 実装準備完了 (Step 1 着手)
+- ステータス: Step 1-6 / 8-9 完了。Step 7 はIntegration Testとセットアップ手順を実装済みだが、
+  ComfyUI環境が未構築のため未実行。Step 10 (E2E) 未実施
 - 関連Issue: [#1 Roadmap](https://github.com/Sylphy0052/agentic-imagegen/issues/1) / [#2 推論高速化検証](https://github.com/Sylphy0052/agentic-imagegen/issues/2)
 
 ---
@@ -128,8 +129,6 @@ agentic-imagegen/
 ├── uv.lock
 ├── workflows/
 │   └── txt2img.json
-├── presets/
-│   └── anime.yaml
 ├── specs/
 │   ├── examples/
 │   │   └── txt2img.yaml
@@ -160,16 +159,24 @@ agentic-imagegen/
 │       └── workflow.py
 └── tests/
     ├── conftest.py
-    ├── fixtures/
-    │   └── txt2img.json
     ├── unit/
     │   ├── test_models.py
+    │   ├── test_policy.py
+    │   ├── test_spec_loader.py
     │   ├── test_workflow_injector.py
+    │   ├── test_comfyui_client.py
+    │   ├── test_comfyui_execution.py
+    │   ├── test_generation.py
     │   ├── test_config.py
-    │   └── test_cli.py
+    │   ├── test_cli.py
+    │   └── test_package.py
     └── integration/
         └── test_comfyui.py
 ```
+
+Preset system (`presets/`) はPhase 2 (#3) の対象であり、Phase 1では作成しない。
+Unit TestのComfyUI応答は `httpx.MockTransport` とテスト内で組み立てるペイロードで代替するため、
+フィクスチャファイルのディレクトリは設けない。
 
 ---
 
@@ -242,22 +249,22 @@ output:
 
 ### 6.3 Workflow Injection
 
+Node IDとclass_typeの対応は `WorkflowBinding` として `adapters/comfyui/workflow.py` の
+`TXT2IMG_BINDING` に集約する。ComfyUI固有の知識であるため、Adapter層に置く。
+
 ```python
-@dataclass(frozen=True)
-class NodeRef:
-    node_id: str
-    class_type: str
-
-
-TXT2IMG_NODES: dict[str, NodeRef] = {
-    "checkpoint": NodeRef("4", "CheckpointLoaderSimple"),
-    "positive_prompt": NodeRef("6", "CLIPTextEncode"),
-    "negative_prompt": NodeRef("7", "CLIPTextEncode"),
-    "latent": NodeRef("5", "EmptyLatentImage"),
-    "ksampler": NodeRef("3", "KSampler"),
-    "save_image": NodeRef("9", "SaveImage"),
-}
+TXT2IMG_BINDING: Final = WorkflowBinding(
+    checkpoint=NodeRef("4", "CheckpointLoaderSimple"),
+    positive_prompt=NodeRef("6", "CLIPTextEncode"),
+    negative_prompt=NodeRef("7", "CLIPTextEncode"),
+    latent=NodeRef("5", "EmptyLatentImage"),
+    ksampler=NodeRef("3", "KSampler"),
+    save_image=NodeRef("9", "SaveImage"),
+)
 ```
+
+`workflows/injector.py` は「どのworkflowを実行してよいか」という allowlist
+(`ALLOWED_WORKFLOWS`) とテンプレート読み込みだけを持ち、構造検証と注入はAdapter層へ委譲する。
 
 - Node IDはComfyUI標準txt2imgテンプレート (API形式) の既定IDに合わせる。
 - 注入前に、各NodeRefについて「対象node_idが存在するか」「class_typeが一致するか」「必要な入力キーが存在するか」を検証する。1つでも不一致なら `WorkflowValidationError` でfail-fastし、誤ったノードへの注入を防ぐ。
@@ -368,6 +375,25 @@ URL: http://127.0.0.1:8188
 | `IMAGEGEN_OUTPUT_ROOT` | `outputs` | 出力ルート |
 
 秘密情報は扱わないため環境変数ファイルは必須としない。設定は `config.Settings` に集約し、ハードコードを避ける。
+
+### 6.9 Logging
+
+標準 `logging` を使い、モジュールごとに `logging.getLogger(__name__)` を持つ。
+出力レベルはCLIの `--verbose` で切り替える (既定 `WARNING` / 指定時 `DEBUG`)。
+
+追跡できるようにする情報は次のとおり。
+
+| 情報 | レベル | 出力箇所 |
+| --- | --- | --- |
+| workflow / prefix / 解決後のseed (生成開始) | INFO | `services/generation.py` |
+| prompt_id / 保存ファイル数 / 出力先 (生成完了) | INFO | `services/generation.py` |
+| prompt_id (workflow投入) | INFO | `adapters/comfyui/client.py` |
+| 接続先URLとComfyUIバージョン (health成功) | DEBUG | `adapters/comfyui/client.py` |
+| checkpoint一覧の取得失敗、WebSocketからポーリングへのフォールバック | WARNING | `adapters/comfyui/client.py` |
+| 失敗時の例外トレースバック | DEBUG | `cli.py` |
+
+Specの状態は `metadata.json` に全量を残すため、prompt全文などをログへ常時出力はしない。
+エラーはCLIが原因を特定できる短いメッセージのみ表示し、トレースバックは `--verbose` 時に限る。
 
 ---
 
