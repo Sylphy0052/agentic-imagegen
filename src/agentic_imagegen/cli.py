@@ -238,7 +238,7 @@ def batch_generate(
         settings = Settings.from_env()
         parsed_seeds = _parse_seeds(seeds)
         # 検証は全件を実行前に済ませる。途中で不正なSpecに当たって止まらないようにする
-        pairs = [(path, _load_and_validate(path, settings)) for path in spec_paths]
+        pairs = [(path.as_posix(), _load_and_validate(path, settings)) for path in spec_paths]
         items = expand_seeds(pairs, seeds=parsed_seeds)
 
         outcomes = asyncio.run(_run_batch(items, settings, timeout))

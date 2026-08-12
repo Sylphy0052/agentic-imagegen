@@ -166,3 +166,41 @@ async def test_available_checkpoints_unreachable_raises() -> None:
     async with _client(handler) as client:
         with pytest.raises(ComfyUIUnavailable):
             await client.available_checkpoints()
+
+
+CONTROLNET_OBJECT_INFO: dict[str, Any] = {
+    "ControlNetLoader": {
+        "input": {
+            "required": {
+                "control_net_name": [
+                    ["control_v11p_sd15_canny_fp16.safetensors", "control_v11f1p_sd15_depth.pth"],
+                    {},
+                ]
+            }
+        }
+    }
+}
+
+
+async def test_available_controlnets() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/object_info/ControlNetLoader"
+        return httpx.Response(200, json=CONTROLNET_OBJECT_INFO)
+
+    async with _client(handler) as client:
+        names = await client.available_controlnets()
+
+    assert names == (
+        "control_v11p_sd15_canny_fp16.safetensors",
+        "control_v11f1p_sd15_depth.pth",
+    )
+
+
+async def test_available_controlnets_empty_when_none_installed() -> None:
+    """ControlNetモデルが1つも置かれていない場合も空タプルになる。"""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"ControlNetLoader": {"input": {"required": {}}}})
+
+    async with _client(handler) as client:
+        assert await client.available_controlnets() == ()

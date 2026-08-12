@@ -56,7 +56,7 @@ def _result(root: Path) -> GenerationResult:
 
 class TestSubmitGeneration:
     async def test_returns_job_id_and_workflow(self, settings: Settings, tmp_path: Path) -> None:
-        registry = JobRegistry()
+        registry = JobRegistry[GenerationResult]()
 
         async def runner(spec: Any) -> GenerationResult:
             return _result(tmp_path)
@@ -76,7 +76,7 @@ class TestSubmitGeneration:
 
     async def test_rejects_invalid_spec(self, settings: Settings, tmp_path: Path) -> None:
         """生成を行うtoolなので、不正な入力は例外にして投入させない。"""
-        registry = JobRegistry()
+        registry = JobRegistry[GenerationResult]()
 
         with pytest.raises(InvalidGenerationSpec):
             submit_generation(
@@ -88,7 +88,7 @@ class TestSubmitGeneration:
             )
 
     async def test_rejects_policy_violation(self, settings: Settings, tmp_path: Path) -> None:
-        registry = JobRegistry()
+        registry = JobRegistry[GenerationResult]()
         oversized = {**VALID_SPEC, "generation": {"width": 4096, "height": 4096}}
 
         with pytest.raises(InvalidGenerationSpec):
@@ -106,7 +106,7 @@ class TestGetGenerationStatus:
         self, settings: Settings, tmp_path: Path
     ) -> None:
         """絶対パスを返すと環境の情報が漏れるため、作業ルートからの相対で返す。"""
-        registry = JobRegistry()
+        registry = JobRegistry[GenerationResult]()
 
         async def runner(spec: Any) -> GenerationResult:
             return _result(tmp_path)
@@ -131,7 +131,7 @@ class TestGetGenerationStatus:
     async def test_reports_running(self, settings: Settings, tmp_path: Path) -> None:
         import asyncio
 
-        registry = JobRegistry()
+        registry = JobRegistry[GenerationResult]()
         release = asyncio.Event()
 
         async def runner(spec: Any) -> GenerationResult:
@@ -156,7 +156,7 @@ class TestGetGenerationStatus:
 
     async def test_reports_failure_with_exit_code(self, settings: Settings, tmp_path: Path) -> None:
         """CLIのexit code体系をそのまま応答へ持ち込む。"""
-        registry = JobRegistry()
+        registry = JobRegistry[GenerationResult]()
 
         async def runner(spec: Any) -> GenerationResult:
             raise GenerationTimeout("生成がタイムアウトしました")
@@ -179,7 +179,7 @@ class TestGetGenerationStatus:
     async def test_unexpected_error_maps_to_exit_code_one(
         self, settings: Settings, tmp_path: Path
     ) -> None:
-        registry = JobRegistry()
+        registry = JobRegistry[GenerationResult]()
 
         async def runner(spec: Any) -> GenerationResult:
             raise RuntimeError("想定外")
@@ -199,7 +199,7 @@ class TestGetGenerationStatus:
         assert status["exit_code"] == 1
 
     async def test_unknown_job_id_raises(self, tmp_path: Path) -> None:
-        registry = JobRegistry()
+        registry = JobRegistry[GenerationResult]()
 
         with pytest.raises(ValueError, match="job_id"):
             get_generation_status("nope", registry=registry, project_root=tmp_path)

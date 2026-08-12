@@ -147,3 +147,61 @@ class TestListWorkflows:
         names = list_workflows()
 
         assert names == sorted(names)
+
+
+class TestValidateReportsAdvancedOptions:
+    """ControlNet と hires fix の指定が検証結果に現れることを見る。
+
+    workflow名だけでは、どのパラメータで効いているのかまでは分からない。
+    """
+
+    def test_reports_control(self, settings: Settings, tmp_path: Path) -> None:
+        spec = {
+            **VALID_SPEC,
+            "control": {
+                "image": "inputs/pose.png",
+                "model": "control_v11p_sd15_canny_fp16.safetensors",
+                "strength": 0.9,
+            },
+        }
+
+        result = validate_generation(spec, settings=settings, project_root=tmp_path)
+
+        assert result["valid"] is True
+        assert result["workflow"] == "txt2img_controlnet"
+        assert result["control"] is not None
+        assert result["control"]["image"] == "inputs/pose.png"
+        assert result["control"]["model"] == "control_v11p_sd15_canny_fp16.safetensors"
+        assert result["control"]["strength"] == 0.9
+
+    def test_reports_upscale(self, settings: Settings, tmp_path: Path) -> None:
+        spec = {
+            **VALID_SPEC,
+            "generation": {
+                "width": 512,
+                "height": 512,
+                "seed": 42,
+                "upscale": {"scale": 1.5, "denoise": 0.45},
+            },
+        }
+
+        result = validate_generation(spec, settings=settings, project_root=tmp_path)
+
+        assert result["valid"] is True
+        assert result["workflow"] == "txt2img_hires"
+        assert result["upscale"] is not None
+        assert result["upscale"]["scale"] == 1.5
+        assert result["upscale"]["denoise"] == 0.45
+
+    def test_absent_options_are_none(self, settings: Settings, tmp_path: Path) -> None:
+        result = validate_generation(VALID_SPEC, settings=settings, project_root=tmp_path)
+
+        assert result["control"] is None
+        assert result["upscale"] is None
+
+    def test_failure_payload_has_same_keys(self, settings: Settings, tmp_path: Path) -> None:
+        """成功と失敗で鍵の集合を揃える。呼び出し側の分岐を増やさないため。"""
+        ok = validate_generation(VALID_SPEC, settings=settings, project_root=tmp_path)
+        ng = validate_generation({"task": "txt2img"}, settings=settings, project_root=tmp_path)
+
+        assert set(ok) == set(ng)
