@@ -6,15 +6,27 @@ ComfyUIのエンドポイント仕様とレスポンス形状の知識はこの�
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
+import uuid
 from dataclasses import dataclass
 from types import TracebackType
 from typing import Any, Final, Self
+from urllib.parse import urlencode
 
 import httpx
+import websockets
+from websockets.exceptions import WebSocketException
 
 from agentic_imagegen.config import Settings
-from agentic_imagegen.errors import ComfyUIUnavailable
+from agentic_imagegen.errors import (
+    ComfyUIUnavailable,
+    GenerationFailed,
+    GenerationTimeout,
+    OutputNotFound,
+    WorkflowSubmissionError,
+)
 
 logger: Final = logging.getLogger(__name__)
 
@@ -33,6 +45,15 @@ class HealthStatus:
     devices: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class ImageRef:
+    """ComfyUIのoutput上にある画像1件への参照。"""
+
+    filename: str
+    subfolder: str
+    type: str
+
+
 class ComfyUIClient:
     """ComfyUIサーバとの通信を担う。
 
@@ -48,6 +69,7 @@ class ComfyUIClient:
     ) -> None:
         self._settings = settings
         self._base_url = settings.comfyui_base_url.rstrip("/")
+        self._client_id = str(uuid.uuid4())
         self._client = httpx.AsyncClient(
             base_url=self._base_url,
             timeout=httpx.Timeout(settings.timeout_seconds),
@@ -57,6 +79,11 @@ class ComfyUIClient:
     @property
     def base_url(self) -> str:
         return self._base_url
+
+    @property
+    def client_id(self) -> str:
+        """このクライアントの識別子。WebSocket監視とprompt投入で同じ値を使う。"""
+        return self._client_id
 
     async def __aenter__(self) -> Self:
         return self
@@ -107,6 +134,134 @@ class ComfyUIClient:
             )
         return names
 
+    async def submit(self, workflow: dict[str, Any]) -> str:
+        """Workflowを投入し、prompt_idを返す。"""
+        try:
+            response = await self._client.post(
+                "/prompt", json={"prompt": workflow, "client_id": self._client_id}
+            )
+        except httpx.HTTPError as exc:
+            raise ComfyUIUnavailable(
+                f"ComfyUIへ接続できません: {self._base_url} ({type(exc).__name__})"
+            ) from exc
+
+        if response.status_code >= httpx.codes.BAD_REQUEST:
+            raise WorkflowSubmissionError(_format_submission_error(response))
+
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise WorkflowSubmissionError(
+                "ComfyUIの応答を解釈できません (JSONではありません)"
+            ) from exc
+
+        prompt_id = payload.get("prompt_id") if isinstance(payload, dict) else None
+        if not isinstance(prompt_id, str) or not prompt_id:
+            raise WorkflowSubmissionError(
+                f"ComfyUIの応答に prompt_id が含まれていません: {payload!r}"
+            )
+
+        logger.info("workflow submitted: prompt_id=%s", prompt_id)
+        return prompt_id
+
+    async def wait_for_completion(
+        self,
+        prompt_id: str,
+        *,
+        timeout: float | None = None,
+        poll_interval: float = 1.0,
+        use_websocket: bool = True,
+    ) -> None:
+        """実行完了まで待つ。
+
+        監視方式はこのメソッド内に隠蔽する。WebSocketが使えない環境では
+        history のポーリングへ自動的にフォールバックする。
+        """
+        limit = float(timeout if timeout is not None else self._settings.timeout_seconds)
+
+        if use_websocket:
+            try:
+                await self._wait_via_websocket(prompt_id, limit)
+            except (OSError, WebSocketException) as exc:
+                logger.warning(
+                    "WebSocket監視を使用できないためポーリングへ切り替えます (%s)",
+                    type(exc).__name__,
+                )
+            else:
+                return
+
+        await self._wait_via_polling(prompt_id, limit, poll_interval)
+
+    async def _wait_via_websocket(self, prompt_id: str, timeout: float) -> None:
+        """WebSocketで実行完了を検知する。"""
+        ws_url = _to_websocket_url(self._base_url, self._client_id)
+        try:
+            async with asyncio.timeout(timeout), websockets.connect(ws_url) as connection:
+                async for raw in connection:
+                    if not isinstance(raw, str):
+                        continue
+                    if _is_completion_message(raw, prompt_id):
+                        return
+        except TimeoutError as exc:
+            raise GenerationTimeout(
+                f"生成が制限時間 {timeout} 秒以内に完了しませんでした (prompt_id={prompt_id})"
+            ) from exc
+
+    async def _wait_via_polling(self, prompt_id: str, timeout: float, poll_interval: float) -> None:
+        """historyのポーリングで実行完了を検知する。"""
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+
+        while True:
+            entry = await self._history_entry(prompt_id)
+            if entry is not None:
+                _raise_if_execution_failed(entry, prompt_id)
+                if _is_completed(entry):
+                    return
+            if loop.time() >= deadline:
+                raise GenerationTimeout(
+                    f"生成が制限時間 {timeout} 秒以内に完了しませんでした (prompt_id={prompt_id})"
+                )
+            await asyncio.sleep(poll_interval)
+
+    async def fetch_outputs(self, prompt_id: str) -> tuple[ImageRef, ...]:
+        """生成された画像への参照を取得する。"""
+        entry = await self._history_entry(prompt_id)
+        if entry is None:
+            raise OutputNotFound(f"履歴に prompt_id={prompt_id} の記録がありません")
+
+        _raise_if_execution_failed(entry, prompt_id)
+
+        images = _extract_images(entry)
+        if not images:
+            raise OutputNotFound(f"生成結果に画像が含まれていません (prompt_id={prompt_id})")
+        return images
+
+    async def download(self, ref: ImageRef) -> bytes:
+        """ComfyUIのoutputから画像データを取得する。"""
+        params = {
+            "filename": ref.filename,
+            "subfolder": ref.subfolder,
+            "type": ref.type,
+        }
+        try:
+            response = await self._client.get("/view", params=params)
+        except httpx.HTTPError as exc:
+            raise ComfyUIUnavailable(
+                f"ComfyUIへ接続できません: {self._base_url} ({type(exc).__name__})"
+            ) from exc
+
+        if response.status_code >= httpx.codes.BAD_REQUEST:
+            raise OutputNotFound(
+                f"画像を取得できません (HTTP {response.status_code}): {ref.filename}"
+            )
+        return response.content
+
+    async def _history_entry(self, prompt_id: str) -> dict[str, Any] | None:
+        payload = await self._get_json(f"/history/{prompt_id}")
+        entry = payload.get(prompt_id)
+        return entry if isinstance(entry, dict) else None
+
     async def _get_json(self, path: str, *, timeout: float | None = None) -> dict[str, Any]:
         try:
             response = await self._client.get(path, timeout=timeout or self._client.timeout)
@@ -154,4 +309,121 @@ def _extract_checkpoint_names(payload: dict[str, Any]) -> tuple[str, ...]:
     return tuple(name for name in candidates if isinstance(name, str))
 
 
-__all__ = ["ComfyUIClient", "HealthStatus"]
+def _to_websocket_url(base_url: str, client_id: str) -> str:
+    """HTTPのベースURLからWebSocket監視用のURLを組み立てる。"""
+    scheme, _, rest = base_url.partition("://")
+    ws_scheme = "wss" if scheme == "https" else "ws"
+    return f"{ws_scheme}://{rest}/ws?{urlencode({'clientId': client_id})}"
+
+
+def _is_completion_message(raw: str, prompt_id: str) -> bool:
+    """WebSocketメッセージが対象promptの完了通知かを判定する。
+
+    ComfyUIは実行終了時に node=None の executing メッセージを送る。
+    """
+    try:
+        message = json.loads(raw)
+    except ValueError:
+        return False
+    if not isinstance(message, dict):
+        return False
+
+    data = message.get("data")
+    if not isinstance(data, dict) or data.get("prompt_id") != prompt_id:
+        return False
+
+    if message.get("type") == "execution_error":
+        raise GenerationFailed(_execution_error_message(data, prompt_id))
+    return message.get("type") == "executing" and data.get("node") is None
+
+
+def _is_completed(entry: dict[str, Any]) -> bool:
+    status = entry.get("status")
+    if not isinstance(status, dict):
+        return False
+    return status.get("completed") is True or status.get("status_str") == "success"
+
+
+def _raise_if_execution_failed(entry: dict[str, Any], prompt_id: str) -> None:
+    status = entry.get("status")
+    if not isinstance(status, dict) or status.get("status_str") != "error":
+        return
+
+    detail = "詳細不明"
+    messages = status.get("messages")
+    if isinstance(messages, list):
+        for item in messages:
+            if (
+                isinstance(item, list)
+                and len(item) == 2
+                and item[0] == "execution_error"
+                and isinstance(item[1], dict)
+            ):
+                detail = _execution_error_message(item[1], prompt_id)
+                break
+    raise GenerationFailed(f"ComfyUIでの実行が失敗しました (prompt_id={prompt_id}): {detail}")
+
+
+def _execution_error_message(data: dict[str, Any], prompt_id: str) -> str:
+    message = data.get("exception_message")
+    node = data.get("node_type") or data.get("node_id")
+    if isinstance(message, str) and message:
+        return f"{message} (node={node})" if node else message
+    return f"実行エラー (prompt_id={prompt_id})"
+
+
+def _extract_images(entry: dict[str, Any]) -> tuple[ImageRef, ...]:
+    outputs = entry.get("outputs")
+    if not isinstance(outputs, dict):
+        return ()
+
+    images: list[ImageRef] = []
+    for node_output in outputs.values():
+        if not isinstance(node_output, dict):
+            continue
+        for image in node_output.get("images", []):
+            if not isinstance(image, dict):
+                continue
+            filename = image.get("filename")
+            if not isinstance(filename, str):
+                continue
+            images.append(
+                ImageRef(
+                    filename=filename,
+                    subfolder=str(image.get("subfolder", "")),
+                    type=str(image.get("type", "output")),
+                )
+            )
+    return tuple(images)
+
+
+def _format_submission_error(response: httpx.Response) -> str:
+    """ComfyUIの拒否レスポンスから、原因を特定できるメッセージを組み立てる。"""
+    base = f"ComfyUIがWorkflowを受け付けませんでした (HTTP {response.status_code})"
+    try:
+        payload = response.json()
+    except ValueError:
+        return base
+    if not isinstance(payload, dict):
+        return base
+
+    details: list[str] = []
+    error = payload.get("error")
+    if isinstance(error, dict):
+        message = error.get("message")
+        if isinstance(message, str):
+            details.append(message)
+
+    node_errors = payload.get("node_errors")
+    if isinstance(node_errors, dict):
+        for node_id, node_error in node_errors.items():
+            if not isinstance(node_error, dict):
+                continue
+            for item in node_error.get("errors", []):
+                if isinstance(item, dict) and isinstance(item.get("message"), str):
+                    details.append(f"node {node_id}: {item['message']}")
+
+    return f"{base}: {' / '.join(details)}" if details else base
+
+
+__all__ = ["ComfyUIClient", "HealthStatus", "ImageRef"]
