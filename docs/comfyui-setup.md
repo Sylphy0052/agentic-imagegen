@@ -11,8 +11,10 @@ Phase 1では **WSL上でCPU推論** を使う。理由は次のとおり。
 - したがってCUDA前提の一般的な手順は使えない
 - CPU推論は追加ドライバ不要で確実に動作し、Phase 1のゴール (一気通貫の動作確認) には十分
 
-Intel XPUによる高速化とWindows側ComfyUIの代替案は
-[Issue #2](https://github.com/Sylphy0052/agentic-imagegen/issues/2) で別途扱う。
+**2026-08-12追記: Intel XPU (内蔵Arc GPU) での実行が可能になった。** 手順は
+[xpu-setup.md](xpu-setup.md) を参照。CPU推論よりおよそ5倍速いため、通常はそちらを使う。
+本ドキュメントのCPU手順は、XPUが使えない環境でのフォールバックとして維持する。
+経緯は [Issue #2](https://github.com/Sylphy0052/agentic-imagegen/issues/2)。
 
 CPU推論の所要時間 (Core Ultra 7 165H / 22スレッド / WSL2での実測):
 

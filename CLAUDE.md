@@ -64,8 +64,16 @@ CPU推論のため、既定は控えめにする。
 | cfg | 5.0-8.0 | 30 |
 | batch_size | 1 | 4 |
 
-**所要時間に注意する。** CPU推論のため、SD1.5 / 512x768 / 20 steps で **約12分** かかる (実測)。
-生成時は `IMAGEGEN_TIMEOUT` を十分に取る (例: `IMAGEGEN_TIMEOUT=1200`)。
+**所要時間に注意する。** SD1.5 / 512x768 / 20 steps の実測は次のとおり。
+
+| 実行基盤 | 実測 |
+| --- | --- |
+| Intel XPU (内蔵Arc GPU) | 約135秒 |
+| CPU | 約12分 |
+
+XPUが使える環境ではそちらを使う (手順: [docs/xpu-setup.md](docs/xpu-setup.md))。
+`uv run imagegen health` の `Devices:` が `xpu:0` ならXPUで動いている。
+生成時は `IMAGEGEN_TIMEOUT` を十分に取る (XPUなら300、CPUなら1200が目安)。
 SDXL / Illustrious系 (`novaAnimeXL_ilV190.safetensors`) はさらに遅く、常用しない。
 
 seedに `-1` を指定するとランダムな値へ解決され、実際に使われた値が `metadata.json` に記録される。
