@@ -27,7 +27,7 @@ def _result(tmp_path: Path) -> GenerationResult:
 
 
 async def test_submit_returns_job_id(tmp_path: Path) -> None:
-    registry = JobRegistry()
+    registry = JobRegistry[GenerationResult]()
 
     async def run() -> GenerationResult:
         return _result(tmp_path)
@@ -39,7 +39,7 @@ async def test_submit_returns_job_id(tmp_path: Path) -> None:
 
 
 async def test_completes_and_keeps_result(tmp_path: Path) -> None:
-    registry = JobRegistry()
+    registry = JobRegistry[GenerationResult]()
     started = asyncio.Event()
 
     async def run() -> GenerationResult:
@@ -59,7 +59,7 @@ async def test_completes_and_keeps_result(tmp_path: Path) -> None:
 
 
 async def test_running_before_completion(tmp_path: Path) -> None:
-    registry = JobRegistry()
+    registry = JobRegistry[GenerationResult]()
     release = asyncio.Event()
 
     async def run() -> GenerationResult:
@@ -80,7 +80,7 @@ async def test_running_before_completion(tmp_path: Path) -> None:
 
 async def test_records_failure_without_raising() -> None:
     """失敗はジョブの状態として残す。投入側へ例外を伝播させない。"""
-    registry = JobRegistry()
+    registry = JobRegistry[GenerationResult]()
 
     async def run() -> GenerationResult:
         raise GenerationFailed("ComfyUI側で失敗しました")
@@ -97,7 +97,7 @@ async def test_records_failure_without_raising() -> None:
 
 async def test_keeps_exit_code_of_error() -> None:
     """CLIのexit code体系をそのままMCPの応答へ持ち込めるようにする。"""
-    registry = JobRegistry()
+    registry = JobRegistry[GenerationResult]()
 
     async def run() -> GenerationResult:
         raise GenerationTimeout("時間切れ")
@@ -113,7 +113,7 @@ async def test_keeps_exit_code_of_error() -> None:
 
 async def test_unexpected_error_is_recorded() -> None:
     """ImageGenError以外の例外もジョブを壊さずに記録する。"""
-    registry = JobRegistry()
+    registry = JobRegistry[GenerationResult]()
 
     async def run() -> GenerationResult:
         raise RuntimeError("想定外")
@@ -128,20 +128,20 @@ async def test_unexpected_error_is_recorded() -> None:
 
 
 async def test_unknown_job_id_returns_none() -> None:
-    registry = JobRegistry()
+    registry = JobRegistry[GenerationResult]()
 
     assert registry.get("does-not-exist") is None
 
 
 async def test_wait_on_unknown_job_raises() -> None:
-    registry = JobRegistry()
+    registry = JobRegistry[GenerationResult]()
 
     with pytest.raises(KeyError):
         await registry.wait("does-not-exist")
 
 
 async def test_job_ids_are_unique(tmp_path: Path) -> None:
-    registry = JobRegistry()
+    registry = JobRegistry[GenerationResult]()
 
     async def run() -> GenerationResult:
         return _result(tmp_path)

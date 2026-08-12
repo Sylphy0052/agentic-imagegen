@@ -32,12 +32,39 @@ stdioで待ち受けるため、単体で実行しても何も表示されずに
 | `validate_generation` | GenerationSpecを検証する。画像は生成しない | 不要 |
 | `generate_image` | 生成を開始し、`job_id` を返す | 必要 |
 | `get_generation_status` | 生成の状態と結果を返す | 不要 |
+| `generate_batch` | 複数のSpecをまとめて生成し、`job_id` を返す | 必要 |
+| `get_batch_status` | 一括生成の状態と結果を返す | 不要 |
 | `list_models` | 利用可能なcheckpoint名を返す | 必要 |
 | `list_loras` | 利用可能なLoRA名を返す | 必要 |
+| `list_controlnets` | 利用可能なControlNetモデル名を返す | 必要 |
 | `list_workflows` | 実行を許可しているWorkflowテンプレート名を返す | 不要 |
 
-`validate_generation` はpresetを展開したうえで、選択されるテンプレート・解像度・LoRA構成を返す。
+`validate_generation` はpresetを展開したうえで、選択されるテンプレート・解像度・LoRA構成・
+ControlNet (`control`) と hires fix (`generation.upscale`) の設定を返す。
 不正なSpecでもエラーにはせず `valid: false` と理由を返すので、生成前の確認に使える。
+
+### CLIとの機能差
+
+Specに書ける項目はCLIとMCPで同じものが使える。ControlNet・hires fix・LoRA・img2imgは
+いずれもSpecの内容で決まるため、MCP側に専用のパラメータは無い。使うWorkflowテンプレートも
+Specから自動的に決まる。
+
+```json
+{
+  "task": "txt2img",
+  "prompt": {"positive": "1girl, blue hair"},
+  "generation": {"width": 512, "height": 512, "steps": 20, "seed": 1234},
+  "model": {"checkpoint": "meinamix_v12Final.safetensors"},
+  "control": {
+    "image": "inputs/pose.png",
+    "model": "control_v11p_sd15_canny_fp16.safetensors",
+    "strength": 0.8
+  }
+}
+```
+
+ControlNetモデルは `list_controlnets` で実在するものを確認してから指定する。
+`control` の画像パスは作業ルートからの相対で書く (CLIと同じ規則)。
 
 ### 生成の流れ
 
@@ -64,6 +91,31 @@ exit codeはCLIと同じ体系 (2: Specが不正 / 3: ComfyUIへ到達できな�
 
 ジョブの状態はサーバープロセスのメモリにのみ持つ。サーバーを再起動すると
 `job_id` は失われるが、生成物と `metadata.json` はディスクに残る。
+
+### 一括生成の流れ
+
+同じSpecでseedを変えて何枚か出したい場合や、複数のSpecを流したい場合は `generate_batch` を使う。
+`seeds` を指定すると、Specごとに各seedを当てたものへ展開する (Spec1件 + seed3つなら3枚)。
+
+```text
+generate_batch(specs=[specA, specB], seeds=[111, 222])
+  -> {"job_id": "bd4a...", "status": "running", "total": 4,
+      "items": [{"label": "spec[0] (seed=111)", "workflow": "txt2img"}, ...]}
+
+get_batch_status(job_id)
+  -> {"status": "running", "total": null, "items": []}
+  -> {"status": "completed", "total": 4, "succeeded": 3, "failed": 1,
+      "items": [{"label": "spec[0] (seed=111)", "status": "completed",
+                 "seed": 111, "files": [...], "error": null, "exit_code": null},
+                {"label": "spec[1] (seed=222)", "status": "failed",
+                 "seed": null, "files": [], "error": "...", "exit_code": 6}]}
+```
+
+- 検証は投入前に全件行う。1件でも不正なら1件も生成しない。このときtool呼び出し自体がエラーになる
+- 生成は順に実行され、1件失敗しても残りは続く。そのため失敗が混ざっていても
+  ジョブ全体の `status` は `completed` になる。内訳は `succeeded` / `failed` と `items` で判断する
+- Specがファイルとして存在しないため、`label` には受け取った並びの位置 (`spec[0]`) が入る
+- 実行中は件数がまだ確定した結果として無いため `total` は `null` になる。投入時の戻り値に入っている
 
 ## Claude Code から使う
 

@@ -83,7 +83,10 @@ async def generate(
     )
     seed = prepared.seed
     logger.info(
-        "generation start: workflow=%s prefix=%s seed=%s", spec.task, spec.output.prefix, seed
+        "generation start: workflow=%s prefix=%s seed=%s",
+        prepared.workflow_name,
+        spec.output.prefix,
+        seed,
     )
 
     prompt_id = await backend.submit(prepared.workflow)
