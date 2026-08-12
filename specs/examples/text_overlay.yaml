@@ -29,7 +29,7 @@ generation:
   batch_size: 1
 
 model:
-  checkpoint: v1-5-pruned-emaonly.safetensors
+  checkpoint: meinamix_v12Final.safetensors
 
 text:
   layers:

@@ -108,7 +108,7 @@ OK
 Spec: specs/examples/txt2img.yaml
 Workflow: txt2img
 Resolution: 512x768 (batch 1)
-Checkpoint: v1-5-pruned-emaonly.safetensors
+Checkpoint: meinamix_v12Final.safetensors
 ```
 
 presetやLoRAを指定している場合は、適用内容と実際に使われるテンプレート名も表示される。
@@ -189,7 +189,7 @@ generation:
   scheduler: normal
 
 model:
-  checkpoint: v1-5-pruned-emaonly.safetensors
+  checkpoint: meinamix_v12Final.safetensors
   loras:            # 省略可。同時3件まで
     - name: add_detail.safetensors
       strength_model: 0.8
