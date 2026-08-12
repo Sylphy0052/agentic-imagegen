@@ -55,7 +55,42 @@ RANDOM_SEED: Final = -1
 MAX_SEED: Final = 2**63 - 1
 
 ALLOWED_CHECKPOINT_SUFFIXES: Final = frozenset({".safetensors", ".ckpt"})
+
+#: LoRAは学習側の都合で .pt が配布されることがあるため、checkpointより1つ広い。
+ALLOWED_LORA_SUFFIXES: Final = frozenset({".safetensors", ".pt", ".ckpt"})
+
+#: 同時に適用できるLoRAの本数。Workflowテンプレート側のLoraLoaderの段数と一致させる。
+MAX_LORAS: Final = 3
+
+#: strengthの実用上の範囲。ComfyUI自体は±100を許すが、事故を防ぐため絞る。
+LORA_STRENGTH_LIMIT: Final = 10.0
+
 _PREFIX_PATTERN: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def _validate_model_filename(value: str, *, allowed_suffixes: frozenset[str]) -> str:
+    """モデルファイル名にPath Traversalや想定外の拡張子を許さない。
+
+    ComfyUIの各modelsディレクトリ配下を前提とし、サブフォルダは1階層まで許可する。
+    checkpointとLoRAで共通の規則。
+    """
+    if any(ord(ch) < 32 for ch in value):
+        raise ValueError("制御文字を含む名前は指定できません")
+    if "\\" in value:
+        raise ValueError("バックスラッシュは使用できません")
+    if value.startswith(("/", "~")):
+        raise ValueError("絶対パスやホームディレクトリ参照は指定できません")
+
+    segments = value.split("/")
+    if len(segments) > 2:
+        raise ValueError("サブフォルダは1階層までしか指定できません")
+    if any(segment in {"", ".", ".."} for segment in segments):
+        raise ValueError("上位ディレクトリ参照を含む名前は指定できません")
+
+    if PurePosixPath(segments[-1]).suffix not in allowed_suffixes:
+        allowed = " / ".join(sorted(allowed_suffixes))
+        raise ValueError(f"拡張子は {allowed} のいずれかにしてください (指定値: {value})")
+    return value
 
 
 class _StrictModel(BaseModel):
@@ -91,34 +126,44 @@ class GenerationParams(_StrictModel):
         return value
 
 
+class LoraSpec(_StrictModel):
+    """適用するLoRA1件。"""
+
+    name: str = Field(min_length=1)
+    strength_model: Annotated[float, Field(ge=-LORA_STRENGTH_LIMIT, le=LORA_STRENGTH_LIMIT)] = 1.0
+    strength_clip: Annotated[float, Field(ge=-LORA_STRENGTH_LIMIT, le=LORA_STRENGTH_LIMIT)] = 1.0
+
+    @field_validator("name")
+    @classmethod
+    def _reject_unsafe_path(cls, value: str) -> str:
+        return _validate_model_filename(value, allowed_suffixes=ALLOWED_LORA_SUFFIXES)
+
+
 class ModelSpec(_StrictModel):
     """使用するモデル。"""
 
     checkpoint: str = Field(min_length=1)
+    #: 適用順に並べる。Workflowテンプレートの LoraLoader の段へ先頭から割り当てる。
+    loras: tuple[LoraSpec, ...] = ()
 
     @field_validator("checkpoint")
     @classmethod
     def _reject_unsafe_path(cls, value: str) -> str:
-        """checkpoint名にPath Traversalや想定外の拡張子を許さない。
+        return _validate_model_filename(value, allowed_suffixes=ALLOWED_CHECKPOINT_SUFFIXES)
 
-        ComfyUIのcheckpointsディレクトリ配下を前提とし、サブフォルダは1階層まで許可する。
-        """
-        if any(ord(ch) < 32 for ch in value):
-            raise ValueError("制御文字を含む名前は指定できません")
-        if "\\" in value:
-            raise ValueError("バックスラッシュは使用できません")
-        if value.startswith(("/", "~")):
-            raise ValueError("絶対パスやホームディレクトリ参照は指定できません")
+    @field_validator("loras")
+    @classmethod
+    def _validate_loras(cls, value: tuple[LoraSpec, ...]) -> tuple[LoraSpec, ...]:
+        if len(value) > MAX_LORAS:
+            raise ValueError(
+                f"LoRAは同時に{MAX_LORAS}件までしか指定できません (指定数: {len(value)})"
+            )
 
-        segments = value.split("/")
-        if len(segments) > 2:
-            raise ValueError("サブフォルダは1階層までしか指定できません")
-        if any(segment in {"", ".", ".."} for segment in segments):
-            raise ValueError("上位ディレクトリ参照を含む名前は指定できません")
-
-        if PurePosixPath(segments[-1]).suffix not in ALLOWED_CHECKPOINT_SUFFIXES:
-            allowed = " / ".join(sorted(ALLOWED_CHECKPOINT_SUFFIXES))
-            raise ValueError(f"拡張子は {allowed} のいずれかにしてください (指定値: {value})")
+        seen: set[str] = set()
+        for lora in value:
+            if lora.name in seen:
+                raise ValueError(f"同じLoRAが重複して指定されています: {lora.name}")
+            seen.add(lora.name)
         return value
 
 
