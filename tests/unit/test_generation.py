@@ -8,7 +8,7 @@ import pytest
 
 from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.models import GenerationSpec
-from agentic_imagegen.domain.results import ImageRef
+from agentic_imagegen.domain.results import HealthStatus, ImageRef
 from agentic_imagegen.errors import GenerationTimeout, OutputNotFound
 from agentic_imagegen.services.generation import generate
 
@@ -25,10 +25,12 @@ class FakeBackend:
         images: tuple[ImageRef, ...] = (),
         wait_error: Exception | None = None,
         outputs_error: Exception | None = None,
+        health_error: Exception | None = None,
     ) -> None:
         self.images = images
         self.wait_error = wait_error
         self.outputs_error = outputs_error
+        self.health_error = health_error
         self.submitted: dict[str, Any] | None = None
         self.wait_timeout: float | None = None
 
@@ -48,6 +50,15 @@ class FakeBackend:
 
     async def download(self, ref: ImageRef) -> bytes:
         return PNG + ref.filename.encode()
+
+    async def health(self) -> HealthStatus:
+        if self.health_error is not None:
+            raise self.health_error
+        return HealthStatus(
+            base_url="http://127.0.0.1:8188",
+            comfyui_version="0.32.0",
+            devices=("xpu:0 Intel(R) Graphics [0x7d55]",),
+        )
 
 
 def _settings(tmp_path: Path, **overrides: Any) -> Settings:
@@ -124,6 +135,42 @@ async def test_generate_writes_metadata(tmp_path: Path) -> None:
     assert metadata["outputs"] == ["image_0001.png"]
     assert metadata["spec"]["prompt"]["positive"] == "1girl, blue hair"
     assert metadata["created_at"]
+
+
+async def test_generate_records_workflow_hash(tmp_path: Path) -> None:
+    backend = FakeBackend(images=_images(1))
+
+    result = await generate(_spec(), _settings(tmp_path), backend=backend, project_root=tmp_path)
+
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert metadata["workflow_hash"].startswith("sha256:")
+    assert len(metadata["workflow_hash"]) == len("sha256:") + 64
+
+
+async def test_generate_records_backend_info(tmp_path: Path) -> None:
+    backend = FakeBackend(images=_images(1))
+
+    result = await generate(_spec(), _settings(tmp_path), backend=backend, project_root=tmp_path)
+
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert metadata["backend"] == {
+        "comfyui_version": "0.32.0",
+        "devices": ["xpu:0 Intel(R) Graphics [0x7d55]"],
+    }
+
+
+async def test_generate_keeps_images_when_backend_info_fails(tmp_path: Path) -> None:
+    """実行基盤の情報取得に失敗しても、生成済みの画像は失わない。"""
+    backend = FakeBackend(images=_images(1), health_error=RuntimeError("boom"))
+
+    result = await generate(_spec(), _settings(tmp_path), backend=backend, project_root=tmp_path)
+
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert metadata["backend"] is None
+    assert result.files[0].is_file()
 
 
 async def test_generate_resolves_random_seed(tmp_path: Path) -> None:

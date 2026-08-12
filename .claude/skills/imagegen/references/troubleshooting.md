@@ -88,4 +88,8 @@ ComfyUIの起動ログを見る。よくある原因:
 - `metadata.json` の `spec.prompt.positive` に展開後のpromptが記録されている。
   実際にComfyUIへ渡った内容はここで確認する
 - 同じ画を再現するには `metadata.json` の `resolved_seed` をSpecの `seed` へ書き戻す
+- 以前と同じSpecなのに結果が変わった場合は `metadata.json` の `workflow_hash` を
+  前回の結果と比べる。値が違えばWorkflowテンプレート自体が変わっている
+- `metadata.json` の `backend` で実行基盤 (ComfyUI版とデバイス) を確認できる。
+  XPUとCPUではfp16とfp32の違いがあり、同じseedでも完全には一致しない
 - 構図だけ変えたい場合は scene preset を差し替える。character presetは変えない

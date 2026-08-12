@@ -7,8 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from agentic_imagegen import cli
-from agentic_imagegen.adapters.comfyui.client import HealthStatus
-from agentic_imagegen.domain.results import GenerationResult
+from agentic_imagegen.domain.results import GenerationResult, HealthStatus
 from agentic_imagegen.errors import (
     ComfyUIUnavailable,
     GenerationTimeout,

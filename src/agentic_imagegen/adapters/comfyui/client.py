@@ -10,7 +10,6 @@ import asyncio
 import json
 import logging
 import uuid
-from dataclasses import dataclass
 from types import TracebackType
 from typing import Any, Final, Self
 from urllib.parse import urlencode
@@ -20,7 +19,7 @@ import websockets
 from websockets.exceptions import WebSocketException
 
 from agentic_imagegen.config import Settings
-from agentic_imagegen.domain.results import ImageRef
+from agentic_imagegen.domain.results import HealthStatus, ImageRef
 from agentic_imagegen.errors import (
     ComfyUIUnavailable,
     GenerationFailed,
@@ -35,15 +34,6 @@ logger: Final = logging.getLogger(__name__)
 HEALTH_TIMEOUT_SECONDS: Final = 5.0
 
 _CHECKPOINT_LOADER: Final = "CheckpointLoaderSimple"
-
-
-@dataclass(frozen=True, slots=True)
-class HealthStatus:
-    """ComfyUIの到達確認結果。"""
-
-    base_url: str
-    comfyui_version: str | None
-    devices: tuple[str, ...]
 
 
 class ComfyUIClient:
@@ -418,4 +408,4 @@ def _format_submission_error(response: httpx.Response) -> str:
     return f"{base}: {' / '.join(details)}" if details else base
 
 
-__all__ = ["ComfyUIClient", "HealthStatus", "ImageRef"]
+__all__ = ["ComfyUIClient"]

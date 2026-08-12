@@ -15,7 +15,7 @@ from typing import Any, Final, Protocol
 from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.domain.policy import resolve_output_directory
-from agentic_imagegen.domain.results import GenerationResult, ImageRef
+from agentic_imagegen.domain.results import GenerationResult, HealthStatus, ImageRef
 from agentic_imagegen.workflows.injector import prepare_workflow
 
 logger: Final = logging.getLogger(__name__)
@@ -44,6 +44,8 @@ class GenerationBackend(Protocol):
 
     async def download(self, ref: ImageRef) -> bytes: ...
 
+    async def health(self) -> HealthStatus: ...
+
 
 async def generate(
     spec: GenerationSpec,
@@ -57,12 +59,13 @@ async def generate(
     """Specに従って画像を生成し、結果をプロジェクト配下へ保存する。"""
     directory = _prepare_directory(spec, settings, project_root)
 
-    workflow, seed = prepare_workflow(spec, workflows_dir=workflows_dir)
+    prepared = prepare_workflow(spec, workflows_dir=workflows_dir)
+    seed = prepared.seed
     logger.info(
         "generation start: workflow=%s prefix=%s seed=%s", spec.task, spec.output.prefix, seed
     )
 
-    prompt_id = await backend.submit(workflow)
+    prompt_id = await backend.submit(prepared.workflow)
     await backend.wait_for_completion(
         prompt_id, timeout=timeout if timeout is not None else float(settings.timeout_seconds)
     )
@@ -74,7 +77,13 @@ async def generate(
     )
 
     metadata_path = _write_metadata(
-        directory, spec=spec, prompt_id=prompt_id, seed=seed, files=files
+        directory,
+        spec=spec,
+        prompt_id=prompt_id,
+        seed=seed,
+        files=files,
+        workflow_hash=prepared.template_hash,
+        backend_info=await _collect_backend_info(backend),
     )
     logger.info("generation done: prompt_id=%s files=%d dir=%s", prompt_id, len(files), directory)
 
@@ -116,6 +125,22 @@ async def _save_image(
     return path
 
 
+async def _collect_backend_info(backend: GenerationBackend) -> dict[str, Any] | None:
+    """metadataへ残す実行基盤の情報を集める。
+
+    ここでの失敗は生成そのものを巻き戻す理由にならない (画像は既に取得済み)。
+    記録を諦めるだけにして、理由はログへ残す。
+    """
+    try:
+        status = await backend.health()
+    except Exception:
+        logger.warning(
+            "実行基盤の情報を取得できませんでした。metadataへは記録しません", exc_info=True
+        )
+        return None
+    return {"comfyui_version": status.comfyui_version, "devices": list(status.devices)}
+
+
 def _write_metadata(
     directory: Path,
     *,
@@ -123,12 +148,16 @@ def _write_metadata(
     prompt_id: str,
     seed: int,
     files: tuple[Path, ...],
+    workflow_hash: str,
+    backend_info: dict[str, Any] | None,
 ) -> Path:
     metadata = {
         "prompt_id": prompt_id,
         "workflow": spec.task,
+        "workflow_hash": workflow_hash,
         "created_at": datetime.now().astimezone().isoformat(),
         "resolved_seed": seed,
+        "backend": backend_info,
         "spec": spec.model_dump(mode="json"),
         "outputs": [path.name for path in files],
     }

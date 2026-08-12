@@ -17,11 +17,11 @@ from typing import Annotated, Final
 import typer
 
 from agentic_imagegen import __version__
-from agentic_imagegen.adapters.comfyui.client import ComfyUIClient, HealthStatus
+from agentic_imagegen.adapters.comfyui.client import ComfyUIClient
 from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.domain.policy import validate_against_limits
-from agentic_imagegen.domain.results import GenerationResult
+from agentic_imagegen.domain.results import GenerationResult, HealthStatus
 from agentic_imagegen.errors import ComfyUIUnavailable, ImageGenError
 from agentic_imagegen.services.generation import generate
 from agentic_imagegen.services.spec_loader import load_spec

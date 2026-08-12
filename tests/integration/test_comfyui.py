@@ -143,7 +143,7 @@ async def test_submit_rejects_unknown_checkpoint(client: ComfyUIClient) -> None:
     from agentic_imagegen.errors import WorkflowSubmissionError
     from agentic_imagegen.workflows.injector import prepare_workflow
 
-    workflow, _ = prepare_workflow(_spec("definitely-missing-model.safetensors", "integration"))
+    prepared = prepare_workflow(_spec("definitely-missing-model.safetensors", "integration"))
 
     with pytest.raises(WorkflowSubmissionError):
-        await client.submit(workflow)
+        await client.submit(prepared.workflow)

@@ -113,6 +113,24 @@ SDXL / Illustrious系 (`novaAnimeXL_ilV190.safetensors`) はさらに遅く、�
 seedに `-1` を指定するとランダムな値へ解決され、実際に使われた値が `metadata.json` に記録される。
 同じ画を再現したい場合は、その値をSpecへ書き戻す。
 
+## metadata.json
+
+生成結果と同じディレクトリへ出力する。再現に必要な情報をここへ集約する。
+
+| キー | 内容 |
+| --- | --- |
+| `prompt_id` | ComfyUI側の実行ID |
+| `workflow` | 使用したworkflow名 |
+| `workflow_hash` | Workflowテンプレートのダイジェスト (`sha256:...`) |
+| `created_at` | 生成時刻 (タイムゾーン付き) |
+| `resolved_seed` | 実際に使われたseed |
+| `backend` | 実行基盤 (`comfyui_version` / `devices`)。取得に失敗した場合は `null` |
+| `spec` | preset展開後のSpec全体。適用したpreset名も含む |
+| `outputs` | 出力ファイル名 |
+
+`workflow_hash` は正規化したJSONから取るため、インデントや鍵の順序が変わっただけでは動かない。
+同じSpecで結果が変わったときに、テンプレート自体が変わったのかを切り分けられる。
+
 ## 開発時のルール
 
 ### 品質ゲート (commit前に全て通す)
