@@ -70,10 +70,36 @@ UpscaleMethod = Literal["nearest-exact", "bilinear", "area", "bicubic", "bislerp
 #: hires fix の拡大倍率の上限。これ以上は生成時間が現実的でない。
 MAX_UPSCALE_SCALE: Final = 4.0
 
+#: ControlNetモデルとして受け付ける拡張子。.pth 配布があるためcheckpointより広い。
+ALLOWED_CONTROLNET_SUFFIXES: Final = frozenset({".safetensors", ".pth", ".ckpt"})
+
 #: img2imgの入力画像として受け付ける拡張子。
 ALLOWED_SOURCE_IMAGE_SUFFIXES: Final = frozenset({".png", ".jpg", ".jpeg", ".webp"})
 
 _PREFIX_PATTERN: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def _validate_relative_image_path(value: str) -> str:
+    """リポジトリ配下の画像パスとして安全か検証する。
+
+    checkpointと違い階層の深さは問わない。実体の解決とルート外への脱出検証は
+    domain.policy が担う。
+    """
+    if any(ord(ch) < 32 for ch in value):
+        raise ValueError("制御文字を含むパスは指定できません")
+    if "\\" in value:
+        raise ValueError("バックスラッシュは使用できません")
+    if value.startswith(("/", "~")):
+        raise ValueError("絶対パスやホームディレクトリ参照は指定できません")
+
+    segments = value.split("/")
+    if any(segment in {"", ".", ".."} for segment in segments):
+        raise ValueError("上位ディレクトリ参照や空のセグメントを含むパスは指定できません")
+
+    if PurePosixPath(segments[-1]).suffix.lower() not in ALLOWED_SOURCE_IMAGE_SUFFIXES:
+        allowed = " / ".join(sorted(ALLOWED_SOURCE_IMAGE_SUFFIXES))
+        raise ValueError(f"拡張子は {allowed} のいずれかにしてください (指定値: {value})")
+    return value
 
 
 def _validate_model_filename(value: str, *, allowed_suffixes: frozenset[str]) -> str:
@@ -231,21 +257,45 @@ class SourceSpec(_StrictModel):
     @field_validator("image")
     @classmethod
     def _reject_unsafe_path(cls, value: str) -> str:
-        if any(ord(ch) < 32 for ch in value):
-            raise ValueError("制御文字を含むパスは指定できません")
-        if "\\" in value:
-            raise ValueError("バックスラッシュは使用できません")
-        if value.startswith(("/", "~")):
-            raise ValueError("絶対パスやホームディレクトリ参照は指定できません")
+        return _validate_relative_image_path(value)
 
-        segments = value.split("/")
-        if any(segment in {"", ".", ".."} for segment in segments):
-            raise ValueError("上位ディレクトリ参照や空のセグメントを含むパスは指定できません")
 
-        if PurePosixPath(segments[-1]).suffix.lower() not in ALLOWED_SOURCE_IMAGE_SUFFIXES:
-            allowed = " / ".join(sorted(ALLOWED_SOURCE_IMAGE_SUFFIXES))
-            raise ValueError(f"拡張子は {allowed} のいずれかにしてください (指定値: {value})")
-        return value
+class ControlSpec(_StrictModel):
+    """ControlNetの指定。
+
+    control画像は Canny で線画へ変換してから使う。前処理済みの線画を直接渡す
+    経路は今のところ持たない (必要になったら足す)。
+    """
+
+    #: 構図の元になる画像。リポジトリ配下の相対パス。
+    image: str = Field(min_length=1)
+    #: ComfyUIの models/controlnet 配下のファイル名。
+    model: str = Field(min_length=1)
+    strength: Annotated[float, Field(ge=0.0, le=10.0)] = 1.0
+    #: 効かせ始める / 終える進行度。構図だけ借りたい場合は end_percent を下げる。
+    start_percent: Annotated[float, Field(ge=0.0, le=1.0)] = 0.0
+    end_percent: Annotated[float, Field(ge=0.0, le=1.0)] = 1.0
+    #: Cannyの閾値。低いほど細かい線を拾う。
+    low_threshold: Annotated[float, Field(ge=0.01, le=0.99)] = 0.4
+    high_threshold: Annotated[float, Field(ge=0.01, le=0.99)] = 0.8
+
+    @field_validator("image")
+    @classmethod
+    def _reject_unsafe_image(cls, value: str) -> str:
+        return _validate_relative_image_path(value)
+
+    @field_validator("model")
+    @classmethod
+    def _reject_unsafe_model(cls, value: str) -> str:
+        return _validate_model_filename(value, allowed_suffixes=ALLOWED_CONTROLNET_SUFFIXES)
+
+    @model_validator(mode="after")
+    def _validate_ranges(self) -> ControlSpec:
+        if self.low_threshold >= self.high_threshold:
+            raise ValueError("low_threshold は high_threshold より小さくしてください")
+        if self.start_percent >= self.end_percent:
+            raise ValueError("start_percent は end_percent より小さくしてください")
+        return self
 
 
 class PresetRefs(_StrictModel):
@@ -275,10 +325,15 @@ class GenerationSpec(_StrictModel):
     model: ModelSpec
     #: img2imgのときのみ指定する。
     source: SourceSpec | None = None
+    #: 指定するとControlNetで構図を制御する。txt2img / img2img のどちらでも使える。
+    control: ControlSpec | None = None
     output: OutputSpec = Field(default_factory=OutputSpec)
 
     @model_validator(mode="after")
     def _validate_task_combination(self) -> GenerationSpec:
+        if self.generation.upscale is not None and self.control is not None:
+            # 両方かけると生成時間が現実的でないため、テンプレートを用意していない
+            raise ValueError("upscale と control の同時指定は未対応です")
         """taskと他フィールドの組み合わせを検証する。
 
         指定しても効かない項目は黙って無視せず拒否する。書いたのに反映されていない
@@ -305,6 +360,7 @@ class GenerationSpec(_StrictModel):
 
 
 __all__ = [
+    "ControlSpec",
     "GenerationParams",
     "GenerationSpec",
     "ModelSpec",

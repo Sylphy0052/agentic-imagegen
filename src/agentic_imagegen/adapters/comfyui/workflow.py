@@ -180,6 +180,59 @@ IMG2IMG_LORA_BINDING: Final = _with_lora_chain(
     IMG2IMG_BINDING, name="img2img_lora", first_node_id=20
 )
 
+#: ControlNet で使うノードの役割名。
+CONTROL_IMAGE_ROLE: Final = "control_image"
+CONTROL_PREPROCESSOR_ROLE: Final = "control_preprocessor"
+CONTROL_LOADER_ROLE: Final = "control_loader"
+CONTROL_APPLY_ROLE: Final = "control_apply"
+
+
+def _with_controlnet(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
+    """既存のbindingに ControlNet を挟んだbindingを組み立てる。
+
+    ControlNetApplyAdvanced は positive / negative の両方を返すため、
+    KSamplerの2つの入力をどちらもここから受け直す。片方だけ繋ぎ替えると
+    条件が食い違ったまま生成が成功してしまう。
+    """
+    nodes = dict(base.nodes)
+    nodes[CONTROL_IMAGE_ROLE] = NodeRef("40", "LoadImage", ("image",))
+    nodes[CONTROL_PREPROCESSOR_ROLE] = NodeRef("41", "Canny", ("low_threshold", "high_threshold"))
+    nodes[CONTROL_LOADER_ROLE] = NodeRef("42", "ControlNetLoader", ("control_net_name",))
+    nodes[CONTROL_APPLY_ROLE] = NodeRef(
+        "43",
+        "ControlNetApplyAdvanced",
+        ("strength", "start_percent", "end_percent"),
+    )
+
+    # KSamplerのpositive/negativeはControlNet経由になるため、元のリンクを差し替える
+    links = [
+        link
+        for link in base.links
+        if not (link.source_node == "ksampler" and link.input_key in {"positive", "negative"})
+    ]
+    links.extend(
+        [
+            LinkRef(CONTROL_PREPROCESSOR_ROLE, "image", CONTROL_IMAGE_ROLE),
+            LinkRef(CONTROL_APPLY_ROLE, "control_net", CONTROL_LOADER_ROLE),
+            LinkRef(CONTROL_APPLY_ROLE, "image", CONTROL_PREPROCESSOR_ROLE),
+            LinkRef(CONTROL_APPLY_ROLE, "positive", "positive_prompt"),
+            LinkRef(CONTROL_APPLY_ROLE, "negative", "negative_prompt"),
+            LinkRef("ksampler", "positive", CONTROL_APPLY_ROLE),
+            LinkRef("ksampler", "negative", CONTROL_APPLY_ROLE),
+        ]
+    )
+    return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
+
+
+TXT2IMG_CONTROLNET_BINDING: Final = _with_controlnet(TXT2IMG_BINDING, name="txt2img_controlnet")
+TXT2IMG_LORA_CONTROLNET_BINDING: Final = _with_controlnet(
+    TXT2IMG_LORA_BINDING, name="txt2img_lora_controlnet"
+)
+IMG2IMG_CONTROLNET_BINDING: Final = _with_controlnet(IMG2IMG_BINDING, name="img2img_controlnet")
+IMG2IMG_LORA_CONTROLNET_BINDING: Final = _with_controlnet(
+    IMG2IMG_LORA_BINDING, name="img2img_lora_controlnet"
+)
+
 TXT2IMG_HIRES_BINDING: Final = _with_hires_fix(TXT2IMG_BINDING, name="txt2img_hires")
 TXT2IMG_LORA_HIRES_BINDING: Final = _with_hires_fix(TXT2IMG_LORA_BINDING, name="txt2img_lora_hires")
 IMG2IMG_HIRES_BINDING: Final = _with_hires_fix(IMG2IMG_BINDING, name="img2img_hires")
@@ -258,6 +311,7 @@ def build_workflow(
     seed: int,
     binding: WorkflowBinding = TXT2IMG_BINDING,
     source_image_name: str | None = None,
+    control_image_name: str | None = None,
 ) -> dict[str, Any]:
     """テンプレートへSpecの値を注入した新しいWorkflowを返す。
 
@@ -302,8 +356,42 @@ def build_workflow(
     _inject_loras(spec, binding, inputs_of)
     _inject_source_image(spec, binding, inputs_of, source_image_name)
     _inject_upscale(spec, binding, inputs_of, seed=seed)
+    _inject_controlnet(spec, binding, inputs_of, control_image_name)
 
     return workflow
+
+
+def _inject_controlnet(
+    spec: GenerationSpec,
+    binding: WorkflowBinding,
+    inputs_of: Callable[[str], dict[str, Any]],
+    control_image_name: str | None,
+) -> None:
+    """ControlNet用テンプレートへ control画像と各パラメータを注入する。"""
+    if CONTROL_APPLY_ROLE not in binding.nodes:
+        return
+
+    control = spec.control
+    if control is None:
+        raise WorkflowValidationError(
+            f"Workflow ({binding.name}) はControlNet用ですが、Specに control が指定されていません"
+        )
+    if not control_image_name:
+        raise WorkflowValidationError(
+            f"Workflow ({binding.name}) のcontrol画像がComfyUIへアップロードされていません"
+        )
+
+    inputs_of(CONTROL_IMAGE_ROLE)["image"] = control_image_name
+    inputs_of(CONTROL_LOADER_ROLE)["control_net_name"] = control.model
+
+    preprocessor = inputs_of(CONTROL_PREPROCESSOR_ROLE)
+    preprocessor["low_threshold"] = control.low_threshold
+    preprocessor["high_threshold"] = control.high_threshold
+
+    apply_node = inputs_of(CONTROL_APPLY_ROLE)
+    apply_node["strength"] = control.strength
+    apply_node["start_percent"] = control.start_percent
+    apply_node["end_percent"] = control.end_percent
 
 
 def _inject_upscale(
@@ -405,15 +493,23 @@ def _inject_loras(
 
 
 __all__ = [
+    "CONTROL_APPLY_ROLE",
+    "CONTROL_IMAGE_ROLE",
+    "CONTROL_LOADER_ROLE",
+    "CONTROL_PREPROCESSOR_ROLE",
     "HIRES_KSAMPLER_ROLE",
     "IMG2IMG_BINDING",
+    "IMG2IMG_CONTROLNET_BINDING",
     "IMG2IMG_HIRES_BINDING",
     "IMG2IMG_LORA_BINDING",
+    "IMG2IMG_LORA_CONTROLNET_BINDING",
     "IMG2IMG_LORA_HIRES_BINDING",
     "LORA_SLOT_ROLES",
     "TXT2IMG_BINDING",
+    "TXT2IMG_CONTROLNET_BINDING",
     "TXT2IMG_HIRES_BINDING",
     "TXT2IMG_LORA_BINDING",
+    "TXT2IMG_LORA_CONTROLNET_BINDING",
     "TXT2IMG_LORA_HIRES_BINDING",
     "UPSCALE_ROLE",
     "LinkRef",

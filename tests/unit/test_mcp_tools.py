@@ -137,6 +137,10 @@ class TestListWorkflows:
             "img2img_lora",
             "img2img_hires",
             "img2img_lora_hires",
+            "txt2img_controlnet",
+            "txt2img_lora_controlnet",
+            "img2img_controlnet",
+            "img2img_lora_controlnet",
         }
 
     def test_is_sorted(self) -> None:

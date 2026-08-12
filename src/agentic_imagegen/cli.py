@@ -106,6 +106,11 @@ def validate(spec_path: SpecArgument, verbose: VerboseOption = False) -> None:
         else:
             typer.echo(f"Resolution: {params.width}x{params.height} (batch {params.batch_size})")
         typer.echo(f"Checkpoint: {spec.model.checkpoint}")
+        if spec.control is not None:
+            typer.echo(
+                f"ControlNet: {spec.control.image} "
+                f"(model={spec.control.model}, strength={spec.control.strength})"
+            )
         for lora in spec.model.loras:
             typer.echo(
                 f"LoRA: {lora.name} (model={lora.strength_model}, clip={lora.strength_clip})"

@@ -240,6 +240,33 @@ generation:
   (spec > style > scene > character)
 - 適用したpreset名は解決後のSpecに残り、`metadata.json` にも記録される
 
+## ControlNet (構図を指定する)
+
+参考画像から線画 (Canny) を取り、その構図を保ったまま生成する。
+
+```yaml
+control:
+  image: inputs/pose.png
+  model: control_v11p_sd15_canny_fp16.safetensors
+  strength: 0.9
+  low_threshold: 0.3
+  high_threshold: 0.7
+```
+
+```text
+$ uv run imagegen validate specs/generated/controlnet-check.yaml
+Workflow: txt2img_controlnet
+ControlNet: inputs/pose.png (model=control_v11p_sd15_canny_fp16.safetensors, strength=0.9)
+```
+
+- txt2img / img2img のどちらでも使える。LoRAとも併用できる
+- control画像は生成前にComfyUIへ自動でアップロードされる
+- ControlNetモデルは `~/ComfyUI/models/controlnet/` へ置く
+- **前処理は Canny のみ。** pose / depth はpreprocessorのカスタムノードが要るため未対応
+- `upscale` との同時指定は未対応
+
+線が強く出すぎる場合は `low_threshold` を上げるか `strength` を下げる。
+
 ## hires fix (解像度を上げる)
 
 1段目の結果をlatentのまま拡大し、2段目のKSamplerで描き足す。アップスケールモデルは不要。

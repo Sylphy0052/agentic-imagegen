@@ -61,9 +61,25 @@ async def generate(
     """Specに従って画像を生成し、結果をプロジェクト配下へ保存する。"""
     directory = _prepare_directory(spec, settings, project_root)
 
-    source_image_name = await _upload_source_image(spec, settings, backend, project_root)
+    source_image_name = await _upload_image(
+        spec.source.image if spec.source is not None else None,
+        settings,
+        backend,
+        project_root,
+        label="source",
+    )
+    control_image_name = await _upload_image(
+        spec.control.image if spec.control is not None else None,
+        settings,
+        backend,
+        project_root,
+        label="control",
+    )
     prepared = prepare_workflow(
-        spec, workflows_dir=workflows_dir, source_image_name=source_image_name
+        spec,
+        workflows_dir=workflows_dir,
+        source_image_name=source_image_name,
+        control_image_name=control_image_name,
     )
     seed = prepared.seed
     logger.info(
@@ -131,25 +147,25 @@ async def _save_image(
     return path
 
 
-async def _upload_source_image(
-    spec: GenerationSpec,
+async def _upload_image(
+    relative_path: str | None,
     settings: Settings,
     backend: GenerationBackend,
     project_root: Path,
+    *,
+    label: str,
 ) -> str | None:
-    """img2imgの入力画像を検証し、ComfyUIへアップロードして参照名を返す。
+    """入力画像を検証し、ComfyUIへアップロードして参照名を返す。
 
     LoadImageが参照できるのはComfyUIのinput配下だけなので、リポジトリ内の画像は
-    そのままでは使えない。ここで送っておく。
+    そのままでは使えない。img2imgの入力画像とControlNetのcontrol画像で共通の手順。
     """
-    if spec.source is None:
+    if relative_path is None:
         return None
 
-    path = resolve_source_image(
-        spec.source.image, project_root, max_bytes=settings.max_source_bytes
-    )
+    path = resolve_source_image(relative_path, project_root, max_bytes=settings.max_source_bytes)
     name = await backend.upload_image(path)
-    logger.info("source image uploaded: %s -> %s", spec.source.image, name)
+    logger.info("%s image uploaded: %s -> %s", label, relative_path, name)
     return name
 
 

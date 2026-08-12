@@ -14,12 +14,16 @@ from typing import Any, Final
 
 from agentic_imagegen.adapters.comfyui.workflow import (
     IMG2IMG_BINDING,
+    IMG2IMG_CONTROLNET_BINDING,
     IMG2IMG_HIRES_BINDING,
     IMG2IMG_LORA_BINDING,
+    IMG2IMG_LORA_CONTROLNET_BINDING,
     IMG2IMG_LORA_HIRES_BINDING,
     TXT2IMG_BINDING,
+    TXT2IMG_CONTROLNET_BINDING,
     TXT2IMG_HIRES_BINDING,
     TXT2IMG_LORA_BINDING,
+    TXT2IMG_LORA_CONTROLNET_BINDING,
     TXT2IMG_LORA_HIRES_BINDING,
     WorkflowBinding,
     build_workflow,
@@ -41,6 +45,10 @@ ALLOWED_WORKFLOWS: Final[dict[str, WorkflowBinding]] = {
     "txt2img_lora_hires": TXT2IMG_LORA_HIRES_BINDING,
     "img2img_hires": IMG2IMG_HIRES_BINDING,
     "img2img_lora_hires": IMG2IMG_LORA_HIRES_BINDING,
+    "txt2img_controlnet": TXT2IMG_CONTROLNET_BINDING,
+    "txt2img_lora_controlnet": TXT2IMG_LORA_CONTROLNET_BINDING,
+    "img2img_controlnet": IMG2IMG_CONTROLNET_BINDING,
+    "img2img_lora_controlnet": IMG2IMG_LORA_CONTROLNET_BINDING,
 }
 
 
@@ -55,6 +63,8 @@ def resolve_workflow_name(spec: GenerationSpec) -> str:
         suffix += "_lora"
     if spec.generation.upscale is not None:
         suffix += "_hires"
+    if spec.control is not None:
+        suffix += "_controlnet"
     return f"{spec.task}{suffix}"
 
 
@@ -124,6 +134,7 @@ def prepare_workflow(
     *,
     workflows_dir: Path | None = None,
     source_image_name: str | None = None,
+    control_image_name: str | None = None,
 ) -> PreparedWorkflow:
     """Specから実行可能なWorkflowと、解決済みseed・テンプレートのダイジェストを組み立てる。
 
@@ -139,6 +150,7 @@ def prepare_workflow(
         seed=seed,
         binding=get_binding(name),
         source_image_name=source_image_name,
+        control_image_name=control_image_name,
     )
     return PreparedWorkflow(
         workflow=workflow,
