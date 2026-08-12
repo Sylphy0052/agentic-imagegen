@@ -108,6 +108,14 @@ def test_accepts_pth_model() -> None:
     assert control.model == "control_canny.pth"
 
 
+def test_accepts_uppercase_suffix() -> None:
+    """実在ファイル名は大文字混じりのことがある。拡張子の大小では弾かない。"""
+    control = GenerationSpec.model_validate(_spec(model="Control_Canny.SafeTensors")).control
+
+    assert control is not None
+    assert control.model == "Control_Canny.SafeTensors"
+
+
 def test_rejects_unknown_key() -> None:
     with pytest.raises(ValidationError):
         GenerationSpec.model_validate(_spec(preprocessor="openpose"))

@@ -165,7 +165,7 @@ def _validate_model_filename(value: str, *, allowed_suffixes: frozenset[str]) ->
     """モデルファイル名にPath Traversalや想定外の拡張子を許さない。
 
     ComfyUIの各modelsディレクトリ配下を前提とし、サブフォルダは1階層まで許可する。
-    checkpointとLoRAで共通の規則。
+    checkpoint / LoRA / ControlNet / IPAdapter / CLIP Vision / フォントで共通の規則。
     """
     if any(ord(ch) < 32 for ch in value):
         raise ValueError("制御文字を含む名前は指定できません")
@@ -180,7 +180,8 @@ def _validate_model_filename(value: str, *, allowed_suffixes: frozenset[str]) ->
     if any(segment in {"", ".", ".."} for segment in segments):
         raise ValueError("上位ディレクトリ参照を含む名前は指定できません")
 
-    if PurePosixPath(segments[-1]).suffix not in allowed_suffixes:
+    # 実在ファイル名には大文字混じりがある。画像パスの検証と同じく大小は無視する
+    if PurePosixPath(segments[-1]).suffix.lower() not in allowed_suffixes:
         allowed = " / ".join(sorted(allowed_suffixes))
         raise ValueError(f"拡張子は {allowed} のいずれかにしてください (指定値: {value})")
     return value
