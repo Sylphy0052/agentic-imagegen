@@ -7,9 +7,12 @@ ComfyUIのエンドポイント仕様とレスポンス形状の知識はこの�
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
+import mimetypes
 import uuid
+from pathlib import Path
 from types import TracebackType
 from typing import Any, Final, Self
 from urllib.parse import urlencode
@@ -24,6 +27,7 @@ from agentic_imagegen.errors import (
     ComfyUIUnavailable,
     GenerationFailed,
     GenerationTimeout,
+    InvalidGenerationSpec,
     OutputNotFound,
     WorkflowSubmissionError,
 )
@@ -34,6 +38,9 @@ logger: Final = logging.getLogger(__name__)
 HEALTH_TIMEOUT_SECONDS: Final = 5.0
 
 _CHECKPOINT_LOADER: Final = "CheckpointLoaderSimple"
+
+#: アップロードした入力画像に付ける接頭辞。ComfyUIのinput配下で由来を判別できるようにする。
+_UPLOAD_PREFIX: Final = "imagegen_"
 
 
 class ComfyUIClient:
@@ -115,6 +122,52 @@ class ComfyUIClient:
                 "ComfyUIからcheckpoint一覧を取得できませんでした (レスポンス形式が想定外)"
             )
         return names
+
+    async def upload_image(self, path: Path) -> str:
+        """画像をComfyUIのinputへアップロードし、LoadImageで参照する名前を返す。
+
+        ComfyUIのLoadImageはinput直下のファイルしか候補に出さないため、
+        サブフォルダは使わない。名前は内容のダイジェストから決めるので、
+        同じ画像を何度指定しても同じ名前に落ち着く。
+        """
+        try:
+            data = path.read_bytes()
+        except OSError as exc:
+            raise InvalidGenerationSpec(f"入力画像を読み込めません: {path}") from exc
+
+        digest = hashlib.sha256(data).hexdigest()[:12]
+        name = f"{_UPLOAD_PREFIX}{digest}_{path.name}"
+        media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+
+        try:
+            response = await self._client.post(
+                "/upload/image",
+                files={"image": (name, data, media_type)},
+                data={"overwrite": "true"},
+            )
+        except httpx.HTTPError as exc:
+            raise ComfyUIUnavailable(
+                f"ComfyUIへ接続できません: {self._base_url} ({type(exc).__name__})"
+            ) from exc
+
+        if response.status_code >= httpx.codes.BAD_REQUEST:
+            raise WorkflowSubmissionError(
+                f"入力画像のアップロードに失敗しました (status={response.status_code})"
+            )
+
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise WorkflowSubmissionError(
+                "アップロードの応答を解釈できません (JSONではありません)"
+            ) from exc
+
+        uploaded = payload.get("name") if isinstance(payload, dict) else None
+        if not isinstance(uploaded, str) or not uploaded:
+            raise WorkflowSubmissionError("アップロードの応答にファイル名が含まれていません")
+
+        logger.debug("uploaded source image: %s -> %s", path, uploaded)
+        return uploaded
 
     async def submit(self, workflow: dict[str, Any]) -> str:
         """Workflowを投入し、prompt_idを返す。"""

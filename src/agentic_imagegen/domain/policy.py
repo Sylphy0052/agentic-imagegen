@@ -67,4 +67,32 @@ def resolve_output_directory(directory: str, root: Path) -> Path:
     return resolved
 
 
-__all__ = ["resolve_output_directory", "validate_against_limits"]
+def resolve_source_image(image: str, root: Path, *, max_bytes: int) -> Path:
+    """img2imgの入力画像を root 配下の絶対パスへ解決する。
+
+    パス形式のハード制約は SourceSpec 側で済んでいる。ここでは実体に触れる検証
+    (rootの外を指していないか、実在するか、大きすぎないか) を担う。
+    """
+    resolved_root = root.resolve()
+    resolved = (resolved_root / Path(image)).resolve()
+
+    if resolved_root not in resolved.parents:
+        raise InvalidGenerationSpec(
+            f"source.image が作業ルートの外を指しています (指定値: {image})"
+        )
+    if not resolved.is_file():
+        raise InvalidGenerationSpec(f"入力画像が見つかりません: {image}")
+
+    size = resolved.stat().st_size
+    if size > max_bytes:
+        raise InvalidGenerationSpec(
+            f"入力画像が大きすぎます ({size} bytes > {max_bytes} bytes): {image}"
+        )
+    return resolved
+
+
+__all__ = [
+    "resolve_output_directory",
+    "resolve_source_image",
+    "validate_against_limits",
+]

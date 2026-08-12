@@ -97,6 +97,25 @@ model:
 - 拡張子は `.safetensors` / `.pt` / `.ckpt`
 - 配置先は `~/ComfyUI/models/loras/`。実在しない名前を指定するとComfyUI側で拒否される
 
+## img2imgを使う
+
+`task: img2img` と `source` を指定する。入力画像はリポジトリ配下に置く。
+
+```yaml
+task: img2img
+
+source:
+  image: inputs/reference.png
+  denoise: 0.55            # 0に近いほど入力画像を保ち、1に近いほど描き直す
+```
+
+- 入力画像は生成前にComfyUIへ自動でアップロードされる。`~/ComfyUI/input/` へ手で置く必要はない
+- **解像度は入力画像のサイズをそのまま使う。** `width` / `height` を書くと拒否される
+  (書いたのに効かない状態を作らないため)
+- `batch_size` は1のみ。LoRAとの併用は未対応
+- 入力画像は `inputs/` へ置く (git管理外)。拡張子は `.png` / `.jpg` / `.jpeg` / `.webp`
+- 上限サイズは `IMAGEGEN_MAX_SOURCE_BYTES` (既定32MiB)
+
 ## 禁止事項
 
 - **`workflows/*.json` を勝手に書き換えない。** Workflowは人間がComfyUI GUIで作成しAPI形式で書き出す。
@@ -200,6 +219,7 @@ uv run mypy src
 | `presets/styles/` | 画風preset (画風・品質タグ・サンプラー設定) |
 | `specs/examples/` | サンプルSpec |
 | `specs/generated/` | Claude Codeが生成したSpec (git管理外) |
+| `inputs/` | img2imgの入力画像 (git管理外) |
 | `outputs/` | 生成結果 (git管理外) |
 
 ## 環境変数
@@ -214,6 +234,7 @@ uv run mypy src
 | `IMAGEGEN_TIMEOUT` | 300 | 生成のタイムアウト秒 |
 | `IMAGEGEN_OUTPUT_ROOT` | `outputs` | 出力ルート |
 | `IMAGEGEN_PRESETS_ROOT` | `presets` | presetの探索ルート |
+| `IMAGEGEN_MAX_SOURCE_BYTES` | 33554432 | img2imgの入力画像の上限バイト数 |
 
 ## exit code
 

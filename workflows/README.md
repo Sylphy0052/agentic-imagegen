@@ -19,8 +19,9 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | --- | --- |
 | `txt2img.json` | text-to-image (ComfyUI標準のtxt2imgグラフと同じノード構成) |
 | `txt2img_lora.json` | LoRA付きtext-to-image (`txt2img` に `LoraLoader` を3段挟んだ構成) |
+| `img2img.json` | image-to-image (`EmptyLatentImage` を `LoadImage` + `VAEEncode` へ置き換えた構成) |
 
-どちらを使うかは `model.loras` の有無で自動的に決まる。定義は
+どれを使うかは `task` と `model.loras` の有無で自動的に決まる。定義は
 [src/agentic_imagegen/workflows/injector.py](../src/agentic_imagegen/workflows/injector.py)
 の `resolve_workflow_name` を参照。
 
@@ -51,6 +52,19 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 `strength_model` / `strength_clip` を0にして無効化する。ComfyUIは `lora_name` に
 実在するファイル名を要求するため空にはできず、直前のLoRA名を使い回す。
 
+`img2img.json` は `txt2img.json` の `EmptyLatentImage` (5) を外し、代わりに次を持つ。
+
+| ノードID | class_type | 役割 |
+| --- | --- | --- |
+| 10 | `LoadImage` | image (ComfyUIのinput配下の名前) |
+| 11 | `VAEEncode` | pixels は10から、vae は `CheckpointLoaderSimple` から受ける |
+
+`KSampler.latent_image` は11から受ける。`denoise` はimg2imgで意味を持つため注入対象に含む。
+
+`LoadImage` が参照できるのはComfyUIの `input/` 直下だけで、サブフォルダに置いたファイルは
+候補に現れない。入力画像は生成前に `POST /upload/image` で直下へ送っており、名前は
+`imagegen_<内容ダイジェスト>_<元のファイル名>` になる。同じ画像なら同じ名前へ落ち着く。
+
 ## GUIから書き出す手順
 
 ComfyUI環境に合わせて作り直す場合の手順。
@@ -71,7 +85,7 @@ GUIから書き出すのが原則だが、既存テンプレートに定型の�
 3. 生成後にノード参照の整合性を検査する (存在しないノードID・範囲外の出力スロットがないか)
 4. **実機のComfyUIへ投入し、生成が成功することを確認する**
 
-`txt2img_lora.json` はこの手順で作成し、実機 (ComfyUI 0.32.0 / Intel XPU) で
+`txt2img_lora.json` と `img2img.json` はこの手順で作成し、実機 (ComfyUI 0.32.0 / Intel XPU) で
 生成成功を確認している。ノードや接続を実行時に組み立てる設計は引き続き採らない。
 
 ## 構造検証について

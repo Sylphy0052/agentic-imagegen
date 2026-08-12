@@ -22,6 +22,10 @@ DEFAULT_TIMEOUT_SECONDS: Final = 300
 DEFAULT_OUTPUT_ROOT: Final = "outputs"
 DEFAULT_PRESETS_ROOT: Final = "presets"
 
+#: img2imgの入力画像として受け付ける最大バイト数 (32MiB)。
+#: 巨大画像はそのままの解像度で生成されるため、時間とメモリを直撃する。
+DEFAULT_MAX_SOURCE_BYTES: Final = 32 * 1024 * 1024
+
 # batch_sizeのハード上限 (Phase 1)。設定でこれを超える値は許可しない。
 BATCH_HARD_LIMIT: Final = 4
 
@@ -72,6 +76,7 @@ class Settings:
     output_root: Path
     #: presetの探索ルート。既存の呼び出しを壊さないよう既定値を持たせている。
     presets_root: Path = Path(DEFAULT_PRESETS_ROOT)
+    max_source_bytes: int = DEFAULT_MAX_SOURCE_BYTES
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -95,6 +100,7 @@ class Settings:
             timeout_seconds=_positive_int("IMAGEGEN_TIMEOUT", DEFAULT_TIMEOUT_SECONDS),
             output_root=Path(output_root),
             presets_root=Path(presets_root),
+            max_source_bytes=_positive_int("IMAGEGEN_MAX_SOURCE_BYTES", DEFAULT_MAX_SOURCE_BYTES),
         )
 
 
