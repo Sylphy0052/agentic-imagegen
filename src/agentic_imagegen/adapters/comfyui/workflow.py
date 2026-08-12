@@ -80,19 +80,22 @@ LORA_SLOT_ROLES: Final = ("lora_1", "lora_2", "lora_3")
 _LORA_INPUTS: Final = ("lora_name", "strength_model", "strength_clip")
 
 
-def _lora_binding() -> WorkflowBinding:
-    """txt2imgの構成に LoraLoader を3段挟んだbindingを組み立てる。
+def _with_lora_chain(base: WorkflowBinding, *, name: str, first_node_id: int) -> WorkflowBinding:
+    """既存のbindingに LoraLoader 3段を挟んだbindingを組み立てる。
 
     checkpoint -> lora_1 -> lora_2 -> lora_3 -> KSampler / CLIPTextEncode の順で
     繋がっていることまで検証する。1段でも迂回していればLoRAが効かないため、
     構造検証で落とす。
-    """
-    nodes = dict(TXT2IMG_BINDING.nodes)
-    for index, role in enumerate(LORA_SLOT_ROLES):
-        nodes[role] = NodeRef(str(10 + index), "LoraLoader", _LORA_INPUTS)
 
-    links = [link for link in TXT2IMG_BINDING.links if link.input_key != "model"]
-    # LoRAチェーンの接続を先頭から順に検証する
+    ノードIDはテンプレートごとに空き番が違うため first_node_id で受ける
+    (img2imgは10/11をLoadImageとVAEEncodeで使っている)。
+    """
+    nodes = dict(base.nodes)
+    for index, role in enumerate(LORA_SLOT_ROLES):
+        nodes[role] = NodeRef(str(first_node_id + index), "LoraLoader", _LORA_INPUTS)
+
+    # KSamplerのmodelはLoRAの最終段から来るようになるため、元のリンクを差し替える
+    links = [link for link in base.links if link.input_key != "model"]
     upstream = "checkpoint"
     for role in LORA_SLOT_ROLES:
         links.append(LinkRef(role, "model", upstream))
@@ -102,10 +105,12 @@ def _lora_binding() -> WorkflowBinding:
     links.append(LinkRef("positive_prompt", "clip", upstream))
     links.append(LinkRef("negative_prompt", "clip", upstream))
 
-    return WorkflowBinding(name="txt2img_lora", nodes=nodes, links=tuple(links))
+    return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
 
 
-TXT2IMG_LORA_BINDING: Final = _lora_binding()
+TXT2IMG_LORA_BINDING: Final = _with_lora_chain(
+    TXT2IMG_BINDING, name="txt2img_lora", first_node_id=10
+)
 
 
 IMG2IMG_BINDING: Final = WorkflowBinding(
@@ -132,6 +137,12 @@ IMG2IMG_BINDING: Final = WorkflowBinding(
         LinkRef("vae_encode", "pixels", "source_image"),
         LinkRef("vae_encode", "vae", "checkpoint"),
     ),
+)
+
+
+#: img2imgにLoRAを重ねた構成。VAEはLoraLoaderを通らないため checkpoint 直結のまま。
+IMG2IMG_LORA_BINDING: Final = _with_lora_chain(
+    IMG2IMG_BINDING, name="img2img_lora", first_node_id=20
 )
 
 
@@ -321,6 +332,7 @@ def _inject_loras(
 
 __all__ = [
     "IMG2IMG_BINDING",
+    "IMG2IMG_LORA_BINDING",
     "LORA_SLOT_ROLES",
     "TXT2IMG_BINDING",
     "TXT2IMG_LORA_BINDING",

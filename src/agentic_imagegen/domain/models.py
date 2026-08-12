@@ -276,9 +276,6 @@ class GenerationSpec(_StrictModel):
         if self.generation.batch_size > 1:
             raise ValueError("img2img では batch_size は1のみ対応しています")
 
-        if self.model.loras:
-            raise ValueError("img2img とLoRAの組み合わせは未対応です")
-
 
 __all__ = [
     "GenerationParams",
