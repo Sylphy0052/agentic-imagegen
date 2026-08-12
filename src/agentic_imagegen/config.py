@@ -20,6 +20,7 @@ DEFAULT_MAX_PIXELS: Final = 4194304
 DEFAULT_MAX_BATCH: Final = 4
 DEFAULT_TIMEOUT_SECONDS: Final = 300
 DEFAULT_OUTPUT_ROOT: Final = "outputs"
+DEFAULT_PRESETS_ROOT: Final = "presets"
 
 # batch_sizeのハード上限 (Phase 1)。設定でこれを超える値は許可しない。
 BATCH_HARD_LIMIT: Final = 4
@@ -69,6 +70,8 @@ class Settings:
     max_batch: int
     timeout_seconds: int
     output_root: Path
+    #: presetの探索ルート。既存の呼び出しを壊さないよう既定値を持たせている。
+    presets_root: Path = Path(DEFAULT_PRESETS_ROOT)
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -76,6 +79,10 @@ class Settings:
         output_root = os.environ.get("IMAGEGEN_OUTPUT_ROOT", DEFAULT_OUTPUT_ROOT).strip()
         if not output_root:
             raise InvalidConfiguration("IMAGEGEN_OUTPUT_ROOT に空文字は指定できません")
+
+        presets_root = os.environ.get("IMAGEGEN_PRESETS_ROOT", DEFAULT_PRESETS_ROOT).strip()
+        if not presets_root:
+            raise InvalidConfiguration("IMAGEGEN_PRESETS_ROOT に空文字は指定できません")
 
         return cls(
             comfyui_base_url=_base_url("COMFYUI_BASE_URL", DEFAULT_BASE_URL),
@@ -87,6 +94,7 @@ class Settings:
             ),
             timeout_seconds=_positive_int("IMAGEGEN_TIMEOUT", DEFAULT_TIMEOUT_SECONDS),
             output_root=Path(output_root),
+            presets_root=Path(presets_root),
         )
 
 

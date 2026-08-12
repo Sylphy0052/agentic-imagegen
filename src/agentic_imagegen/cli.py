@@ -99,6 +99,17 @@ def validate(spec_path: SpecArgument, verbose: VerboseOption = False) -> None:
         typer.echo(f"Workflow: {spec.task}")
         typer.echo(f"Resolution: {params.width}x{params.height} (batch {params.batch_size})")
         typer.echo(f"Checkpoint: {spec.model.checkpoint}")
+        if not spec.presets.is_empty():
+            applied = ", ".join(
+                f"{kind}={name}"
+                for kind, name in (
+                    ("character", spec.presets.character),
+                    ("scene", spec.presets.scene),
+                    ("style", spec.presets.style),
+                )
+                if name is not None
+            )
+            typer.echo(f"Presets: {applied}")
 
 
 @app.command(name="generate")
@@ -148,7 +159,7 @@ def _handled_errors() -> Iterator[None]:
 
 
 def _load_and_validate(spec_path: Path, settings: Settings) -> GenerationSpec:
-    spec = load_spec(spec_path)
+    spec = load_spec(spec_path, presets_root=settings.presets_root)
     validate_against_limits(spec, settings)
     return spec
 

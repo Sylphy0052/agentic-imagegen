@@ -14,10 +14,14 @@ from pydantic import ValidationError
 
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.errors import InvalidGenerationSpec
+from agentic_imagegen.services.preset_loader import PRESETS_KEY, apply_presets
 
 
-def load_spec(path: Path) -> GenerationSpec:
-    """YAMLファイルからGenerationSpecを読み込んで検証する。"""
+def load_spec(path: Path, *, presets_root: Path | None = None) -> GenerationSpec:
+    """YAMLファイルからGenerationSpecを読み込んで検証する。
+
+    presets: ブロックがある場合は presets_root 配下のpresetを解決してから検証する。
+    """
     if not path.is_file():
         raise InvalidGenerationSpec(f"Specファイルが見つかりません: {path}")
 
@@ -31,13 +35,33 @@ def load_spec(path: Path) -> GenerationSpec:
     if not isinstance(raw, dict):
         raise InvalidGenerationSpec(f"Specのトップレベルはマッピングである必要があります: {path}")
 
-    return parse_spec(raw, source=path)
+    return parse_spec(raw, source=path, presets_root=presets_root)
 
 
-def parse_spec(payload: dict[str, Any], *, source: Path | None = None) -> GenerationSpec:
-    """辞書からGenerationSpecを組み立てる。CLI以外の入力経路からも利用する。"""
+def parse_spec(
+    payload: dict[str, Any],
+    *,
+    source: Path | None = None,
+    presets_root: Path | None = None,
+) -> GenerationSpec:
+    """辞書からGenerationSpecを組み立てる。CLI以外の入力経路からも利用する。
+
+    presetの展開はこの関数を必ず通す。presets: があるのに presets_root が無い場合は
+    黙って無視せずエラーにする。展開されないまま下層へ流れると、
+    presetを書いたのに効いていない状態に気づけないため。
+    """
+    resolved = payload
+    if PRESETS_KEY in payload:
+        if presets_root is None:
+            raise InvalidGenerationSpec(
+                "presets: が指定されていますが、presetの探索ルートが渡されていません"
+            )
+        resolved, applied = apply_presets(payload, root=presets_root)
+        if applied:
+            resolved[PRESETS_KEY] = applied
+
     try:
-        return GenerationSpec.model_validate(payload)
+        return GenerationSpec.model_validate(resolved)
     except ValidationError as exc:
         raise InvalidGenerationSpec(_format_validation_error(exc, source)) from exc
 

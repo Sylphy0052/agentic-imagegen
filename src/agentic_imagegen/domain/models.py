@@ -142,11 +142,28 @@ class OutputSpec(_StrictModel):
         return value
 
 
+class PresetRefs(_StrictModel):
+    """適用するpresetの参照。軸ごとに1つまで。
+
+    Specの読み込み時に services.preset_loader が解決し、prompt と generation へ
+    展開する。展開後もどのpresetを使ったかは再現のためここに残す。
+    下層 (Workflow / Adapter) はこのフィールドを参照しない。
+    """
+
+    character: str | None = None
+    scene: str | None = None
+    style: str | None = None
+
+    def is_empty(self) -> bool:
+        return self.character is None and self.scene is None and self.style is None
+
+
 class GenerationSpec(_StrictModel):
     """画像生成の要求全体。Phase 1では txt2img のみ対応する。"""
 
     version: Literal["1"] = "1"
     task: Literal["txt2img"] = "txt2img"
+    presets: PresetRefs = Field(default_factory=PresetRefs)
     prompt: PromptSpec
     generation: GenerationParams = Field(default_factory=GenerationParams)
     model: ModelSpec
@@ -158,6 +175,7 @@ __all__ = [
     "GenerationSpec",
     "ModelSpec",
     "OutputSpec",
+    "PresetRefs",
     "PromptSpec",
     "SamplerName",
     "SchedulerName",
