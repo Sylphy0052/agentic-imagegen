@@ -13,14 +13,14 @@ Claude Code -> GenerationSpec -> Python CLI (imagegen) -> ComfyUI API -> 画像�
 
 ## ステータス
 
-Phase 1 (txt2img) は完了。現在はPhase 2 (preset / LoRA / img2img) を実装中。
+Phase 1 (txt2img) から Phase 3 (MCP Server) までは完了。現在はPhase 4 を実装中。
 
 | フェーズ | 内容 | 状態 |
 | --- | --- | --- |
 | Phase 1 | txt2img、CLI、ComfyUI連携 | 完了 ([#1](https://github.com/Sylphy0052/agentic-imagegen/issues/1)) |
-| Phase 2 | Preset / LoRA / img2img / Claude Code Skill | 進行中 ([#3](https://github.com/Sylphy0052/agentic-imagegen/issues/3)) |
-| Phase 3 | MCP Server (Claude Code / Codex 双方対応) | 未着手 ([#4](https://github.com/Sylphy0052/agentic-imagegen/issues/4)) |
-| Phase 4 | ControlNet / IPAdapter / Batch / Upscaling | 未着手 ([#5](https://github.com/Sylphy0052/agentic-imagegen/issues/5)) |
+| Phase 2 | Preset / LoRA / img2img / Claude Code Skill | 完了 ([#3](https://github.com/Sylphy0052/agentic-imagegen/issues/3)) |
+| Phase 3 | MCP Server (Claude Code / Codex 双方対応) | 完了 ([#4](https://github.com/Sylphy0052/agentic-imagegen/issues/4)) |
+| Phase 4 | ControlNet / IPAdapter / Character consistency / Batch / Upscaling | 進行中 ([#5](https://github.com/Sylphy0052/agentic-imagegen/issues/5)) |
 
 設計は [docs/plan/phase1.md](docs/plan/phase1.md) を参照。
 
@@ -291,11 +291,17 @@ IPAdapter: inputs/character.png (model=ip-adapter-plus_sd15.safetensors, weight=
 - 参照画像は生成前にComfyUIへ自動でアップロードされる
 - [ComfyUI_IPAdapter_plus](https://github.com/cubiq/ComfyUI_IPAdapter_plus) の導入が要る。
   モデルは `~/ComfyUI/models/ipadapter/`、CLIP Visionは `~/ComfyUI/models/clip_vision/` へ置く
-- `weight_type` は `linear` / `style transfer` / `composition` など15種
+- `weight_type` は `linear` / `style transfer` / `composition` など15種。
+  背景まで参照画像に引きずられる場合は `style transfer` を使う
 - `upscale` との同時指定は未対応
 
 ControlNetと併用すると、構図をControlNet、特徴をIPAdapterが担う。同一キャラクタを
 異なる構図で出したい場合はこの組み合わせを使う。
+
+同じキャラクタを別の場面で出す手順は
+[.claude/skills/imagegen/references/character-consistency.md](.claude/skills/imagegen/references/character-consistency.md)
+にまとめてある。基準画像を1枚作り、それを `reference` に指定したまま scene preset だけ
+差し替える。preset だけでは顔立ちまでは固定できない。
 
 ## hires fix (解像度を上げる)
 

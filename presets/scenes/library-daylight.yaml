@@ -1,0 +1,8 @@
+# 図書館・昼のシーンpreset。
+# 場所・時間帯・構図を書く。人物の外見は character 側の責務とする。
+
+description: 昼の図書館、本棚を背に立つ上半身の構図
+
+prompt:
+  positive: >
+    library, bookshelves, daylight, indoors, standing, upper body, looking at viewer
