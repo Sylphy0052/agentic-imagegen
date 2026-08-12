@@ -21,8 +21,12 @@ from mcp.server.mcpserver import MCPServer
 from agentic_imagegen import __version__
 from agentic_imagegen.config import Settings
 from agentic_imagegen.services import mcp_tools
+from agentic_imagegen.services.jobs import JobRegistry
 
 SERVER_NAME: Final = "agentic-imagegen"
+
+#: 実行中および完了済みの生成ジョブ。プロセス内に保持する。
+_registry: Final = JobRegistry()
 
 server: Final = MCPServer(
     name=SERVER_NAME,
@@ -63,6 +67,34 @@ async def list_models() -> list[str]:
 async def list_loras() -> list[str]:
     """ComfyUIが持っているLoRA名の一覧を返す。"""
     return await mcp_tools.list_loras(Settings.from_env())
+
+
+@server.tool()
+async def generate_image(spec: dict[str, Any]) -> dict[str, Any]:
+    """GenerationSpecに従って画像生成を開始する。
+
+    生成には数十秒から数分かかるため、完了は待たずに job_id を返す。
+    結果は get_generation_status で受け取る。不正なSpecはここで拒否される。
+
+    このtoolは非同期にしておく必要がある。同期関数として登録すると
+    実行中のイベントループが無い文脈で呼ばれ、ジョブを起動できない。
+    """
+    return mcp_tools.submit_generation(
+        spec,
+        settings=Settings.from_env(),
+        project_root=project_root(),
+        registry=_registry,
+    )
+
+
+@server.tool()
+def get_generation_status(job_id: str) -> dict[str, Any]:
+    """generate_image で開始した生成の状態を返す。
+
+    status は running / completed / failed。完了時は出力ファイルのパスとseedを、
+    失敗時は理由と exit_code (CLIと同じ体系) を返す。パスは作業ルートからの相対。
+    """
+    return mcp_tools.get_generation_status(job_id, registry=_registry, project_root=project_root())
 
 
 @server.tool()

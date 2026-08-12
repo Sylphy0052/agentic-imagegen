@@ -30,12 +30,40 @@ stdioで待ち受けるため、単体で実行しても何も表示されずに
 | tool | 用途 | ComfyUIへの接続 |
 | --- | --- | --- |
 | `validate_generation` | GenerationSpecを検証する。画像は生成しない | 不要 |
+| `generate_image` | 生成を開始し、`job_id` を返す | 必要 |
+| `get_generation_status` | 生成の状態と結果を返す | 不要 |
 | `list_models` | 利用可能なcheckpoint名を返す | 必要 |
 | `list_loras` | 利用可能なLoRA名を返す | 必要 |
 | `list_workflows` | 実行を許可しているWorkflowテンプレート名を返す | 不要 |
 
 `validate_generation` はpresetを展開したうえで、選択されるテンプレート・解像度・LoRA構成を返す。
 不正なSpecでもエラーにはせず `valid: false` と理由を返すので、生成前の確認に使える。
+
+### 生成の流れ
+
+生成は数十秒から数分かかるため、`generate_image` は完了を待たずに `job_id` を返す。
+
+```text
+generate_image(spec)
+  -> {"job_id": "3f1c...", "status": "running", "workflow": "txt2img_lora"}
+
+get_generation_status(job_id)
+  -> {"status": "running", ...}
+  -> {"status": "completed",
+      "seed": 24680,
+      "files": ["outputs/2026-08-12/sample/image_0001.png"],
+      "metadata_path": "outputs/2026-08-12/sample/metadata.json",
+      "error": null, "exit_code": null}
+```
+
+失敗した場合は `status: failed` とともに理由と `exit_code` を返す。
+exit codeはCLIと同じ体系 (2: Specが不正 / 3: ComfyUIへ到達できない / 6: タイムアウト /
+7: ComfyUI側で失敗 など)。一覧は [CLAUDE.md](../CLAUDE.md) を参照。
+
+パスは作業ルートからの相対で返す。絶対パスは実行環境の構成を露出するため返さない。
+
+ジョブの状態はサーバープロセスのメモリにのみ持つ。サーバーを再起動すると
+`job_id` は失われるが、生成物と `metadata.json` はディスクに残る。
 
 ## Claude Code から使う
 
