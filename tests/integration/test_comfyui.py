@@ -56,14 +56,32 @@ async def client(settings: Settings) -> AsyncIterator[ComfyUIClient]:
         yield connected
 
 
+#: CPU推論では軽いモデルほど所要時間が短いため、SD1.5系を優先して選ぶ。
+#: SDXL/Illustrious系は1枚あたり10分以上かかることがあり、Integration Testには向かない。
+_PREFERRED_CHECKPOINT_HINTS = ("v1-5", "sd15", "meinamix", "dreamshaper")
+
+
 @pytest_asyncio.fixture
 async def checkpoint(client: ComfyUIClient) -> str:
-    """ComfyUIが実際に持っているcheckpointを1つ選ぶ。"""
+    """ComfyUIが実際に持っているcheckpointを1つ選ぶ。
+
+    `IMAGEGEN_TEST_CHECKPOINT` で明示指定できる。未指定ならSD1.5系を優先する。
+    """
     names = await client.available_checkpoints()
     if not names:
         pytest.skip("ComfyUIに利用可能なcheckpointがありません")
-    preferred = [name for name in names if "v1-5" in name or "sd15" in name.lower()]
-    return preferred[0] if preferred else names[0]
+
+    explicit = os.environ.get("IMAGEGEN_TEST_CHECKPOINT")
+    if explicit:
+        if explicit not in names:
+            pytest.skip(f"指定されたcheckpointがComfyUIにありません: {explicit}")
+        return explicit
+
+    for hint in _PREFERRED_CHECKPOINT_HINTS:
+        for name in names:
+            if hint in name.lower():
+                return name
+    return names[0]
 
 
 def _spec(checkpoint: str, prefix: str) -> GenerationSpec:
