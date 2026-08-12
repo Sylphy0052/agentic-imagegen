@@ -132,12 +132,16 @@ def compose_text(
     spec: TextSpec,
     fonts_root: Path,
     output: Path,
+    max_pixels: int | None = None,
 ) -> ComposeResult:
     """画像へテキストを合成し、別ファイルとして書き出す。
 
     入力画像は変更しない。出力先が既にある場合は上書きせずに失敗する。
     """
-    if output.exists():
+    if output.exists() or output.is_symlink():
+        # exists() はdangling symlinkをFalseとして扱う。放置すると _save の書き込みが
+        # リンク先へ実体を作ってしまうため、symlinkであること自体も拒否する。
+        # 実際の排他性は _save の O_EXCL 書き込みで保証する (ここはメッセージ品質のため)。
         raise TextCompositionError(f"出力先が既に存在します: {output}")
 
     fonts = tuple(
@@ -150,6 +154,12 @@ def compose_text(
     )
 
     canvas, source_mode = _open_image(image)
+    if max_pixels is not None and canvas.width * canvas.height > max_pixels:
+        pixels = canvas.width * canvas.height
+        raise TextCompositionError(
+            f"画像が大きすぎます ({pixels} pixels > {max_pixels} pixels): {image}"
+        )
+
     for layer, font in zip(spec.layers, fonts, strict=True):
         canvas = Image.alpha_composite(canvas, _render_layer(layer, font, canvas.size))
 
@@ -167,18 +177,24 @@ def _open_image(path: Path) -> tuple[Image.Image, str]:
 
 
 def _save(canvas: Image.Image, output: Path, source_mode: str) -> None:
-    keep_alpha = output.suffix.lower() not in _OPAQUE_SUFFIXES and source_mode in {
-        "RGBA",
-        "LA",
-        "P",
-        "RGB",
-    }
-    image = canvas if keep_alpha and output.suffix.lower() != ".jpg" else canvas.convert("RGB")
-    if output.suffix.lower() in _OPAQUE_SUFFIXES:
-        image = canvas.convert("RGB")
+    opaque_output = output.suffix.lower() in _OPAQUE_SUFFIXES
+    keep_alpha = not opaque_output and source_mode in {"RGBA", "LA", "P", "RGB"}
+    image = canvas if keep_alpha else canvas.convert("RGB")
+
+    save_format = Image.registered_extensions().get(output.suffix.lower())
+    if save_format is None:
+        raise TextCompositionError(f"対応していない出力形式です: {output.suffix}")
+
+    # 存在確認から書き込みまでの間に他プロセスが同じパスへ作成する競合 (TOCTOU) や、
+    # dangling symlink 経由でリンク先へ書き込んでしまう事態を、O_EXCL相当の排他生成で塞ぐ。
     try:
-        image.save(output)
+        with output.open("xb") as fh:
+            image.save(fh, format=save_format)
+    except FileExistsError as exc:
+        raise TextCompositionError(f"出力先が既に存在します: {output}") from exc
     except (OSError, ValueError) as exc:
+        # 書き込み中の失敗で作りかけのファイルを残さない。
+        output.unlink(missing_ok=True)
         raise TextCompositionError(f"画像を書き出せません: {output} ({exc})") from exc
 
 

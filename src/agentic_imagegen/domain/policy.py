@@ -95,6 +95,22 @@ def resolve_source_image(image: str, root: Path, *, max_bytes: int) -> Path:
     return resolved
 
 
+def resolve_compose_output(path: str | Path, root: Path) -> Path:
+    """composeの出力先を root 配下の絶対パスへ解決する。
+
+    resolve_output_directory と異なり、絶対パス指定であっても root 配下なら
+    そのまま通す (`imagegen compose -o` は相対/絶対どちらでも受け付けるため)。
+    見るのは root 配下かどうかだけで、symlinkも `.resolve()` で解決されるため
+    同時に塞がれる。
+    """
+    resolved_root = root.resolve()
+    resolved = (resolved_root / Path(path)).resolve()
+
+    if resolved_root not in resolved.parents:
+        raise InvalidGenerationSpec(f"出力先が作業ルートの外を指しています (指定値: {path})")
+    return resolved
+
+
 def resolve_font(name: str, root: Path) -> Path:
     """フォント名を root 配下の絶対パスへ解決する。
 
@@ -141,6 +157,7 @@ def _describe_available_fonts(root: Path) -> str:
 
 
 __all__ = [
+    "resolve_compose_output",
     "resolve_font",
     "resolve_output_directory",
     "resolve_source_image",

@@ -168,3 +168,28 @@ class TestComposeErrors:
 
         assert result.exit_code == 10
         assert (workspace / "inputs" / "base_text.png").read_bytes() == b"existing"
+
+    def test_exits_2_for_absolute_output_outside_root(
+        self, workspace: Path, tmp_path: Path
+    ) -> None:
+        spec = _write(workspace / "text.yaml", TEXT_ONLY_SPEC)
+        # 既存の test_exits_2_for_image_outside_root と同じ tmp_path.parent (pytestの
+        # セッション共有tmpルート) を使うため、ファイル名は衝突しないものにする
+        outside = tmp_path.parent / "outside_compose_output.png"
+
+        result = runner.invoke(
+            cli.app, ["compose", "inputs/base.png", str(spec), "-o", str(outside)]
+        )
+
+        assert result.exit_code == 2
+        assert not outside.exists()
+
+    def test_exits_2_for_relative_output_escaping_root(self, workspace: Path) -> None:
+        spec = _write(workspace / "text.yaml", TEXT_ONLY_SPEC)
+
+        result = runner.invoke(
+            cli.app, ["compose", "inputs/base.png", str(spec), "-o", "../escape.png"]
+        )
+
+        assert result.exit_code == 2
+        assert not (workspace.parent / "escape.png").exists()

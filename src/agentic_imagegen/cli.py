@@ -20,7 +20,11 @@ from agentic_imagegen import __version__
 from agentic_imagegen.adapters.comfyui.client import ComfyUIClient
 from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.models import GenerationSpec
-from agentic_imagegen.domain.policy import resolve_source_image, validate_against_limits
+from agentic_imagegen.domain.policy import (
+    resolve_compose_output,
+    resolve_source_image,
+    validate_against_limits,
+)
 from agentic_imagegen.domain.results import GenerationResult, HealthStatus
 from agentic_imagegen.errors import ComfyUIUnavailable, ImageGenError, InvalidGenerationSpec
 from agentic_imagegen.services.batch import BatchItem, BatchOutcome, expand_seeds, run_batch
@@ -185,13 +189,18 @@ def compose_image(
             max_bytes=settings.max_source_bytes,
         )
         spec = load_text_spec(spec_path)
-        destination = output or source.with_name(f"{source.stem}{TEXT_SUFFIX}{source.suffix}")
+        destination = (
+            resolve_compose_output(output, project_root)
+            if output is not None
+            else source.with_name(f"{source.stem}{TEXT_SUFFIX}{source.suffix}")
+        )
 
         result = compose_text(
             image=source,
             spec=spec,
             fonts_root=resolve_fonts_root(settings, project_root),
             output=destination,
+            max_pixels=settings.max_pixels,
         )
         typer.echo(str(result.output))
 

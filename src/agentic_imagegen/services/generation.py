@@ -116,14 +116,13 @@ async def generate(
         backend_info=backend_info,
     )
 
-    try:
-        text_files, text_info = _compose_text_layers(spec, files, settings, project_root)
-    except TextCompositionError:
-        # 画像は取得済みなので、再現に必要な記録だけは残してから失敗させる
-        write_metadata(text_info=None)
-        raise
-
+    text_files, text_info, text_error = _compose_text_layers(spec, files, settings, project_root)
+    # 画像は取得済みなので、途中まで合成できていればその分の記録は残してから失敗させる。
+    # 1件も成功していない場合は従来どおり text_info は None のまま。
     metadata_path = write_metadata(text_info=text_info)
+    if text_error is not None:
+        raise text_error
+
     logger.info("generation done: prompt_id=%s files=%d dir=%s", prompt_id, len(files), directory)
 
     return GenerationResult(
@@ -141,36 +140,55 @@ def _compose_text_layers(
     files: tuple[Path, ...],
     settings: Settings,
     project_root: Path,
-) -> tuple[tuple[Path, ...], dict[str, Any] | None]:
+) -> tuple[tuple[Path, ...], dict[str, Any] | None, TextCompositionError | None]:
     """生成画像へテキストを合成する。
 
     生成そのままの画像は消さずに残し、合成結果を別ファイルとして書き出す。
     文字だけ差し替えて作り直せる状態を保つため。
+
+    batch_size > 1 で途中の1件が失敗しても、それより前に成功した分は
+    呼び出し元へ返す。生成そのものは既に完了しているため、後段の合成の失敗で
+    成功済みの記録まで失うべきではない。1件も成功していない場合の戻り値は
+    従来どおり `(( ), None, error)`。
     """
     if spec.text is None:
-        return (), None
+        return (), None, None
 
     fonts_root = resolve_fonts_root(settings, project_root)
     outputs: list[Path] = []
     fonts: tuple[ResolvedFont, ...] = ()
     for path in files:
-        result = compose_text(
-            image=path,
-            spec=spec.text,
-            fonts_root=fonts_root,
-            output=path.with_name(f"{path.stem}{TEXT_SUFFIX}{path.suffix}"),
-        )
+        try:
+            result = compose_text(
+                image=path,
+                spec=spec.text,
+                fonts_root=fonts_root,
+                output=path.with_name(f"{path.stem}{TEXT_SUFFIX}{path.suffix}"),
+                max_pixels=settings.max_pixels,
+            )
+        except TextCompositionError as exc:
+            info = _text_compose_info(outputs, fonts, error=str(exc)) if outputs else None
+            return tuple(outputs), info, exc
         outputs.append(result.output)
         fonts = result.fonts
 
     logger.info("text composed: files=%d dir=%s", len(outputs), files[0].parent if files else "-")
-    info = {
+    return tuple(outputs), _text_compose_info(outputs, fonts), None
+
+
+def _text_compose_info(
+    outputs: list[Path], fonts: tuple[ResolvedFont, ...], *, error: str | None = None
+) -> dict[str, Any]:
+    info: dict[str, Any] = {
         "fonts": [
             {"name": font.name, "path": str(font.path), "index": font.index} for font in fonts
         ],
         "outputs": [path.name for path in outputs],
     }
-    return tuple(outputs), info
+    if error is not None:
+        # 部分失敗であることをmetadataから分かるようにする
+        info["error"] = error
+    return info
 
 
 def resolve_fonts_root(settings: Settings, project_root: Path) -> Path:

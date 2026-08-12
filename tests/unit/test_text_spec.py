@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from agentic_imagegen.domain.models import (
+    MAX_DIMENSION,
     MAX_FONT_SIZE,
     MAX_TEXT_CONTENT_LENGTH,
     MAX_TEXT_LAYERS,
@@ -144,9 +145,28 @@ class TestTextLayerGeometry:
     def test_accepts_negative_offset(self) -> None:
         assert TextLayer.model_validate(_layer(offset=[-10, -48])).offset == (-10, -48)
 
+    def test_accepts_offset_at_bounds(self) -> None:
+        layer = TextLayer.model_validate(_layer(offset=[-MAX_DIMENSION, MAX_DIMENSION]))
+
+        assert layer.offset == (-MAX_DIMENSION, MAX_DIMENSION)
+
+    @pytest.mark.parametrize("offset", [[-MAX_DIMENSION - 1, 0], [0, MAX_DIMENSION + 1]])
+    def test_rejects_offset_out_of_range(self, offset: list[int]) -> None:
+        with pytest.raises(ValidationError):
+            TextLayer.model_validate(_layer(offset=offset))
+
     def test_rejects_non_positive_max_width(self) -> None:
         with pytest.raises(ValidationError):
             TextLayer.model_validate(_layer(max_width=0))
+
+    def test_accepts_max_width_at_upper_bound(self) -> None:
+        layer = TextLayer.model_validate(_layer(max_width=MAX_DIMENSION))
+
+        assert layer.max_width == MAX_DIMENSION
+
+    def test_rejects_max_width_over_upper_bound(self) -> None:
+        with pytest.raises(ValidationError):
+            TextLayer.model_validate(_layer(max_width=MAX_DIMENSION + 1))
 
     @pytest.mark.parametrize("anchor", ["top-left", "center", "bottom-right"])
     def test_accepts_anchor(self, anchor: str) -> None:
@@ -178,6 +198,16 @@ class TestDecorations:
     def test_rejects_negative_blur(self) -> None:
         with pytest.raises(ValidationError):
             TextLayer.model_validate(_layer(shadow={"blur": -1}))
+
+    def test_shadow_accepts_offset_at_bounds(self) -> None:
+        layer = TextLayer.model_validate(_layer(shadow={"offset": [-MAX_DIMENSION, MAX_DIMENSION]}))
+
+        assert layer.shadow is not None
+        assert layer.shadow.offset == (-MAX_DIMENSION, MAX_DIMENSION)
+
+    def test_shadow_rejects_offset_out_of_range(self) -> None:
+        with pytest.raises(ValidationError):
+            TextLayer.model_validate(_layer(shadow={"offset": [0, MAX_DIMENSION + 1]}))
 
     def test_accepts_box(self) -> None:
         layer = TextLayer.model_validate(_layer(box={"padding": [16, 24], "radius": 12}))

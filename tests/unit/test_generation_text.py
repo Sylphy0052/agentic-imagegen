@@ -53,6 +53,22 @@ class FakeBackend:
         return path.name
 
 
+class PartiallyBrokenBackend(FakeBackend):
+    """指定したファイル名の画像として、画像として開けないバイト列を返すバックエンド。
+
+    batch_size > 1 での途中失敗 (2件目のテキスト合成が失敗する状況) を再現するために使う。
+    """
+
+    def __init__(self, *, images: tuple[ImageRef, ...], broken_filenames: frozenset[str]) -> None:
+        super().__init__(images=images)
+        self._broken_filenames = broken_filenames
+
+    async def download(self, ref: ImageRef) -> bytes:
+        if ref.filename in self._broken_filenames:
+            return b"not an image"
+        return _png_bytes()
+
+
 def _settings(tmp_path: Path, **overrides: Any) -> Settings:
     defaults: dict[str, Any] = {
         "comfyui_base_url": "http://127.0.0.1:8188",
@@ -220,3 +236,50 @@ class TestComposeFailure:
         assert len(images) == 1
         assert len(metadata) == 1
         assert json.loads(metadata[0].read_text(encoding="utf-8"))["text"] is None
+
+
+@pytest.mark.asyncio
+class TestPartialComposeFailure:
+    """batch_size > 1 で2枚目以降の合成が失敗しても、1枚目の成功分は残る。"""
+
+    def _backend(self) -> PartiallyBrokenBackend:
+        return PartiallyBrokenBackend(
+            images=(
+                ImageRef(filename="a.png", subfolder="", type="output"),
+                ImageRef(filename="b.png", subfolder="", type="output"),
+            ),
+            broken_filenames=frozenset({"b.png"}),
+        )
+
+    async def test_keeps_earlier_success_as_text_file(
+        self, tmp_path: Path, fonts_root: Path
+    ) -> None:
+        with pytest.raises(TextCompositionError):
+            await generate(
+                _spec(_text()),
+                _settings(tmp_path, fonts_root=fonts_root),
+                backend=self._backend(),
+                project_root=tmp_path,
+                workflows_dir=Path("workflows"),
+            )
+
+        text_files = sorted((tmp_path / "outputs").rglob("*_text.png"))
+        assert [path.name for path in text_files] == ["image_0001_text.png"]
+
+    async def test_metadata_records_partial_success_with_error(
+        self, tmp_path: Path, fonts_root: Path
+    ) -> None:
+        with pytest.raises(TextCompositionError):
+            await generate(
+                _spec(_text()),
+                _settings(tmp_path, fonts_root=fonts_root),
+                backend=self._backend(),
+                project_root=tmp_path,
+                workflows_dir=Path("workflows"),
+            )
+
+        metadata_path = sorted((tmp_path / "outputs").rglob("metadata.json"))[0]
+        text_info = json.loads(metadata_path.read_text(encoding="utf-8"))["text"]
+        assert text_info is not None
+        assert text_info["outputs"] == ["image_0001_text.png"]
+        assert "error" in text_info

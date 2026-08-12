@@ -54,6 +54,26 @@ def _bounding_box(path: Path) -> tuple[int, int, int, int] | None:
         return image.convert("RGB").getbbox()
 
 
+def _row_bounding_box(path: Path, y0: int, y1: int) -> tuple[int, int, int, int] | None:
+    """縦方向を [y0, y1) へ絞ったうえでbounding boxを取る。
+
+    複数行のうち1行だけを見たいとき (align の検証など) に使う。
+    """
+    with Image.open(path) as image:
+        rgb = image.convert("RGB")
+        return rgb.crop((0, y0, rgb.width, y1)).getbbox()
+
+
+def _column_bounding_box(path: Path, x0: int, x1: int) -> tuple[int, int, int, int] | None:
+    """横方向を [x0, x1) へ絞ったうえでbounding boxを取る。
+
+    縦書きの列を1本だけ見たいとき (align の検証など) に使う。
+    """
+    with Image.open(path) as image:
+        rgb = image.convert("RGB")
+        return rgb.crop((x0, 0, x1, rgb.height)).getbbox()
+
+
 class TestParseColor:
     @pytest.mark.parametrize(
         ("value", "expected"),
@@ -357,6 +377,16 @@ class TestComposeText:
         with Image.open(output) as image:
             assert image.mode == "RGB"
 
+    def test_fails_for_unsupported_output_extension(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        output = base_image.parent / "out.txt"
+
+        with pytest.raises(TextCompositionError, match="対応していない出力形式"):
+            compose_text(image=base_image, spec=_spec(), fonts_root=fonts_root, output=output)
+
+        assert not output.exists()
+
     def test_does_not_overwrite_existing_output(self, base_image: Path, fonts_root: Path) -> None:
         output = base_image.parent / "out.png"
         output.write_bytes(b"existing")
@@ -389,3 +419,154 @@ class TestComposeText:
         compose_text(image=base_image, spec=_spec(), fonts_root=fonts_root, output=output)
 
         assert output.is_file()
+
+    def test_fails_when_font_file_is_corrupt(self, base_image: Path, tmp_path: Path) -> None:
+        corrupt_root = tmp_path / "corrupt_fonts"
+        corrupt_root.mkdir()
+        (corrupt_root / "broken.ttf").write_bytes(b"not a font file" * 8)
+        output = base_image.parent / "out.png"
+
+        with pytest.raises(TextCompositionError, match="フォントを読み込めません"):
+            compose_text(
+                image=base_image,
+                spec=_spec(font="broken.ttf"),
+                fonts_root=corrupt_root,
+                output=output,
+            )
+
+        assert not output.exists()
+
+    def test_fails_when_image_exceeds_max_pixels(self, base_image: Path, fonts_root: Path) -> None:
+        output = base_image.parent / "out.png"
+        max_pixels = CANVAS[0] * CANVAS[1] - 1
+
+        with pytest.raises(TextCompositionError, match="大きすぎます"):
+            compose_text(
+                image=base_image,
+                spec=_spec(),
+                fonts_root=fonts_root,
+                output=output,
+                max_pixels=max_pixels,
+            )
+
+        assert not output.exists()
+
+    def test_allows_image_within_max_pixels(self, base_image: Path, fonts_root: Path) -> None:
+        output = base_image.parent / "out.png"
+        max_pixels = CANVAS[0] * CANVAS[1]
+
+        compose_text(
+            image=base_image,
+            spec=_spec(),
+            fonts_root=fonts_root,
+            output=output,
+            max_pixels=max_pixels,
+        )
+
+        assert output.is_file()
+
+    def test_does_not_write_through_dangling_symlink(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        target = base_image.parent / "target.png"
+        link = base_image.parent / "link.png"
+        link.symlink_to(target)
+
+        with pytest.raises(TextCompositionError, match="既に存在"):
+            compose_text(image=base_image, spec=_spec(), fonts_root=fonts_root, output=link)
+
+        assert not target.exists()
+
+
+class TestComposeTextAlign:
+    """align (`left` / `center` / `right`) が描画位置を変えることの検証。
+
+    行によって長さの異なる2行を用意し、短い行 (1行目) だけを切り出して
+    align ごとに位置が動くことを見る。
+    """
+
+    CONTENT = "A\nABCDEFGHIJ"
+
+    def _first_row_box(
+        self, base_image: Path, fonts_root: Path, output: Path, *, direction: str
+    ) -> dict[str, tuple[int, int, int, int] | None]:
+        boxes: dict[str, tuple[int, int, int, int] | None] = {}
+        for align in ("left", "center", "right"):
+            path = output.with_stem(f"{output.stem}_{align}")
+            compose_text(
+                image=base_image,
+                spec=_spec(
+                    content=self.CONTENT, anchor="top-left", align=align, direction=direction
+                ),
+                fonts_root=fonts_root,
+                output=path,
+            )
+            # 1行目 (短い方) だけを切り出す。line_height = round(size * line_spacing) = 38
+            boxes[align] = _row_bounding_box(path, 0, 36)
+        return boxes
+
+    def test_horizontal_align_moves_short_first_line(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        output = base_image.parent / "out.png"
+        boxes = self._first_row_box(base_image, fonts_root, output, direction="horizontal")
+
+        assert boxes["left"] is not None
+        assert boxes["center"] is not None
+        assert boxes["right"] is not None
+        assert boxes["left"][0] < boxes["center"][0] < boxes["right"][0]
+
+    def test_vertical_align_moves_short_first_column(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        output = base_image.parent / "out.png"
+        boxes: dict[str, tuple[int, int, int, int] | None] = {}
+        for align in ("left", "center", "right"):
+            path = output.with_stem(f"{output.stem}_{align}")
+            compose_text(
+                image=base_image,
+                spec=_spec(
+                    content=self.CONTENT, anchor="top-left", align=align, direction="vertical"
+                ),
+                fonts_root=fonts_root,
+                output=path,
+            )
+            # 列は右から左へ進む。1列目 (短い "A") は column_width=38 * 2列ぶんの
+            # 右端 [38, 76) にある。2列目 ("ABCDEFGHIJ") が支配的な全体bboxではなく、
+            # この列だけを切り出して縦位置を比較する
+            boxes[align] = _column_bounding_box(path, 38, 76)
+
+        assert boxes["left"] is not None
+        assert boxes["center"] is not None
+        assert boxes["right"] is not None
+        # 縦書きでは align が縦位置を動かす。上端 (y) が align ごとに変わる
+        assert boxes["left"][1] < boxes["center"][1] < boxes["right"][1]
+
+
+class TestComposeTextVerticalWrap:
+    def test_max_width_wraps_vertical_columns(self, base_image: Path, fonts_root: Path) -> None:
+        content = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        tall = base_image.parent / "tall.png"
+        wrapped = base_image.parent / "wrapped.png"
+
+        compose_text(
+            image=base_image,
+            spec=_spec(content=content, anchor="top-left", direction="vertical"),
+            fonts_root=fonts_root,
+            output=tall,
+        )
+        compose_text(
+            image=base_image,
+            spec=_spec(content=content, anchor="top-left", direction="vertical", max_width=0.3),
+            fonts_root=fonts_root,
+            output=wrapped,
+        )
+
+        tall_box = _bounding_box(tall)
+        wrapped_box = _bounding_box(wrapped)
+        assert tall_box is not None
+        assert wrapped_box is not None
+        # 縦書きの折り返しは画像の高さが基準。折り返すと列が増えて横へ広がり、
+        # 1列あたりの高さは短くなる
+        assert wrapped_box[2] > tall_box[2]
+        assert wrapped_box[3] < tall_box[3]

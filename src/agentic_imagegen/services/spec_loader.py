@@ -64,7 +64,7 @@ def load_text_spec(path: Path) -> TextSpec:
     生成に使ったSpecを合成のやり直しへ流用できるようにする。
     """
     raw = _load_mapping(path)
-    payload = raw.get(TEXT_KEY, raw) if TEXT_KEY in raw else raw
+    payload = raw.get(TEXT_KEY, raw)
 
     if not isinstance(payload, dict):
         raise InvalidGenerationSpec(f"text: はマッピングである必要があります: {path}")

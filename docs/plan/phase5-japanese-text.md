@@ -157,6 +157,9 @@ text:
 - `content` は1レイヤあたり最大500文字
 - `size` は 1 以上 512 以下
 - `rotation` は -180.0 以上 180.0 以下
+- `offset` (レイヤ本体・影とも) は各成分 `-MAX_DIMENSION` 以上 `MAX_DIMENSION` 以下
+  (解像度のハード上限と同じ8192)
+- `max_width` の上限も `MAX_DIMENSION` (8192)。比率指定 (1.0以下) には影響しない
 - `direction: vertical` は Pillow が縦書きを持たないため1文字ずつ配置して実現する。
   句読点や小書き文字の位置補正、ルビ、縦中横は対象外とする
 
@@ -183,7 +186,9 @@ Noto Sans JP を推奨する。
 `src/agentic_imagegen/services/compose.py` を新設する。
 
 ```
-compose_text(*, image: Path, spec: TextSpec, fonts_root: Path, output: Path) -> ComposeResult
+compose_text(
+    *, image: Path, spec: TextSpec, fonts_root: Path, output: Path, max_pixels: int | None = None
+) -> ComposeResult
 ```
 
 - 入力画像は開いた後 RGBA へ変換する

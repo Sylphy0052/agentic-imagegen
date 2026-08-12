@@ -359,7 +359,10 @@ class ShadowSpec(_StrictModel):
     本体を描いたあとにぼかして下へ敷く。
     """
 
-    offset: tuple[int, int] = (4, 4)
+    offset: tuple[
+        Annotated[int, Field(ge=-MAX_DIMENSION, le=MAX_DIMENSION)],
+        Annotated[int, Field(ge=-MAX_DIMENSION, le=MAX_DIMENSION)],
+    ] = (4, 4)
     blur: Annotated[float, Field(ge=0.0, le=64.0)] = 4.0
     color: str = "#000000"
     opacity: Annotated[float, Field(ge=0.0, le=1.0)] = 0.5
@@ -406,9 +409,13 @@ class TextLayer(_StrictModel):
     color: str = "#ffffff"
     anchor: TextAnchor = "center"
     #: anchor からのずれ (px)。
-    offset: tuple[int, int] = (0, 0)
+    offset: tuple[
+        Annotated[int, Field(ge=-MAX_DIMENSION, le=MAX_DIMENSION)],
+        Annotated[int, Field(ge=-MAX_DIMENSION, le=MAX_DIMENSION)],
+    ] = (0, 0)
     #: 折り返し幅。1.0以下は画像幅に対する比率、1.0超はpxとして扱う。
-    max_width: Annotated[float, Field(gt=0.0)] | None = None
+    #: 上限は解像度のハード上限 (MAX_DIMENSION) に合わせる。
+    max_width: Annotated[float, Field(gt=0.0, le=MAX_DIMENSION)] | None = None
     line_spacing: Annotated[float, Field(ge=0.5, le=5.0)] = 1.2
     align: TextAlign = "center"
     opacity: Annotated[float, Field(ge=0.0, le=1.0)] = 1.0
