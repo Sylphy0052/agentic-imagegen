@@ -1,0 +1,40 @@
+# GenerationSpec のサンプル (txt2img)
+#
+# 検証:  uv run imagegen validate specs/examples/txt2img.yaml
+# 生成:  uv run imagegen generate specs/examples/txt2img.yaml
+#
+# checkpoint は ComfyUI の models/checkpoints 配下に置いたファイル名を指定する。
+# 利用可能な名前は `uv run imagegen health` でComfyUIへ到達できる状態にしてから確認する。
+
+version: "1"
+task: txt2img
+
+prompt:
+  positive: >
+    1girl, blue hair, blue eyes,
+    anime illustration, full body
+
+  negative: >
+    low quality, blurry, bad anatomy
+
+generation:
+  width: 512
+  height: 768
+
+  steps: 20
+  cfg: 5.5
+
+  # -1 は実行時にランダムなseedへ解決し、結果を metadata.json に記録する
+  seed: -1
+  batch_size: 1
+
+  sampler: euler
+  scheduler: normal
+
+model:
+  checkpoint: v1-5-pruned-emaonly.safetensors
+
+output:
+  # 未指定なら IMAGEGEN_OUTPUT_ROOT (既定 outputs) を使う
+  directory: outputs
+  prefix: blue_hair

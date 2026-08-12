@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+
+# テスト・型チェックのキャッシュ
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# 環境設定 (秘密情報を含みうるためコミットしない)
+.env
+.env.*
+!.env.example
+
+# 生成物 (ディレクトリ自体は保持し、中身のみ無視する)
+outputs/*
+!outputs/.gitkeep
+specs/generated/*
+!specs/generated/.gitkeep
+
+# エディタ・OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
