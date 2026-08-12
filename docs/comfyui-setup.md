@@ -61,6 +61,10 @@ checkpointは `~/ComfyUI/models/checkpoints/` へ置く。
 ファイル名にはPath Traversal対策の検証がかかる。サブフォルダは1階層まで、
 拡張子は `.safetensors` / `.ckpt` のみ許可される。
 
+同梱のサンプルSpec (`specs/examples/`) は `meinamix_v12Final.safetensors` を指している。
+サンプルをそのまま動かすなら下の civitai の手順で入れる。別のcheckpointを使う場合は
+Spec側の `model.checkpoint` を実際のファイル名へ書き換える。
+
 ### Hugging Faceから取得する場合 (認証不要)
 
 ```bash

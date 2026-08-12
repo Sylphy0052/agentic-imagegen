@@ -32,7 +32,7 @@ generation:
   scheduler: normal
 
 model:
-  checkpoint: v1-5-pruned-emaonly.safetensors
+  checkpoint: meinamix_v12Final.safetensors
 
 output:
   # 未指定なら IMAGEGEN_OUTPUT_ROOT (既定 outputs) を使う
