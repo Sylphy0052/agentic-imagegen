@@ -131,13 +131,47 @@ source:
 | cfg | 5.0-8.0 | 30 |
 | batch_size | 1 | 4 |
 
+### 画像に日本語を入れる場合
+
+SD1.5 / SDXL 系のモデルは日本語をほぼ描けない。看板・タイトル・台詞のように
+**読める文字**が要求されたら、プロンプトへ書かずに `text` で合成する。
+
+```yaml
+text:
+  layers:
+    - content: 夜の街
+      font: NotoSansJP-Bold.ttf   # fonts/ 配下のファイル名
+      size: 72
+      color: "#ffffff"
+      anchor: top-center          # top/middle/bottom - left/center/right
+      offset: [0, 48]
+      max_width: 0.8              # 折り返し幅。1.0以下は画像幅に対する比率
+      stroke:                     # 背景に埋もれるなら縁取りか box を足す
+        width: 4
+        color: "#101020"
+```
+
+- **使えるフォントを先に確認する。** `ls fonts/` で実在する名前だけを指定する。
+  空なら [docs/fonts-setup.md](../../../docs/fonts-setup.md) の手順を案内する
+- 存在しないフォント名を書くと exit code 10 で失敗する (別の書体へ代替しない)
+- 生成そのままの画像も残るので、文字だけ直したいときは `compose` で作り直せる
+- ネガティブプロンプトへ `text, watermark` を入れておくと、モデルが描く崩れた文字を減らせる
+- ルビ・縦中横・縦書き時の句読点の位置補正は未対応
+
+既に生成済みの画像へ後から入れる場合:
+
+```bash
+uv run imagegen compose inputs/base.png specs/generated/caption.yaml
+```
+
 ### 5. validateする
 
 ```bash
 uv run imagegen validate specs/generated/<name>.yaml
 ```
 
-`Presets:` 行に意図したpresetが並んでいるか確認する。検証を緩めて通すことはしない。
+`Presets:` 行に意図したpresetが並んでいるか確認する。`text` を書いた場合は
+`Text:` 行にレイヤ数とフォント名が出る。検証を緩めて通すことはしない。
 
 ### 6. generateする
 
@@ -157,7 +191,8 @@ uv run imagegen generate specs/generated/<name>.yaml
 ### 7. 結果を報告する
 
 exit codeが0であること、出力ファイルが存在することを確認したうえで、
-**生成された画像のパスとseed** を伝える。
+**生成された画像のパスとseed** を伝える。テキストを合成した場合は、
+合成後のファイル (`*_text.png`) のパスを伝える。
 
 seedに `-1` を指定した場合は実際に使われた値が `metadata.json` に記録される。
 同じ画を再現したい場合は、その値をSpecへ書き戻す。
@@ -174,6 +209,7 @@ exit codeで原因を切り分ける。詳細と対処は
 | 4 | Workflowテンプレートが不正 |
 | 6 | 生成がタイムアウトした |
 | 7 | ComfyUI側で実行が失敗した |
+| 10 | テキスト合成に失敗した (フォントが見つからない等) |
 
 ## してはいけないこと
 

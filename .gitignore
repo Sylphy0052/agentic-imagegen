@@ -29,6 +29,10 @@ specs/generated/*
 inputs/*
 !inputs/.gitkeep
 
+# テキスト合成に使うフォント (再配布の可否がフォントごとに異なるため追跡しない)
+fonts/*
+!fonts/.gitkeep
+
 # Claude Codeの作業用worktree (skillなど .claude/ 配下の他のファイルは追跡する)
 .claude/worktrees/
 

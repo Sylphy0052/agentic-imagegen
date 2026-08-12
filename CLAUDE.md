@@ -186,6 +186,61 @@ generation:
 - 2段目のseedは1段目と同じ値を使う (変えると元の絵から離れる)
 - 最初から大きい解像度で生成するより、hires fix の方が構図が破綻しにくい
 
+## 画像へ日本語を入れる
+
+SD1.5 / SDXL 系のモデルは日本語をほぼ描けない。読める文字が必要な場合は生成に任せず、
+生成後に `text` で合成する。フォント・位置・大きさを完全に制御できる。
+
+```yaml
+text:
+  layers:
+    - content: 夜の街          # 改行を含められる。1レイヤ500文字まで
+      font: NotoSansJP-Bold.ttf  # fonts/ 配下のファイル名
+      size: 72
+      color: "#ffffff"        # #rgb / #rrggbb / #rrggbbaa
+      anchor: top-center      # 9分割の基準位置
+      offset: [0, 48]         # anchor からのずれ (px)
+      max_width: 0.8          # 折り返し幅。1.0以下は画像幅に対する比率
+      line_spacing: 1.4
+      align: center
+      rotation: -5.0          # 度。反時計回り
+      direction: horizontal   # vertical で縦書き
+      stroke:                 # 縁取り
+        width: 4
+        color: "#101020"
+      shadow:                 # 影
+        offset: [0, 6]
+        blur: 8
+        color: "#000000"
+        opacity: 0.6
+      box:                    # 文字の背後へ敷く矩形
+        color: "#000000"
+        opacity: 0.55
+        padding: [24, 16]
+        radius: 12
+```
+
+- レイヤは指定順に描画し、後のものが上へ重なる。最大10件
+- 生成そのままの画像は残り、合成結果は `image_0001_text.png` として別に出力される
+- フォントは `fonts/` へ置く (git管理外)。置き方は [docs/fonts-setup.md](docs/fonts-setup.md)
+- **見つからないフォントは別の書体へ代替せず失敗する** (exit code 10)。
+  意図しない書体で出力されるより、その場で止める方が扱いやすいため
+- **ルビ・縦中横・縦書き時の句読点の位置補正は未対応**
+
+生成済みの画像へ後から合成する場合は `compose` を使う。入力画像は変更しない。
+
+```bash
+uv run imagegen compose inputs/base.png specs/generated/caption.yaml
+uv run imagegen compose inputs/base.png specs/generated/caption.yaml -o outputs/caption.png
+```
+
+テキスト定義のYAMLは `text` ブロックだけを書いてもよいし、生成に使ったSpecをそのまま
+渡してもよい (`text` セクションだけを読む)。
+
+日本語を直接描けるモデル (Qwen-Image) の評価と導入条件は
+[docs/plan/phase5-japanese-text.md](docs/plan/phase5-japanese-text.md) を参照。
+現在の実行環境ではメモリが足りず動かせないため、合成方式を既定とする。
+
 ## 複数枚をまとめて生成する
 
 同じSpecでseedを変えて何枚か出したい場合や、複数のSpecを流したい場合は `batch` を使う。
@@ -259,9 +314,14 @@ seedに `-1` を指定するとランダムな値へ解決され、実際に使�
 | `backend` | 実行基盤 (`comfyui_version` / `devices`)。取得に失敗した場合は `null` |
 | `spec` | preset展開後のSpec全体。適用したpreset名も含む |
 | `outputs` | 出力ファイル名 |
+| `text` | テキスト合成の結果 (解決したフォントの実パスと合成後のファイル名)。合成しなかった場合は `null` |
 
 `workflow_hash` は正規化したJSONから取るため、インデントや鍵の順序が変わっただけでは動かない。
 同じSpecで結果が変わったときに、テンプレート自体が変わったのかを切り分けられる。
+
+`batch_size` > 1 でテキスト合成の一部だけが失敗した場合、`text` にはそれまでに成功した
+分の `outputs` / `fonts` と、失敗理由を示す `error` が入る。1件も成功しなかった場合のみ
+`text` は `null` のまま。
 
 ## 開発時のルール
 
@@ -303,6 +363,7 @@ uv run mypy src
 | `specs/examples/` | サンプルSpec |
 | `specs/generated/` | Claude Codeが生成したSpec (git管理外) |
 | `inputs/` | img2imgの入力画像 (git管理外) |
+| `fonts/` | テキスト合成に使うフォント (git管理外) |
 | `outputs/` | 生成結果 (git管理外) |
 
 ## 環境変数
@@ -318,6 +379,7 @@ uv run mypy src
 | `IMAGEGEN_OUTPUT_ROOT` | `outputs` | 出力ルート |
 | `IMAGEGEN_PRESETS_ROOT` | `presets` | presetの探索ルート |
 | `IMAGEGEN_MAX_SOURCE_BYTES` | 33554432 | img2imgの入力画像の上限バイト数 |
+| `IMAGEGEN_FONTS_ROOT` | `fonts` | テキスト合成に使うフォントの探索ルート |
 
 ## exit code
 
@@ -335,3 +397,4 @@ uv run mypy src
 | 7 | ComfyUI側で実行が失敗した (`GenerationFailed`) |
 | 8 | 出力画像が見つからない (`OutputNotFound`) |
 | 9 | 環境変数の設定値が不正 (`InvalidConfiguration`) |
+| 10 | テキスト合成に失敗した (`TextCompositionError`) |

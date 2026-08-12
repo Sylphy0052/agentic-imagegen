@@ -288,6 +288,7 @@ def get_generation_status(
         prompt_id=result.prompt_id,
         directory=_relative(result.directory, project_root),
         files=[_relative(path, project_root) for path in result.files],
+        text_files=[_relative(path, project_root) for path in result.text_files],
         metadata_path=_relative(result.metadata_path, project_root),
     )
 
@@ -299,6 +300,7 @@ def _status_payload(
     prompt_id: str | None = None,
     directory: str | None = None,
     files: list[str] | None = None,
+    text_files: list[str] | None = None,
     metadata_path: str | None = None,
     error: str | None = None,
     exit_code: int | None = None,
@@ -309,6 +311,8 @@ def _status_payload(
         "prompt_id": prompt_id,
         "directory": directory,
         "files": files or [],
+        # テキストを合成した画像。files の生成そのままの画像とは別に返す
+        "text_files": text_files or [],
         "metadata_path": metadata_path,
         "error": error,
         "exit_code": exit_code,
@@ -355,6 +359,7 @@ def _failure(errors: list[str]) -> dict[str, Any]:
         "control": None,
         "reference": None,
         "upscale": None,
+        "text": None,
     }
 
 
@@ -391,6 +396,15 @@ def _success(spec: GenerationSpec) -> dict[str, Any]:
             spec.reference.model_dump(mode="json") if spec.reference is not None else None
         ),
         "upscale": (params.upscale.model_dump(mode="json") if params.upscale is not None else None),
+        # 合成の有無と使うフォントだけを返す。レイヤ定義そのものは呼び出し側が持っている
+        "text": (
+            None
+            if spec.text is None
+            else {
+                "layers": len(spec.text.layers),
+                "fonts": [layer.font for layer in spec.text.layers],
+            }
+        ),
     }
 
 

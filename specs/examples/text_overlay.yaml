@@ -1,0 +1,72 @@
+# GenerationSpec のサンプル (生成後に日本語テキストを合成する)
+#
+# 検証:  uv run imagegen validate specs/examples/text_overlay.yaml
+# 生成:  uv run imagegen generate specs/examples/text_overlay.yaml
+#
+# SD1.5 / SDXL 系のモデルは日本語をほぼ描けないため、文字は生成に任せず
+# 生成後に合成する。font は fonts/ 配下のファイル名で指定する
+# (置き場所は docs/fonts-setup.md を参照)。
+
+version: "1"
+task: txt2img
+
+prompt:
+  positive: >
+    night city street, neon signs, rain,
+    anime illustration, wide shot
+
+  negative: >
+    low quality, blurry, text, watermark
+
+generation:
+  width: 512
+  height: 768
+
+  steps: 20
+  cfg: 5.5
+
+  seed: -1
+  batch_size: 1
+
+model:
+  checkpoint: v1-5-pruned-emaonly.safetensors
+
+text:
+  layers:
+    # 見出し。背景に埋もれないよう縁取りと影を付ける
+    - content: 夜の街
+      font: NotoSansJP-Bold.ttf
+      size: 72
+      color: "#ffffff"
+      anchor: top-center
+      offset: [0, 48]
+      stroke:
+        width: 4
+        color: "#101020"
+      shadow:
+        offset: [0, 6]
+        blur: 8
+        color: "#000000"
+        opacity: 0.6
+
+    # 説明文。折り返し幅を画像幅の8割にして、半透明の帯を敷く
+    - content: |-
+        雨あがりの繁華街。
+        ネオンが濡れた路面に映る。
+      font: NotoSansJP-Regular.ttf
+      size: 28
+      color: "#f0f0f0"
+      anchor: bottom-center
+      offset: [0, -56]
+      max_width: 0.8
+      line_spacing: 1.4
+      align: center
+      box:
+        color: "#000000"
+        opacity: 0.55
+        padding: [24, 16]
+        radius: 12
+
+output:
+  directory: outputs
+  prefix: night_city

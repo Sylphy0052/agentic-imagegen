@@ -104,7 +104,38 @@ MAX_REFERENCE_WEIGHT: Final = 3.0
 #: img2imgの入力画像として受け付ける拡張子。
 ALLOWED_SOURCE_IMAGE_SUFFIXES: Final = frozenset({".png", ".jpg", ".jpeg", ".webp"})
 
+TextAnchor = Literal[
+    "top-left",
+    "top-center",
+    "top-right",
+    "middle-left",
+    "center",
+    "middle-right",
+    "bottom-left",
+    "bottom-center",
+    "bottom-right",
+]
+
+TextAlign = Literal["left", "center", "right"]
+
+TextDirection = Literal["horizontal", "vertical"]
+
+#: テキスト合成に使うフォントとして受け付ける拡張子。
+ALLOWED_FONT_SUFFIXES: Final = frozenset({".ttf", ".otf", ".ttc"})
+
+#: 1枚へ重ねられるテキストレイヤの上限。これ以上は指定が読めなくなる。
+MAX_TEXT_LAYERS: Final = 10
+
+#: 1レイヤに書ける文字数の上限。
+MAX_TEXT_CONTENT_LENGTH: Final = 500
+
+#: フォントサイズの上限。解像度の上限に対して十分大きい。
+MAX_FONT_SIZE: Final = 512
+
 _PREFIX_PATTERN: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+#: #rgb / #rrggbb / #rrggbbaa の3形式を受け付ける。
+_COLOR_PATTERN: Final = re.compile(r"^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$")
 
 
 def _validate_relative_image_path(value: str) -> str:
@@ -153,6 +184,18 @@ def _validate_model_filename(value: str, *, allowed_suffixes: frozenset[str]) ->
         allowed = " / ".join(sorted(allowed_suffixes))
         raise ValueError(f"拡張子は {allowed} のいずれかにしてください (指定値: {value})")
     return value
+
+
+def _validate_color(value: str) -> str:
+    """色指定を検証し、小文字へ正規化する。
+
+    色名 (white 等) は環境やライブラリの版で解釈が揺れるため受け付けない。
+    """
+    if not _COLOR_PATTERN.fullmatch(value):
+        raise ValueError(
+            f"色は #rgb / #rrggbb / #rrggbbaa の形式で指定してください (指定値: {value!r})"
+        )
+    return value.lower()
 
 
 class _StrictModel(BaseModel):
@@ -326,6 +369,128 @@ class ControlSpec(_StrictModel):
         return self
 
 
+class StrokeSpec(_StrictModel):
+    """文字の縁取り。"""
+
+    width: Annotated[int, Field(ge=1, le=64)] = 2
+    color: str = "#000000"
+
+    @field_validator("color")
+    @classmethod
+    def _normalize_color(cls, value: str) -> str:
+        return _validate_color(value)
+
+
+class ShadowSpec(_StrictModel):
+    """文字の影。
+
+    本体を描いたあとにぼかして下へ敷く。
+    """
+
+    offset: tuple[
+        Annotated[int, Field(ge=-MAX_DIMENSION, le=MAX_DIMENSION)],
+        Annotated[int, Field(ge=-MAX_DIMENSION, le=MAX_DIMENSION)],
+    ] = (4, 4)
+    blur: Annotated[float, Field(ge=0.0, le=64.0)] = 4.0
+    color: str = "#000000"
+    opacity: Annotated[float, Field(ge=0.0, le=1.0)] = 0.5
+
+    @field_validator("color")
+    @classmethod
+    def _normalize_color(cls, value: str) -> str:
+        return _validate_color(value)
+
+
+class BoxSpec(_StrictModel):
+    """文字の背後へ敷く矩形。
+
+    背景に埋もれて読めなくなるのを避けるために使う。
+    """
+
+    color: str = "#000000"
+    opacity: Annotated[float, Field(ge=0.0, le=1.0)] = 0.5
+    #: (横, 縦) 方向の余白。
+    padding: tuple[Annotated[int, Field(ge=0, le=512)], Annotated[int, Field(ge=0, le=512)]] = (
+        16,
+        16,
+    )
+    radius: Annotated[int, Field(ge=0, le=512)] = 0
+
+    @field_validator("color")
+    @classmethod
+    def _normalize_color(cls, value: str) -> str:
+        return _validate_color(value)
+
+
+class TextLayer(_StrictModel):
+    """重ねるテキスト1件。
+
+    fontは fonts/ 配下のファイル名で指定する。実体の解決とルート外への脱出検証は
+    domain.policy が担う。
+    """
+
+    content: str = Field(min_length=1, max_length=MAX_TEXT_CONTENT_LENGTH)
+    font: str = Field(min_length=1)
+    #: .ttc のようなコレクションの中で使う書体の索引。
+    font_index: Annotated[int, Field(ge=0, le=64)] = 0
+    size: Annotated[int, Field(ge=1, le=MAX_FONT_SIZE)]
+    color: str = "#ffffff"
+    anchor: TextAnchor = "center"
+    #: anchor からのずれ (px)。
+    offset: tuple[
+        Annotated[int, Field(ge=-MAX_DIMENSION, le=MAX_DIMENSION)],
+        Annotated[int, Field(ge=-MAX_DIMENSION, le=MAX_DIMENSION)],
+    ] = (0, 0)
+    #: 折り返し幅。1.0以下は画像幅に対する比率、1.0超はpxとして扱う。
+    #: 上限は解像度のハード上限 (MAX_DIMENSION) に合わせる。
+    max_width: Annotated[float, Field(gt=0.0, le=MAX_DIMENSION)] | None = None
+    line_spacing: Annotated[float, Field(ge=0.5, le=5.0)] = 1.2
+    align: TextAlign = "center"
+    opacity: Annotated[float, Field(ge=0.0, le=1.0)] = 1.0
+    #: 度。反時計回り。
+    rotation: Annotated[float, Field(ge=-180.0, le=180.0)] = 0.0
+    direction: TextDirection = "horizontal"
+    stroke: StrokeSpec | None = None
+    shadow: ShadowSpec | None = None
+    box: BoxSpec | None = None
+
+    @field_validator("content")
+    @classmethod
+    def _reject_control_characters(cls, value: str) -> str:
+        # 改行だけは複数行の指定として許す。
+        if any(ord(ch) < 32 and ch != "\n" for ch in value):
+            raise ValueError("改行以外の制御文字は指定できません")
+        return value
+
+    @field_validator("font")
+    @classmethod
+    def _reject_unsafe_font(cls, value: str) -> str:
+        return _validate_model_filename(value, allowed_suffixes=ALLOWED_FONT_SUFFIXES)
+
+    @field_validator("color")
+    @classmethod
+    def _normalize_color(cls, value: str) -> str:
+        return _validate_color(value)
+
+
+class TextSpec(_StrictModel):
+    """生成後に重ねるテキスト全体。
+
+    layers は指定順に描画し、後のものが上へ重なる。
+    """
+
+    layers: tuple[TextLayer, ...] = Field(min_length=1)
+
+    @field_validator("layers")
+    @classmethod
+    def _validate_layer_count(cls, value: tuple[TextLayer, ...]) -> tuple[TextLayer, ...]:
+        if len(value) > MAX_TEXT_LAYERS:
+            raise ValueError(
+                f"テキストレイヤは{MAX_TEXT_LAYERS}件までしか指定できません (指定数: {len(value)})"
+            )
+        return value
+
+
 class ReferenceSpec(_StrictModel):
     """IPAdapterの指定。参照画像から人物や画風の特徴を寄せる。
 
@@ -400,6 +565,8 @@ class GenerationSpec(_StrictModel):
     control: ControlSpec | None = None
     #: 指定するとIPAdapterで参照画像の特徴を寄せる。controlとは併用できる。
     reference: ReferenceSpec | None = None
+    #: 指定すると生成後に日本語テキストを合成する。生成そのものの挙動は変わらない。
+    text: TextSpec | None = None
     output: OutputSpec = Field(default_factory=OutputSpec)
 
     @model_validator(mode="after")
@@ -435,6 +602,7 @@ class GenerationSpec(_StrictModel):
 
 
 __all__ = [
+    "BoxSpec",
     "ControlSpec",
     "GenerationParams",
     "GenerationSpec",
@@ -446,7 +614,14 @@ __all__ = [
     "ReferenceSpec",
     "SamplerName",
     "SchedulerName",
+    "ShadowSpec",
     "SourceSpec",
+    "StrokeSpec",
+    "TextAlign",
+    "TextAnchor",
+    "TextDirection",
+    "TextLayer",
+    "TextSpec",
     "UpscaleMethod",
     "UpscaleSpec",
 ]
