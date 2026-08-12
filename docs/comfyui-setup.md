@@ -5,7 +5,10 @@
 
 ## 前提
 
-Phase 1では **WSL上でCPU推論** を使う。理由は次のとおり。
+本手順は **WSL上でCPU推論** を動かす場合のもの。Intel GPU (XPU) が使えるなら
+[xpu-setup.md](xpu-setup.md) のほうが約5倍速いため、通常はそちらを使う。
+
+CPU推論を選ぶ理由は次のとおり。
 
 - 開発機にNVIDIA GPUがなく、GPUはIntel Arc Graphics (Core Ultra 7 165H内蔵iGPU) のみ
 - したがってCUDA前提の一般的な手順は使えない

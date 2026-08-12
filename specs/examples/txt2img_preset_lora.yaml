@@ -1,0 +1,49 @@
+# GenerationSpec のサンプル (preset + LoRA)
+#
+# 検証:  uv run imagegen validate specs/examples/txt2img_preset_lora.yaml
+# 生成:  uv run imagegen generate specs/examples/txt2img_preset_lora.yaml
+#
+# preset を使うと、繰り返し使う指定を軸ごとに切り出して再利用できる。
+# LoRA を指定すると Workflow テンプレートが txt2img_lora へ自動的に切り替わる。
+#
+# 利用可能な preset:     ls presets/characters presets/scenes presets/styles
+# 利用可能な LoRA:       ls ~/ComfyUI/models/loras/
+# 利用可能な checkpoint: ls ~/ComfyUI/models/checkpoints/
+
+version: "1"
+task: txt2img
+
+# 軸ごとに1つまで。character -> scene -> style -> Spec本体 の順に prompt が連結される。
+# 重複するトークンは自動で除去されるため、重複を気にして削る必要はない。
+presets:
+  character: anime-girl-blue
+  scene: rooftop-sunset
+  style: anime-soft
+
+# preset で足りない要素だけ足す。prompt ごと省略してもよい。
+prompt:
+  positive: >
+    looking at viewer
+
+generation:
+  width: 512
+  height: 768
+
+  # steps / cfg / sampler / scheduler は style preset 側で指定済み。
+  # ここに書けば preset より優先される。
+  seed: -1
+  batch_size: 1
+
+model:
+  checkpoint: meinamix_v12Final.safetensors
+
+  # 同時3件まで。strength は省略時 1.0、範囲は ±10.0。
+  # 同じ LoRA を重複して指定することはできない。
+  loras:
+    - name: add_detail.safetensors
+      strength_model: 0.8
+      strength_clip: 0.8
+
+output:
+  directory: outputs
+  prefix: preset_lora_sample

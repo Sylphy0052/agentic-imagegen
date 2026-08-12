@@ -13,14 +13,30 @@ Claude Code -> GenerationSpec -> Python CLI (imagegen) -> ComfyUI API -> 画像�
 
 ## ステータス
 
-Phase 1 (txt2imgのみ) を実装中。進捗は [Issue #1](https://github.com/Sylphy0052/agentic-imagegen/issues/1)、
+Phase 1 (txt2img) は完了。現在はPhase 2 (preset / LoRA / img2img) を実装中。
+
+| フェーズ | 内容 | 状態 |
+| --- | --- | --- |
+| Phase 1 | txt2img、CLI、ComfyUI連携 | 完了 ([#1](https://github.com/Sylphy0052/agentic-imagegen/issues/1)) |
+| Phase 2 | Preset / LoRA / img2img / Claude Code Skill | 進行中 ([#3](https://github.com/Sylphy0052/agentic-imagegen/issues/3)) |
+| Phase 3 | MCP Server (Claude Code / Codex 双方対応) | 未着手 ([#4](https://github.com/Sylphy0052/agentic-imagegen/issues/4)) |
+| Phase 4 | ControlNet / IPAdapter / Batch / Upscaling | 未着手 ([#5](https://github.com/Sylphy0052/agentic-imagegen/issues/5)) |
+
 設計は [docs/plan/phase1.md](docs/plan/phase1.md) を参照。
 
 ## 必要環境
 
 - Python 3.12以上
 - [uv](https://docs.astral.sh/uv/)
-- ComfyUI (別途セットアップ。Phase 1はWSL上のCPU推論を前提とする)
+- ComfyUI (別途セットアップ)
+
+GPUはIntel Arc内蔵GPU (XPU) での動作を確認している。NVIDIA GPUがなくてもCPU推論で動くが、
+XPUのほうがおよそ5倍速い。
+
+| 実行基盤 | SD1.5 / 512x768 / 20 steps |
+| --- | --- |
+| Intel XPU | 約135秒 |
+| CPU | 約12分 |
 
 ## セットアップ
 
@@ -32,20 +48,31 @@ uv sync
 
 ## ComfyUIの起動
 
-詳細な手順は [docs/comfyui-setup.md](docs/comfyui-setup.md) を参照。要点のみ:
+- Intel GPU (XPU) を使う場合: [docs/xpu-setup.md](docs/xpu-setup.md)
+- CPU推論で動かす場合: [docs/comfyui-setup.md](docs/comfyui-setup.md)
+
+要点のみ:
 
 ```bash
 cd ~/ComfyUI
-uv run python main.py --cpu --listen 127.0.0.1 --port 8188
+./.venv/bin/python main.py --listen 127.0.0.1 --port 8188   # XPU (自動検出)
+./.venv/bin/python main.py --cpu --listen 127.0.0.1 --port 8188  # CPU推論を強制
 ```
 
-`0.0.0.0` での公開は想定していない。Phase 1はループバック限定で使う。
+`0.0.0.0` での公開は想定していない。ループバック限定で使う。
 
 ## Workflowの準備
 
-`workflows/txt2img.json` を同梱済み。ComfyUI標準のtxt2imgグラフと同じノード構成のため、
-通常は差し替え不要。自環境に合わせて作り直す場合は
-[workflows/README.md](workflows/README.md) の手順 (API形式での書き出し) に従う。
+同梱テンプレート:
+
+| ファイル | 用途 |
+| --- | --- |
+| `workflows/txt2img.json` | text-to-image |
+| `workflows/txt2img_lora.json` | LoRA付き text-to-image (`LoraLoader` 3段) |
+
+どちらを使うかは `model.loras` の有無で自動的に決まる。通常は差し替え不要。
+自環境に合わせて作り直す場合は [workflows/README.md](workflows/README.md) の手順
+(API形式での書き出し) に従う。
 
 読み込み時にノードID・class_type・必要な入力キー・ノード間の接続を検証し、
 1つでも想定と違えば注入せずに失敗する。
@@ -61,9 +88,11 @@ uv run imagegen health
 ```text
 ComfyUI: reachable
 URL: http://127.0.0.1:8188
-Version: 0.3.40
-Devices: cpu
+Version: 0.32.0
+Devices: xpu:0 Intel(R) Graphics [0x7d55]
 ```
+
+`Devices:` が `xpu:0` ならIntel GPU、`cpu` ならCPU推論で動いている。
 
 ### Specの検証
 
@@ -79,6 +108,15 @@ Spec: specs/examples/txt2img.yaml
 Workflow: txt2img
 Resolution: 512x768 (batch 1)
 Checkpoint: v1-5-pruned-emaonly.safetensors
+```
+
+presetやLoRAを指定している場合は、適用内容と実際に使われるテンプレート名も表示される。
+
+```text
+Workflow: txt2img_lora
+Checkpoint: meinamix_v12Final.safetensors
+LoRA: add_detail.safetensors (model=0.8, clip=0.8)
+Presets: character=anime-girl-blue, style=anime-soft
 ```
 
 ### 生成
@@ -109,6 +147,10 @@ uv run imagegen generate specs/examples/txt2img.yaml --timeout 600
 version: "1"
 task: txt2img
 
+presets:              # 省略可。character / scene / style を名前で参照する
+  character: anime-girl-blue
+  style: anime-soft
+
 prompt:
   positive: 1girl, blue hair, blue eyes, anime illustration, full body
   negative: low quality, blurry, bad anatomy
@@ -125,6 +167,10 @@ generation:
 
 model:
   checkpoint: v1-5-pruned-emaonly.safetensors
+  loras:            # 省略可。同時3件まで
+    - name: add_detail.safetensors
+      strength_model: 0.8
+      strength_clip: 0.8
 
 output:
   directory: outputs  # 省略時は IMAGEGEN_OUTPUT_ROOT
@@ -135,8 +181,41 @@ output:
 
 - 解像度は64-8192かつ8の倍数、steps 1-100、cfg 0-30、batch_size 1-4
 - 環境変数による上限 (`IMAGEGEN_MAX_*`) を超える指定は拒否する
-- checkpoint名はPath Traversal・絶対パス・想定外の拡張子を拒否する
+- checkpoint名・LoRA名はPath Traversal・絶対パス・想定外の拡張子を拒否する
+- LoRAは同時3件まで、同じLoRAの重複指定は拒否、strengthは±10.0まで
+- preset名は英数字始まりの `[A-Za-z0-9._-]` のみ
 - 出力先が作業ルートの外を指す場合は拒否する
+
+## Preset
+
+繰り返し使う指定を3つの軸にまとめ、Specから名前で参照する。
+
+| 軸 | 置き場 | 書く内容 |
+| --- | --- | --- |
+| `character` | `presets/characters/<name>.yaml` | 人物の外見的特徴 |
+| `scene` | `presets/scenes/<name>.yaml` | 場所・時間帯・構図 |
+| `style` | `presets/styles/<name>.yaml` | 画風・品質タグ・サンプラー設定 |
+
+```yaml
+# presets/styles/anime-soft.yaml
+description: 柔らかい光のアニメ調。SD1.5想定
+
+prompt:
+  positive: anime illustration, soft lighting, masterpiece, best quality
+  negative: low quality, worst quality, blurry
+
+generation:
+  sampler: dpmpp_2m
+  scheduler: karras
+```
+
+解決規則:
+
+- **prompt** は `character` -> `scene` -> `style` -> Spec本体 の順にカンマ連結し、
+  重複トークンは最初の1つを残して除去する (大文字小文字と連続空白は無視)。negativeも同じ
+- **generation** はpresetの指定を取り込んだうえで、Spec本体の指定を優先する
+  (spec > style > scene > character)
+- 適用したpreset名は解決後のSpecに残り、`metadata.json` にも記録される
 
 ## 出力
 
@@ -148,8 +227,23 @@ outputs/
         └── metadata.json
 ```
 
-`metadata.json` には `prompt_id` / `workflow` / `created_at` / `resolved_seed` / `spec` / `outputs` を記録する。
+`metadata.json` の内容:
+
+| キー | 内容 |
+| --- | --- |
+| `prompt_id` | ComfyUI側の実行ID |
+| `workflow` | 実際に使ったテンプレート名 |
+| `workflow_hash` | テンプレートのダイジェスト (`sha256:...`) |
+| `created_at` | 生成時刻 (タイムゾーン付き) |
+| `resolved_seed` | 実際に使われたseed |
+| `backend` | 実行基盤 (`comfyui_version` / `devices`) |
+| `spec` | preset展開後のSpec全体 |
+| `outputs` | 出力ファイル名 |
+
 同じ日に同じprefixで再実行した場合は連番ディレクトリを作り、既存の結果を上書きしない。
+
+同じSpecなのに結果が変わった場合は `workflow_hash` と `backend` を前回と比べると、
+テンプレートが変わったのか実行基盤が変わったのかを切り分けられる。
 
 ## 設定
 
@@ -162,6 +256,7 @@ outputs/
 | `IMAGEGEN_MAX_BATCH` | 4 | batch_sizeの上限 |
 | `IMAGEGEN_TIMEOUT` | 300 | 生成のタイムアウト秒 |
 | `IMAGEGEN_OUTPUT_ROOT` | `outputs` | 出力ルート |
+| `IMAGEGEN_PRESETS_ROOT` | `presets` | presetの探索ルート |
 
 秘密情報は扱わないため、環境変数ファイルは必須ではない。
 
@@ -174,6 +269,7 @@ uv run pytest -m integration  # ComfyUI起動時のみ
 ```
 
 Unit Testは実ComfyUIへ接続しない。Integration TestはComfyUI未起動時にskipされる。
+特定のcheckpointで実行する場合は `IMAGEGEN_TEST_CHECKPOINT` を指定する。
 
 品質ゲート:
 
@@ -185,7 +281,8 @@ uv run mypy src
 
 ## Claude Codeからの利用
 
-このリポジトリでClaude Codeに画像生成を依頼すると、[CLAUDE.md](CLAUDE.md) の手順に従って
+このリポジトリでClaude Codeに画像生成を依頼すると、
+[.claude/skills/imagegen/SKILL.md](.claude/skills/imagegen/SKILL.md) の手順に従って
 Spec作成から生成まで自動で実行される。
 
 ```text
@@ -194,12 +291,19 @@ Spec作成から生成まで自動で実行される。
 
 実行される流れ:
 
-1. GenerationSpecを作成し `specs/generated/` へ保存
-2. `uv run imagegen validate` で検証
-3. `uv run imagegen generate` で生成
-4. 出力パスとseedを返す
+1. `imagegen health` で実行基盤を確認
+2. 使えるcheckpoint / LoRA / presetを確認
+3. GenerationSpecを作成し `specs/generated/` へ保存
+4. `uv run imagegen validate` で検証
+5. `uv run imagegen generate` で生成
+6. 出力パスとseedを返す
 
-Claude Codeが守るルール (Workflowを書き換えない、validationを迂回しないなど) は
+「同じキャラで別の構図」のような依頼では、character presetを再利用して
+scene だけを差し替える。失敗時の切り分けは
+[.claude/skills/imagegen/references/troubleshooting.md](.claude/skills/imagegen/references/troubleshooting.md)
+にexit codeごとの手順がある。
+
+Claude Codeが守るルール (Workflowを勝手に書き換えない、validationを迂回しないなど) は
 [CLAUDE.md](CLAUDE.md) に定義している。
 
 ## アーキテクチャ
@@ -207,7 +311,7 @@ Claude Codeが守るルール (Workflowを書き換えない、validationを迂�
 ```text
 CLI (typer)                 入出力とexit codeへの変換
     |
-Service (generation)        ユースケースの組み立て
+Service (generation)        ユースケースの組み立て、presetの解決
     |
 Domain (models / policy)    GenerationSpecと検証規則。外部依存なし
     |
@@ -218,6 +322,7 @@ Adapters (comfyui)          HTTP / WebSocket / ComfyUI固有のJSON形状
 
 ComfyUI依存は `adapters/comfyui/` に閉じ込めてあり、
 バックエンドを追加する際もDomain / Service層の変更を必要としない。
+実際、CPU推論からIntel XPUへ切り替えた際も `src/` の変更は不要だった。
 
 ## ライセンス
 

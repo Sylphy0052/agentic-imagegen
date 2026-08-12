@@ -10,9 +10,10 @@ AIコーディングエージェントから、ComfyUI経由でStable Diffusion�
 Claude Code -> GenerationSpec -> Python CLI (imagegen) -> ComfyUI API -> 画像生成
 ```
 
-現在はPhase 1 (txt2imgのみ)。設計と進捗は
-[docs/plan/phase1.md](docs/plan/phase1.md) と
-[Issue #1](https://github.com/Sylphy0052/agentic-imagegen/issues/1) を参照。
+Phase 1 (txt2img) は完了。現在はPhase 2 (preset / LoRA / img2img) を実装中。
+Phase 1の設計は [docs/plan/phase1.md](docs/plan/phase1.md)、
+進捗は [Issue #1](https://github.com/Sylphy0052/agentic-imagegen/issues/1) と
+[Issue #3](https://github.com/Sylphy0052/agentic-imagegen/issues/3) を参照。
 
 ## 画像生成要求を受けたときの手順
 
@@ -26,20 +27,26 @@ Claude Code -> GenerationSpec -> Python CLI (imagegen) -> ComfyUI API -> 画像�
 1. **GenerationSpecを作る** — 自然言語の要求をSpecの各フィールドへ落とし込む
 2. **`specs/generated/` へ保存する** — ファイル名は内容が分かるものにする (例: `specs/generated/blue-hair-girl.yaml`)
 3. **validateを実行する**
+
    ```bash
    uv run imagegen validate specs/generated/<name>.yaml
    ```
+
 4. **generateを実行する**
+
    ```bash
    uv run imagegen generate specs/generated/<name>.yaml
    ```
+
 5. **結果を確認する** — exit codeが0であること、出力ファイルが存在すること
 6. **output pathをユーザーへ返す** — 生成された画像のパスとseedを伝える
 
 ComfyUIが起動していない場合は `uv run imagegen health` で状態を確認し、
 [docs/comfyui-setup.md](docs/comfyui-setup.md) の手順を案内する。
 
-Specの書き方は [specs/examples/txt2img.yaml](specs/examples/txt2img.yaml) を参照。
+Specの書き方は [specs/examples/txt2img.yaml](specs/examples/txt2img.yaml)、
+preset・LoRAを使う場合は
+[specs/examples/txt2img_preset_lora.yaml](specs/examples/txt2img_preset_lora.yaml) を参照。
 
 ## Presetを使う
 
