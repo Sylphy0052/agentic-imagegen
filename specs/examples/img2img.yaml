@@ -1,0 +1,43 @@
+# GenerationSpec のサンプル (img2img)
+#
+# 検証:  uv run imagegen validate specs/examples/img2img.yaml
+# 生成:  uv run imagegen generate specs/examples/img2img.yaml
+#
+# 入力画像は inputs/ (git管理外) へ置く。生成前にComfyUIへ自動でアップロードされるため、
+# ~/ComfyUI/input/ へ手で置く必要はない。
+#
+# img2img は入力画像のサイズをそのまま使う。width / height を書くと拒否される。
+
+version: "1"
+task: img2img
+
+source:
+  # リポジトリ配下の相対パス。拡張子は .png / .jpg / .jpeg / .webp
+  image: inputs/reference.png
+
+  # 0に近いほど入力画像を保ち、1に近いほど描き直す。
+  # 構図を保ったまま雰囲気を変えるなら 0.4-0.6 あたりが扱いやすい。
+  denoise: 0.55
+
+prompt:
+  positive: >
+    1girl, solo, blue hair, blue eyes, rooftop, night, city lights,
+    anime illustration, masterpiece, best quality
+
+  negative: >
+    low quality, worst quality, blurry, bad anatomy
+
+generation:
+  # width / height は指定しない (入力画像のサイズを使う)
+  steps: 12
+  cfg: 6.0
+  seed: -1
+  sampler: dpmpp_2m
+  scheduler: karras
+
+model:
+  checkpoint: meinamix_v12Final.safetensors
+
+output:
+  directory: outputs
+  prefix: img2img_sample

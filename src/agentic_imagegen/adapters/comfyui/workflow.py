@@ -108,6 +108,33 @@ def _lora_binding() -> WorkflowBinding:
 TXT2IMG_LORA_BINDING: Final = _lora_binding()
 
 
+IMG2IMG_BINDING: Final = WorkflowBinding(
+    name="img2img",
+    nodes={
+        "checkpoint": NodeRef("4", "CheckpointLoaderSimple", ("ckpt_name",)),
+        "positive_prompt": NodeRef("6", "CLIPTextEncode", ("text",)),
+        "negative_prompt": NodeRef("7", "CLIPTextEncode", ("text",)),
+        "source_image": NodeRef("10", "LoadImage", ("image",)),
+        "vae_encode": NodeRef("11", "VAEEncode", ()),
+        "ksampler": NodeRef(
+            "3",
+            "KSampler",
+            ("seed", "steps", "cfg", "sampler_name", "scheduler", "denoise"),
+        ),
+        "save_image": NodeRef("9", "SaveImage", ("filename_prefix",)),
+    },
+    links=(
+        LinkRef("ksampler", "positive", "positive_prompt"),
+        LinkRef("ksampler", "negative", "negative_prompt"),
+        # txt2imgと違い、latentは入力画像をVAEEncodeしたものから来る
+        LinkRef("ksampler", "latent_image", "vae_encode"),
+        LinkRef("ksampler", "model", "checkpoint"),
+        LinkRef("vae_encode", "pixels", "source_image"),
+        LinkRef("vae_encode", "vae", "checkpoint"),
+    ),
+)
+
+
 def resolve_seed(seed: int) -> int:
     """seedが -1 ならランダムな値へ解決する。それ以外はそのまま返す。"""
     if seed != RANDOM_SEED:
@@ -179,6 +206,7 @@ def build_workflow(
     *,
     seed: int,
     binding: WorkflowBinding = TXT2IMG_BINDING,
+    source_image_name: str | None = None,
 ) -> dict[str, Any]:
     """テンプレートへSpecの値を注入した新しいWorkflowを返す。
 
@@ -204,10 +232,12 @@ def build_workflow(
     inputs_of("positive_prompt")["text"] = spec.prompt.positive
     inputs_of("negative_prompt")["text"] = spec.prompt.negative
 
-    latent = inputs_of("latent")
-    latent["width"] = params.width
-    latent["height"] = params.height
-    latent["batch_size"] = params.batch_size
+    # img2imgは入力画像のサイズをそのまま使うため、latentノードを持たない
+    if "latent" in binding.nodes:
+        latent = inputs_of("latent")
+        latent["width"] = params.width
+        latent["height"] = params.height
+        latent["batch_size"] = params.batch_size
 
     ksampler = inputs_of("ksampler")
     ksampler["seed"] = seed
@@ -219,8 +249,36 @@ def build_workflow(
     inputs_of("save_image")["filename_prefix"] = spec.output.prefix
 
     _inject_loras(spec, binding, inputs_of)
+    _inject_source_image(spec, binding, inputs_of, source_image_name)
 
     return workflow
+
+
+def _inject_source_image(
+    spec: GenerationSpec,
+    binding: WorkflowBinding,
+    inputs_of: Callable[[str], dict[str, Any]],
+    source_image_name: str | None,
+) -> None:
+    """img2img用テンプレートへ入力画像とdenoiseを注入する。
+
+    LoadImageが参照するのはComfyUIのinput配下の名前であり、Specに書かれた
+    リポジトリ内のパスではない。アップロード済みの名前を受け取る前提とする。
+    """
+    if "source_image" not in binding.nodes:
+        return
+
+    if spec.source is None:
+        raise WorkflowValidationError(
+            f"Workflow ({binding.name}) はimg2img用ですが、Specに source が指定されていません"
+        )
+    if not source_image_name:
+        raise WorkflowValidationError(
+            f"Workflow ({binding.name}) の入力画像がComfyUIへアップロードされていません"
+        )
+
+    inputs_of("source_image")["image"] = source_image_name
+    inputs_of("ksampler")["denoise"] = spec.source.denoise
 
 
 def _inject_loras(
@@ -262,6 +320,7 @@ def _inject_loras(
 
 
 __all__ = [
+    "IMG2IMG_BINDING",
     "LORA_SLOT_ROLES",
     "TXT2IMG_BINDING",
     "TXT2IMG_LORA_BINDING",

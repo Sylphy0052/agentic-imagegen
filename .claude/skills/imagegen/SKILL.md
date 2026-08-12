@@ -107,6 +107,21 @@ model:
 指定するとWorkflowテンプレートが `txt2img_lora` へ自動的に切り替わる。
 使えるLoRAは `ls ~/ComfyUI/models/loras/` で確認する。強度は省略時1.0。
 
+### 既存画像を描き直す場合 (img2img)
+
+```yaml
+task: img2img
+
+source:
+  image: inputs/reference.png   # リポジトリ配下に置く
+  denoise: 0.55                 # 0に近いほど入力を保ち、1に近いほど描き直す
+```
+
+- 入力画像は生成前にComfyUIへ自動でアップロードされる。手で `~/ComfyUI/input/` へ置かない
+- **解像度は入力画像のサイズをそのまま使う。** `width` / `height` を書くと拒否される
+- `batch_size` は1のみ。LoRAとの併用は未対応
+- 入力画像は `inputs/` へ置く。既存の生成結果を使う場合はそこからコピーする
+
 パラメータの目安 (CPU推論では時間が跳ね返るため控えめにする):
 
 | 項目 | 推奨 | 上限 |

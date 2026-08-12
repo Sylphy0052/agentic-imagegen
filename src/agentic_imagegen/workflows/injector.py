@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from agentic_imagegen.adapters.comfyui.workflow import (
+    IMG2IMG_BINDING,
     TXT2IMG_BINDING,
     TXT2IMG_LORA_BINDING,
     WorkflowBinding,
@@ -29,6 +30,7 @@ WORKFLOWS_DIR: Final = Path(__file__).resolve().parents[3] / "workflows"
 ALLOWED_WORKFLOWS: Final[dict[str, WorkflowBinding]] = {
     "txt2img": TXT2IMG_BINDING,
     "txt2img_lora": TXT2IMG_LORA_BINDING,
+    "img2img": IMG2IMG_BINDING,
 }
 
 
@@ -105,16 +107,26 @@ class PreparedWorkflow:
 
 
 def prepare_workflow(
-    spec: GenerationSpec, *, workflows_dir: Path | None = None
+    spec: GenerationSpec,
+    *,
+    workflows_dir: Path | None = None,
+    source_image_name: str | None = None,
 ) -> PreparedWorkflow:
     """Specから実行可能なWorkflowと、解決済みseed・テンプレートのダイジェストを組み立てる。
 
     seedが -1 の場合はここでランダム値へ解決し、metadataへ記録できるよう返す。
+    img2imgでは、ComfyUIへアップロード済みの入力画像名を source_image_name で渡す。
     """
     name = resolve_workflow_name(spec)
     template = load_workflow_template(name, workflows_dir=workflows_dir)
     seed = resolve_seed(spec.generation.seed)
-    workflow = build_workflow(template, spec, seed=seed, binding=get_binding(name))
+    workflow = build_workflow(
+        template,
+        spec,
+        seed=seed,
+        binding=get_binding(name),
+        source_image_name=source_image_name,
+    )
     return PreparedWorkflow(
         workflow=workflow,
         seed=seed,

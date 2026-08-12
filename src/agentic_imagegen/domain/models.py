@@ -11,7 +11,7 @@ import re
 from pathlib import PurePosixPath
 from typing import Annotated, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SamplerName = Literal[
     "euler",
@@ -64,6 +64,9 @@ MAX_LORAS: Final = 3
 
 #: strengthの実用上の範囲。ComfyUI自体は±100を許すが、事故を防ぐため絞る。
 LORA_STRENGTH_LIMIT: Final = 10.0
+
+#: img2imgの入力画像として受け付ける拡張子。
+ALLOWED_SOURCE_IMAGE_SUFFIXES: Final = frozenset({".png", ".jpg", ".jpeg", ".webp"})
 
 _PREFIX_PATTERN: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
@@ -187,6 +190,37 @@ class OutputSpec(_StrictModel):
         return value
 
 
+class SourceSpec(_StrictModel):
+    """img2imgの入力画像。
+
+    imageはリポジトリ配下の相対パスで指定する。checkpointと違い階層の深さは問わない。
+    実体の解決とリポジトリ外への脱出検証は domain.policy が担う。
+    """
+
+    image: str = Field(min_length=1)
+    #: 0に近いほど入力画像を保ち、1に近いほど描き直す。
+    denoise: Annotated[float, Field(ge=0.0, le=1.0)] = 0.6
+
+    @field_validator("image")
+    @classmethod
+    def _reject_unsafe_path(cls, value: str) -> str:
+        if any(ord(ch) < 32 for ch in value):
+            raise ValueError("制御文字を含むパスは指定できません")
+        if "\\" in value:
+            raise ValueError("バックスラッシュは使用できません")
+        if value.startswith(("/", "~")):
+            raise ValueError("絶対パスやホームディレクトリ参照は指定できません")
+
+        segments = value.split("/")
+        if any(segment in {"", ".", ".."} for segment in segments):
+            raise ValueError("上位ディレクトリ参照や空のセグメントを含むパスは指定できません")
+
+        if PurePosixPath(segments[-1]).suffix.lower() not in ALLOWED_SOURCE_IMAGE_SUFFIXES:
+            allowed = " / ".join(sorted(ALLOWED_SOURCE_IMAGE_SUFFIXES))
+            raise ValueError(f"拡張子は {allowed} のいずれかにしてください (指定値: {value})")
+        return value
+
+
 class PresetRefs(_StrictModel):
     """適用するpresetの参照。軸ごとに1つまで。
 
@@ -204,15 +238,46 @@ class PresetRefs(_StrictModel):
 
 
 class GenerationSpec(_StrictModel):
-    """画像生成の要求全体。Phase 1では txt2img のみ対応する。"""
+    """画像生成の要求全体。"""
 
     version: Literal["1"] = "1"
-    task: Literal["txt2img"] = "txt2img"
+    task: Literal["txt2img", "img2img"] = "txt2img"
     presets: PresetRefs = Field(default_factory=PresetRefs)
     prompt: PromptSpec
     generation: GenerationParams = Field(default_factory=GenerationParams)
     model: ModelSpec
+    #: img2imgのときのみ指定する。
+    source: SourceSpec | None = None
     output: OutputSpec = Field(default_factory=OutputSpec)
+
+    @model_validator(mode="after")
+    def _validate_task_combination(self) -> GenerationSpec:
+        """taskと他フィールドの組み合わせを検証する。
+
+        指定しても効かない項目は黙って無視せず拒否する。書いたのに反映されていない
+        状態は、生成結果を見ても原因が分かりにくいため。
+        """
+        if self.task == "img2img":
+            self._validate_img2img()
+        elif self.source is not None:
+            raise ValueError("source は task が img2img のときにのみ指定できます")
+        return self
+
+    def _validate_img2img(self) -> None:
+        if self.source is None:
+            raise ValueError("task が img2img のときは source を指定してください")
+
+        # 入力画像のサイズをそのまま使うため、解像度の指定は効かない
+        specified = self.generation.model_fields_set
+        for field in ("width", "height"):
+            if field in specified:
+                raise ValueError(f"img2img では入力画像のサイズを使うため {field} は指定できません")
+
+        if self.generation.batch_size > 1:
+            raise ValueError("img2img では batch_size は1のみ対応しています")
+
+        if self.model.loras:
+            raise ValueError("img2img とLoRAの組み合わせは未対応です")
 
 
 __all__ = [
@@ -224,4 +289,5 @@ __all__ = [
     "PromptSpec",
     "SamplerName",
     "SchedulerName",
+    "SourceSpec",
 ]

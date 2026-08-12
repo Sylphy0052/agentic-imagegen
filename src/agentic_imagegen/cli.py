@@ -99,7 +99,11 @@ def validate(spec_path: SpecArgument, verbose: VerboseOption = False) -> None:
         typer.echo(f"Spec: {spec_path}")
         # task ではなく実際に使うテンプレート名を出す (LoRA指定で切り替わるため)
         typer.echo(f"Workflow: {resolve_workflow_name(spec)}")
-        typer.echo(f"Resolution: {params.width}x{params.height} (batch {params.batch_size})")
+        if spec.source is not None:
+            # img2imgは入力画像のサイズをそのまま使うため、解像度は表示しない
+            typer.echo(f"Source: {spec.source.image} (denoise {spec.source.denoise})")
+        else:
+            typer.echo(f"Resolution: {params.width}x{params.height} (batch {params.batch_size})")
         typer.echo(f"Checkpoint: {spec.model.checkpoint}")
         for lora in spec.model.loras:
             typer.echo(

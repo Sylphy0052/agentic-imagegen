@@ -14,6 +14,7 @@ ENV_KEYS = [
     "IMAGEGEN_TIMEOUT",
     "IMAGEGEN_OUTPUT_ROOT",
     "IMAGEGEN_PRESETS_ROOT",
+    "IMAGEGEN_MAX_SOURCE_BYTES",
 ]
 
 
@@ -34,6 +35,7 @@ def test_defaults() -> None:
     assert settings.timeout_seconds == 300
     assert settings.output_root.name == "outputs"
     assert settings.presets_root.name == "presets"
+    assert settings.max_source_bytes == 32 * 1024 * 1024
 
 
 def test_override_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -45,6 +47,7 @@ def test_override_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("IMAGEGEN_TIMEOUT", "30")
     monkeypatch.setenv("IMAGEGEN_OUTPUT_ROOT", "tmp-outputs")
     monkeypatch.setenv("IMAGEGEN_PRESETS_ROOT", "tmp-presets")
+    monkeypatch.setenv("IMAGEGEN_MAX_SOURCE_BYTES", "1048576")
 
     settings = Settings.from_env()
 
@@ -56,6 +59,7 @@ def test_override_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.timeout_seconds == 30
     assert settings.output_root.name == "tmp-outputs"
     assert settings.presets_root.name == "tmp-presets"
+    assert settings.max_source_bytes == 1048576
 
 
 def test_empty_presets_root_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:

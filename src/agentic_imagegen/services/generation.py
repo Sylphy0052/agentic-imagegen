@@ -14,7 +14,7 @@ from typing import Any, Final, Protocol
 
 from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.models import GenerationSpec
-from agentic_imagegen.domain.policy import resolve_output_directory
+from agentic_imagegen.domain.policy import resolve_output_directory, resolve_source_image
 from agentic_imagegen.domain.results import GenerationResult, HealthStatus, ImageRef
 from agentic_imagegen.workflows.injector import prepare_workflow
 
@@ -46,6 +46,8 @@ class GenerationBackend(Protocol):
 
     async def health(self) -> HealthStatus: ...
 
+    async def upload_image(self, path: Path) -> str: ...
+
 
 async def generate(
     spec: GenerationSpec,
@@ -59,7 +61,10 @@ async def generate(
     """Specに従って画像を生成し、結果をプロジェクト配下へ保存する。"""
     directory = _prepare_directory(spec, settings, project_root)
 
-    prepared = prepare_workflow(spec, workflows_dir=workflows_dir)
+    source_image_name = await _upload_source_image(spec, settings, backend, project_root)
+    prepared = prepare_workflow(
+        spec, workflows_dir=workflows_dir, source_image_name=source_image_name
+    )
     seed = prepared.seed
     logger.info(
         "generation start: workflow=%s prefix=%s seed=%s", spec.task, spec.output.prefix, seed
@@ -124,6 +129,28 @@ async def _save_image(
     path = directory / f"image_{index:04d}{suffix}"
     path.write_bytes(data)
     return path
+
+
+async def _upload_source_image(
+    spec: GenerationSpec,
+    settings: Settings,
+    backend: GenerationBackend,
+    project_root: Path,
+) -> str | None:
+    """img2imgの入力画像を検証し、ComfyUIへアップロードして参照名を返す。
+
+    LoadImageが参照できるのはComfyUIのinput配下だけなので、リポジトリ内の画像は
+    そのままでは使えない。ここで送っておく。
+    """
+    if spec.source is None:
+        return None
+
+    path = resolve_source_image(
+        spec.source.image, project_root, max_bytes=settings.max_source_bytes
+    )
+    name = await backend.upload_image(path)
+    logger.info("source image uploaded: %s -> %s", spec.source.image, name)
+    return name
 
 
 async def _collect_backend_info(backend: GenerationBackend) -> dict[str, Any] | None:

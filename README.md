@@ -69,8 +69,9 @@ cd ~/ComfyUI
 | --- | --- |
 | `workflows/txt2img.json` | text-to-image |
 | `workflows/txt2img_lora.json` | LoRA付き text-to-image (`LoraLoader` 3段) |
+| `workflows/img2img.json` | image-to-image (`LoadImage` + `VAEEncode`) |
 
-どちらを使うかは `model.loras` の有無で自動的に決まる。通常は差し替え不要。
+どれを使うかは `task` と `model.loras` の有無で自動的に決まる。通常は差し替え不要。
 自環境に合わせて作り直す場合は [workflows/README.md](workflows/README.md) の手順
 (API形式での書き出し) に従う。
 
@@ -217,6 +218,30 @@ generation:
   (spec > style > scene > character)
 - 適用したpreset名は解決後のSpecに残り、`metadata.json` にも記録される
 
+## img2img
+
+既存の画像を入力にして描き直す。
+
+```yaml
+version: "1"
+task: img2img
+
+source:
+  image: inputs/reference.png   # リポジトリ配下に置く (git管理外)
+  denoise: 0.55                 # 0に近いほど入力を保ち、1に近いほど描き直す
+
+prompt:
+  positive: 1girl, blue hair, rooftop, night, city lights
+
+model:
+  checkpoint: meinamix_v12Final.safetensors
+```
+
+- 入力画像は生成前にComfyUIへ自動でアップロードされる (`~/ComfyUI/input/` へ手で置く必要はない)
+- **解像度は入力画像のサイズをそのまま使う。** `width` / `height` を書くと拒否される
+- `batch_size` は1のみ。LoRAとの併用は未対応
+- 拡張子は `.png` / `.jpg` / `.jpeg` / `.webp`、上限は `IMAGEGEN_MAX_SOURCE_BYTES` (既定32MiB)
+
 ## 出力
 
 ```text
@@ -257,6 +282,7 @@ outputs/
 | `IMAGEGEN_TIMEOUT` | 300 | 生成のタイムアウト秒 |
 | `IMAGEGEN_OUTPUT_ROOT` | `outputs` | 出力ルート |
 | `IMAGEGEN_PRESETS_ROOT` | `presets` | presetの探索ルート |
+| `IMAGEGEN_MAX_SOURCE_BYTES` | 33554432 | img2imgの入力画像の上限バイト数 |
 
 秘密情報は扱わないため、環境変数ファイルは必須ではない。
 
