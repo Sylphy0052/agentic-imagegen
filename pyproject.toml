@@ -56,6 +56,11 @@ select = [
 ]
 ignore = [
     "E501",  # line-length はformatterに委ねる
+    # コメント・docstring・エラーメッセージを日本語で書くため、
+    # 全角文字を「紛らわしい文字」として検出する規則は無効化する
+    "RUF001",
+    "RUF002",
+    "RUF003",
 ]
 
 [tool.ruff.lint.per-file-ignores]
