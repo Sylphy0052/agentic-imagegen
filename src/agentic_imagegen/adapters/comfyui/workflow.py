@@ -108,6 +108,41 @@ def _with_lora_chain(base: WorkflowBinding, *, name: str, first_node_id: int) ->
     return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
 
 
+#: hires fix で使うノードの役割名。
+UPSCALE_ROLE: Final = "upscale"
+HIRES_KSAMPLER_ROLE: Final = "hires_ksampler"
+
+_HIRES_KSAMPLER_INPUTS: Final = (
+    "seed",
+    "steps",
+    "cfg",
+    "sampler_name",
+    "scheduler",
+    "denoise",
+)
+
+
+def _with_hires_fix(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
+    """既存のbindingに latent拡大 + 2段目のKSampler を挟んだbindingを組み立てる。
+
+    1段目のKSamplerから拡大ノードへ、そこから2段目のKSamplerへ、最後にVAEDecodeへ
+    繋がっていることまで検証する。どこかが元のままだと拡大が効かないまま
+    生成が成功してしまい、気づきにくいため。
+    """
+    nodes = dict(base.nodes)
+    nodes[UPSCALE_ROLE] = NodeRef("30", "LatentUpscaleBy", ("upscale_method", "scale_by"))
+    nodes[HIRES_KSAMPLER_ROLE] = NodeRef("31", "KSampler", _HIRES_KSAMPLER_INPUTS)
+    nodes["vae_decode"] = NodeRef("8", "VAEDecode", ())
+
+    links = [
+        *base.links,
+        LinkRef(UPSCALE_ROLE, "samples", "ksampler"),
+        LinkRef(HIRES_KSAMPLER_ROLE, "latent_image", UPSCALE_ROLE),
+        LinkRef("vae_decode", "samples", HIRES_KSAMPLER_ROLE),
+    ]
+    return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
+
+
 TXT2IMG_LORA_BINDING: Final = _with_lora_chain(
     TXT2IMG_BINDING, name="txt2img_lora", first_node_id=10
 )
@@ -144,6 +179,11 @@ IMG2IMG_BINDING: Final = WorkflowBinding(
 IMG2IMG_LORA_BINDING: Final = _with_lora_chain(
     IMG2IMG_BINDING, name="img2img_lora", first_node_id=20
 )
+
+TXT2IMG_HIRES_BINDING: Final = _with_hires_fix(TXT2IMG_BINDING, name="txt2img_hires")
+TXT2IMG_LORA_HIRES_BINDING: Final = _with_hires_fix(TXT2IMG_LORA_BINDING, name="txt2img_lora_hires")
+IMG2IMG_HIRES_BINDING: Final = _with_hires_fix(IMG2IMG_BINDING, name="img2img_hires")
+IMG2IMG_LORA_HIRES_BINDING: Final = _with_hires_fix(IMG2IMG_LORA_BINDING, name="img2img_lora_hires")
 
 
 def resolve_seed(seed: int) -> int:
@@ -261,8 +301,42 @@ def build_workflow(
 
     _inject_loras(spec, binding, inputs_of)
     _inject_source_image(spec, binding, inputs_of, source_image_name)
+    _inject_upscale(spec, binding, inputs_of, seed=seed)
 
     return workflow
+
+
+def _inject_upscale(
+    spec: GenerationSpec,
+    binding: WorkflowBinding,
+    inputs_of: Callable[[str], dict[str, Any]],
+    *,
+    seed: int,
+) -> None:
+    """hires fix 用テンプレートへ拡大倍率と2段目の設定を注入する。"""
+    if UPSCALE_ROLE not in binding.nodes:
+        return
+
+    upscale = spec.generation.upscale
+    if upscale is None:
+        raise WorkflowValidationError(
+            f"Workflow ({binding.name}) はhires fix用ですが、"
+            "Specに generation.upscale が指定されていません"
+        )
+
+    node = inputs_of(UPSCALE_ROLE)
+    node["scale_by"] = upscale.scale
+    node["upscale_method"] = upscale.method
+
+    params = spec.generation
+    second = inputs_of(HIRES_KSAMPLER_ROLE)
+    # 2段目は同じseedを使う。変えると1段目の絵から離れてしまう
+    second["seed"] = seed
+    second["steps"] = upscale.effective_steps(params.steps)
+    second["cfg"] = params.cfg
+    second["sampler_name"] = params.sampler
+    second["scheduler"] = params.scheduler
+    second["denoise"] = upscale.denoise
 
 
 def _inject_source_image(
@@ -331,11 +405,17 @@ def _inject_loras(
 
 
 __all__ = [
+    "HIRES_KSAMPLER_ROLE",
     "IMG2IMG_BINDING",
+    "IMG2IMG_HIRES_BINDING",
     "IMG2IMG_LORA_BINDING",
+    "IMG2IMG_LORA_HIRES_BINDING",
     "LORA_SLOT_ROLES",
     "TXT2IMG_BINDING",
+    "TXT2IMG_HIRES_BINDING",
     "TXT2IMG_LORA_BINDING",
+    "TXT2IMG_LORA_HIRES_BINDING",
+    "UPSCALE_ROLE",
     "LinkRef",
     "NodeRef",
     "WorkflowBinding",

@@ -240,6 +240,28 @@ generation:
   (spec > style > scene > character)
 - 適用したpreset名は解決後のSpecに残り、`metadata.json` にも記録される
 
+## hires fix (解像度を上げる)
+
+1段目の結果をlatentのまま拡大し、2段目のKSamplerで描き足す。アップスケールモデルは不要。
+
+```yaml
+generation:
+  width: 512
+  height: 512
+  steps: 8
+  upscale:
+    scale: 1.5        # 1.0より大きく4.0以下
+    denoise: 0.45     # 低いほど元の絵を保つ
+    steps: 6          # 省略時は1段目と同じ
+    method: nearest-exact
+```
+
+指定するとテンプレートが `*_hires` へ自動的に切り替わる。
+2段目のseedは1段目と同じ値を使う (変えると元の絵から離れるため)。
+
+実測 (Intel XPU / SD1.5 / 512x512 -> 768x768): 43.7秒。
+**生成時間は倍以上になる。** 2段目は拡大後の解像度で走る。
+
 ## img2img
 
 既存の画像を入力にして描き直す。

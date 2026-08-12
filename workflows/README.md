@@ -21,6 +21,10 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `txt2img_lora.json` | LoRA付きtext-to-image (`txt2img` に `LoraLoader` を3段挟んだ構成) |
 | `img2img.json` | image-to-image (`EmptyLatentImage` を `LoadImage` + `VAEEncode` へ置き換えた構成) |
 | `img2img_lora.json` | LoRA付き image-to-image (`img2img` に `LoraLoader` を3段挟んだ構成) |
+| `txt2img_hires.json` | hires fix 付き text-to-image |
+| `txt2img_lora_hires.json` | LoRA + hires fix |
+| `img2img_hires.json` | hires fix 付き image-to-image |
+| `img2img_lora_hires.json` | LoRA + hires fix (img2img) |
 
 どれを使うかは `task` と `model.loras` の有無で自動的に決まる。定義は
 [src/agentic_imagegen/workflows/injector.py](../src/agentic_imagegen/workflows/injector.py)
@@ -78,6 +82,39 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 
 `LoraLoader` はVAEを出さないため、`VAEEncode.vae` と `VAEDecode.vae` は
 `CheckpointLoaderSimple` 直結のままにする。
+
+## 派生テンプレートは合成スクリプトで生成する
+
+`txt2img.json` だけが手書きのベースで、残りは
+[scripts/build_workflow_templates.py](../scripts/build_workflow_templates.py) が生成する。
+
+```bash
+uv run python scripts/build_workflow_templates.py          # 生成
+uv run python scripts/build_workflow_templates.py --check  # 差分がないか確認するだけ
+```
+
+```text
+txt2img.json  (手書きベース)
+  ├─ img2img            EmptyLatentImage -> LoadImage + VAEEncode
+  ├─ *_lora             CheckpointLoader の後に LoraLoader を3段
+  └─ *_hires            KSampler の後に LatentUpscaleBy + 2段目 KSampler
+```
+
+組み合わせが8種になっても手で書かないのは、ノード参照を間違えたときに
+**形は正しいまま意味だけ壊れる**ためである (実際に一度踏んでいる)。
+スクリプトは生成後に次を検査する。
+
+- 存在しないノードIDや範囲外の出力スロットを参照していないか
+- ベースのノードを潰していないか (class_typeが変わっていないか)
+
+ノードIDは用途ごとに帯を分けている。
+
+| 帯 | 用途 |
+| --- | --- |
+| 3-9 | ベース (txt2img標準グラフ) |
+| 10-12 | txt2img系のLoRA / img2imgの LoadImage・VAEEncode |
+| 20-22 | img2img系のLoRA |
+| 30-31 | hires fix (LatentUpscaleBy / 2段目KSampler) |
 
 ## GUIから書き出す手順
 

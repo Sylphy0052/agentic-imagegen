@@ -116,6 +116,27 @@ source:
 - 入力画像は `inputs/` へ置く (git管理外)。拡張子は `.png` / `.jpg` / `.jpeg` / `.webp`
 - 上限サイズは `IMAGEGEN_MAX_SOURCE_BYTES` (既定32MiB)
 
+## 解像度を上げる (hires fix)
+
+`generation.upscale` を指定すると、1段目の結果をlatentのまま拡大し、2段目のKSamplerで
+描き足す。アップスケールモデルは不要。
+
+```yaml
+generation:
+  width: 512
+  height: 768
+  steps: 20
+  upscale:
+    scale: 1.5        # 1.0より大きく4.0以下
+    denoise: 0.45     # 低いほど元の絵を保つ。0.3-0.5が扱いやすい
+    steps: 8          # 省略時は1段目と同じ
+```
+
+- 指定するとテンプレートが `*_hires` へ自動的に切り替わる
+- **生成時間は倍以上になる。** 2段目は拡大後の解像度で走るため、1stepあたりの時間も伸びる
+- 2段目のseedは1段目と同じ値を使う (変えると元の絵から離れる)
+- 最初から大きい解像度で生成するより、hires fix の方が構図が破綻しにくい
+
 ## 複数枚をまとめて生成する
 
 同じSpecでseedを変えて何枚か出したい場合や、複数のSpecを流したい場合は `batch` を使う。

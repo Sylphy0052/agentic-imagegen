@@ -90,7 +90,16 @@ async def test_list_workflows_returns_allowlist() -> None:
     result = await mcp_server.server.call_tool("list_workflows", {})
 
     payload = _payload(result)
-    assert set(payload) == {"txt2img", "txt2img_lora", "img2img", "img2img_lora"}
+    assert set(payload) == {
+        "txt2img",
+        "txt2img_lora",
+        "txt2img_hires",
+        "txt2img_lora_hires",
+        "img2img",
+        "img2img_lora",
+        "img2img_hires",
+        "img2img_lora_hires",
+    }
 
 
 async def test_validate_generation_reports_valid(tmp_path: Path) -> None:
