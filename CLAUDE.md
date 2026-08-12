@@ -116,6 +116,29 @@ source:
 - 入力画像は `inputs/` へ置く (git管理外)。拡張子は `.png` / `.jpg` / `.jpeg` / `.webp`
 - 上限サイズは `IMAGEGEN_MAX_SOURCE_BYTES` (既定32MiB)
 
+## 構図を指定する (ControlNet)
+
+参考画像から線画 (Canny) を取り、その構図を保ったまま生成する。
+
+```yaml
+control:
+  image: inputs/pose.png                              # リポジトリ配下に置く
+  model: control_v11p_sd15_canny_fp16.safetensors     # ~/ComfyUI/models/controlnet/
+  strength: 0.9        # 効かせる強さ (0.0-10.0)
+  start_percent: 0.0   # 効かせ始める進行度
+  end_percent: 1.0     # 効かせ終える進行度。構図だけ借りるなら下げる
+  low_threshold: 0.3   # Cannyの閾値。低いほど細かい線を拾う
+  high_threshold: 0.7
+```
+
+- 指定するとテンプレートが `*_controlnet` へ自動的に切り替わる。txt2img / img2img の両方で使える
+- control画像は生成前にComfyUIへ自動でアップロードされる
+- **前処理は Canny のみ。** pose / depth はpreprocessorのカスタムノードが要るため未対応
+- `upscale` との同時指定は未対応 (両方かけると生成時間が現実的でないため)
+
+線が強く出すぎる場合は `low_threshold` を上げて細かい線を捨てるか、`strength` を下げる。
+写真やイラストをそのまま渡すと輪郭を拾いすぎ、元絵のエッジが残ったような絵になりやすい。
+
 ## 解像度を上げる (hires fix)
 
 `generation.upscale` を指定すると、1段目の結果をlatentのまま拡大し、2段目のKSamplerで

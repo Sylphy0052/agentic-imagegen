@@ -46,9 +46,14 @@ IMG2IMG_VAE_ENCODE = "11"
 IMG2IMG_LORA_IDS = ("20", "21", "22")
 HIRES_UPSCALE = "30"
 HIRES_KSAMPLER = "31"
+CONTROL_LOAD_IMAGE = "40"
+CONTROL_PREPROCESSOR = "41"
+CONTROL_LOADER = "42"
+CONTROL_APPLY = "43"
 
 DEFAULT_LORA = "add_detail.safetensors"
 DEFAULT_SOURCE_IMAGE = "example.png"
+DEFAULT_CONTROLNET = "control_v11p_sd15_canny_fp16.safetensors"
 
 #: 出力スロット数。範囲外の参照を検出するために使う
 OUTPUT_COUNTS = {
@@ -62,6 +67,9 @@ OUTPUT_COUNTS = {
     "VAEDecode": 1,
     "EmptyLatentImage": 1,
     "SaveImage": 0,
+    "Canny": 1,
+    "ControlNetLoader": 1,
+    "ControlNetApplyAdvanced": 2,
 }
 
 Graph = dict[str, dict[str, Any]]
@@ -151,6 +159,51 @@ def with_hires_fix(graph: Graph) -> Graph:
     return graph
 
 
+def with_controlnet(graph: Graph) -> Graph:
+    """CLIPTextEncode と KSampler の間に ControlNet を挟む。
+
+    control画像は Canny で線画へ変換してから ControlNetApplyAdvanced へ渡す。
+    ApplyAdvanced は positive / negative の両方を返すため、KSamplerの
+    2つの入力をどちらもここから受け直す。
+    """
+    graph = copy.deepcopy(graph)
+    for node_id in (CONTROL_LOAD_IMAGE, CONTROL_PREPROCESSOR, CONTROL_LOADER, CONTROL_APPLY):
+        if node_id in graph:
+            raise ValueError(f"ControlNet用のノードID {node_id} が既に使われている")
+
+    graph[CONTROL_LOAD_IMAGE] = {
+        "class_type": "LoadImage",
+        "inputs": {"image": DEFAULT_SOURCE_IMAGE},
+    }
+    graph[CONTROL_PREPROCESSOR] = {
+        "class_type": "Canny",
+        "inputs": {
+            "image": [CONTROL_LOAD_IMAGE, 0],
+            "low_threshold": 0.4,
+            "high_threshold": 0.8,
+        },
+    }
+    graph[CONTROL_LOADER] = {
+        "class_type": "ControlNetLoader",
+        "inputs": {"control_net_name": DEFAULT_CONTROLNET},
+    }
+    graph[CONTROL_APPLY] = {
+        "class_type": "ControlNetApplyAdvanced",
+        "inputs": {
+            "positive": graph[KSAMPLER]["inputs"]["positive"],
+            "negative": graph[KSAMPLER]["inputs"]["negative"],
+            "control_net": [CONTROL_LOADER, 0],
+            "image": [CONTROL_PREPROCESSOR, 0],
+            "strength": 1.0,
+            "start_percent": 0.0,
+            "end_percent": 1.0,
+        },
+    }
+    graph[KSAMPLER]["inputs"]["positive"] = [CONTROL_APPLY, 0]
+    graph[KSAMPLER]["inputs"]["negative"] = [CONTROL_APPLY, 1]
+    return graph
+
+
 def build_all(base: Graph) -> dict[str, Graph]:
     """ベースから全テンプレートを組み立てる。"""
     txt2img = copy.deepcopy(base)
@@ -165,6 +218,12 @@ def build_all(base: Graph) -> dict[str, Graph]:
         "img2img_lora": with_lora_chain(img2img, IMG2IMG_LORA_IDS),
         "img2img_hires": with_hires_fix(img2img),
         "img2img_lora_hires": with_hires_fix(with_lora_chain(img2img, IMG2IMG_LORA_IDS)),
+        # ControlNet と hires の組み合わせは作らない。両方かけると生成時間が
+        # 現実的でなく、必要になってから足せばよい
+        "txt2img_controlnet": with_controlnet(txt2img),
+        "txt2img_lora_controlnet": with_controlnet(with_lora_chain(txt2img, LORA_IDS)),
+        "img2img_controlnet": with_controlnet(img2img),
+        "img2img_lora_controlnet": with_controlnet(with_lora_chain(img2img, IMG2IMG_LORA_IDS)),
     }
 
 

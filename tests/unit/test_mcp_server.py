@@ -95,10 +95,14 @@ async def test_list_workflows_returns_allowlist() -> None:
         "txt2img_lora",
         "txt2img_hires",
         "txt2img_lora_hires",
+        "txt2img_controlnet",
+        "txt2img_lora_controlnet",
         "img2img",
         "img2img_lora",
         "img2img_hires",
         "img2img_lora_hires",
+        "img2img_controlnet",
+        "img2img_lora_controlnet",
     }
 
 

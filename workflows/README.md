@@ -25,6 +25,10 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `txt2img_lora_hires.json` | LoRA + hires fix |
 | `img2img_hires.json` | hires fix 付き image-to-image |
 | `img2img_lora_hires.json` | LoRA + hires fix (img2img) |
+| `txt2img_controlnet.json` | ControlNet付き text-to-image |
+| `txt2img_lora_controlnet.json` | LoRA + ControlNet |
+| `img2img_controlnet.json` | ControlNet付き image-to-image |
+| `img2img_lora_controlnet.json` | LoRA + ControlNet (img2img) |
 
 どれを使うかは `task` と `model.loras` の有無で自動的に決まる。定義は
 [src/agentic_imagegen/workflows/injector.py](../src/agentic_imagegen/workflows/injector.py)
@@ -97,7 +101,8 @@ uv run python scripts/build_workflow_templates.py --check  # 差分がないか�
 txt2img.json  (手書きベース)
   ├─ img2img            EmptyLatentImage -> LoadImage + VAEEncode
   ├─ *_lora             CheckpointLoader の後に LoraLoader を3段
-  └─ *_hires            KSampler の後に LatentUpscaleBy + 2段目 KSampler
+  ├─ *_hires            KSampler の後に LatentUpscaleBy + 2段目 KSampler
+  └─ *_controlnet       CLIPTextEncode と KSampler の間に ControlNet
 ```
 
 組み合わせが8種になっても手で書かないのは、ノード参照を間違えたときに
@@ -115,6 +120,10 @@ txt2img.json  (手書きベース)
 | 10-12 | txt2img系のLoRA / img2imgの LoadImage・VAEEncode |
 | 20-22 | img2img系のLoRA |
 | 30-31 | hires fix (LatentUpscaleBy / 2段目KSampler) |
+| 40-43 | ControlNet (LoadImage / Canny / ControlNetLoader / ControlNetApplyAdvanced) |
+
+ControlNet と hires fix の組み合わせは作っていない。両方かけると生成時間が現実的でなく、
+必要になってから足せばよい (Specの検証で同時指定を拒否している)。
 
 ## GUIから書き出す手順
 
