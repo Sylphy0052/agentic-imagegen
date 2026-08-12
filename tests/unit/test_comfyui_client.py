@@ -204,3 +204,58 @@ async def test_available_controlnets_empty_when_none_installed() -> None:
 
     async with _client(handler) as client:
         assert await client.available_controlnets() == ()
+
+
+IPADAPTER_OBJECT_INFO = {
+    "IPAdapterModelLoader": {
+        "input": {
+            "required": {
+                "ipadapter_file": [
+                    ["ip-adapter-plus_sd15.safetensors", "ip-adapter_sd15_light_v11.bin"],
+                    {},
+                ]
+            }
+        }
+    }
+}
+
+CLIP_VISION_OBJECT_INFO = {
+    "CLIPVisionLoader": {
+        "input": {"required": {"clip_name": [["CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors"], {}]}}
+    }
+}
+
+
+async def test_available_ipadapters() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/object_info/IPAdapterModelLoader"
+        return httpx.Response(200, json=IPADAPTER_OBJECT_INFO)
+
+    async with _client(handler) as client:
+        names = await client.available_ipadapters()
+
+    assert names == (
+        "ip-adapter-plus_sd15.safetensors",
+        "ip-adapter_sd15_light_v11.bin",
+    )
+
+
+async def test_available_ipadapters_empty_when_custom_node_absent() -> None:
+    """IPAdapterはカスタムノード由来のため、未導入ならノード自体が存在しない。"""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={})
+
+    async with _client(handler) as client:
+        assert await client.available_ipadapters() == ()
+
+
+async def test_available_clip_visions() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/object_info/CLIPVisionLoader"
+        return httpx.Response(200, json=CLIP_VISION_OBJECT_INFO)
+
+    async with _client(handler) as client:
+        assert await client.available_clip_visions() == (
+            "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
+        )

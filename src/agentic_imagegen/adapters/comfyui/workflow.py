@@ -238,6 +238,75 @@ TXT2IMG_LORA_HIRES_BINDING: Final = _with_hires_fix(TXT2IMG_LORA_BINDING, name="
 IMG2IMG_HIRES_BINDING: Final = _with_hires_fix(IMG2IMG_BINDING, name="img2img_hires")
 IMG2IMG_LORA_HIRES_BINDING: Final = _with_hires_fix(IMG2IMG_LORA_BINDING, name="img2img_lora_hires")
 
+#: IPAdapter (reference) 用ノードの役割名。
+REFERENCE_IMAGE_ROLE: Final = "reference_image"
+REFERENCE_LOADER_ROLE: Final = "reference_loader"
+REFERENCE_CLIP_VISION_ROLE: Final = "reference_clip_vision"
+REFERENCE_APPLY_ROLE: Final = "reference_apply"
+
+
+def _with_ipadapter(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
+    """既存のbindingに IPAdapter を挟んだbindingを組み立てる。
+
+    IPAdapterAdvanced が返すのは MODEL だけなので、KSamplerのmodel入力だけを
+    差し替える。ControlNetは positive / negative を差し替えるため、
+    両方を同時にかけても互いに干渉しない。
+
+    KSamplerがIPAdapterを経由せずcheckpoint (またはLoRA末尾) から直接MODELを
+    受けていると、参照画像が効かないまま生成が成功してしまう。リンクの期待値を
+    置いて構造検証で落とす。
+    """
+    nodes = dict(base.nodes)
+    nodes[REFERENCE_IMAGE_ROLE] = NodeRef("50", "LoadImage", ("image",))
+    nodes[REFERENCE_LOADER_ROLE] = NodeRef("51", "IPAdapterModelLoader", ("ipadapter_file",))
+    nodes[REFERENCE_CLIP_VISION_ROLE] = NodeRef("52", "CLIPVisionLoader", ("clip_name",))
+    nodes[REFERENCE_APPLY_ROLE] = NodeRef(
+        "53",
+        "IPAdapterAdvanced",
+        ("weight", "weight_type", "start_at", "end_at"),
+    )
+
+    upstream = [
+        link for link in base.links if link.source_node == "ksampler" and link.input_key == "model"
+    ]
+    if len(upstream) != 1:  # pragma: no cover - bindingの組み立て時にしか起きない
+        raise ValueError(f"{name}: KSamplerのmodelリンクを一意に特定できません")
+
+    links = [link for link in base.links if link not in upstream]
+    links.extend(
+        [
+            LinkRef(REFERENCE_APPLY_ROLE, "model", upstream[0].expected_role),
+            LinkRef(REFERENCE_APPLY_ROLE, "ipadapter", REFERENCE_LOADER_ROLE),
+            LinkRef(REFERENCE_APPLY_ROLE, "image", REFERENCE_IMAGE_ROLE),
+            LinkRef(REFERENCE_APPLY_ROLE, "clip_vision", REFERENCE_CLIP_VISION_ROLE),
+            LinkRef("ksampler", "model", REFERENCE_APPLY_ROLE),
+        ]
+    )
+    return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
+
+
+TXT2IMG_IPADAPTER_BINDING: Final = _with_ipadapter(TXT2IMG_BINDING, name="txt2img_ipadapter")
+TXT2IMG_LORA_IPADAPTER_BINDING: Final = _with_ipadapter(
+    TXT2IMG_LORA_BINDING, name="txt2img_lora_ipadapter"
+)
+IMG2IMG_IPADAPTER_BINDING: Final = _with_ipadapter(IMG2IMG_BINDING, name="img2img_ipadapter")
+IMG2IMG_LORA_IPADAPTER_BINDING: Final = _with_ipadapter(
+    IMG2IMG_LORA_BINDING, name="img2img_lora_ipadapter"
+)
+
+TXT2IMG_CONTROLNET_IPADAPTER_BINDING: Final = _with_ipadapter(
+    TXT2IMG_CONTROLNET_BINDING, name="txt2img_controlnet_ipadapter"
+)
+TXT2IMG_LORA_CONTROLNET_IPADAPTER_BINDING: Final = _with_ipadapter(
+    TXT2IMG_LORA_CONTROLNET_BINDING, name="txt2img_lora_controlnet_ipadapter"
+)
+IMG2IMG_CONTROLNET_IPADAPTER_BINDING: Final = _with_ipadapter(
+    IMG2IMG_CONTROLNET_BINDING, name="img2img_controlnet_ipadapter"
+)
+IMG2IMG_LORA_CONTROLNET_IPADAPTER_BINDING: Final = _with_ipadapter(
+    IMG2IMG_LORA_CONTROLNET_BINDING, name="img2img_lora_controlnet_ipadapter"
+)
+
 
 def resolve_seed(seed: int) -> int:
     """seedが -1 ならランダムな値へ解決する。それ以外はそのまま返す。"""
@@ -312,6 +381,7 @@ def build_workflow(
     binding: WorkflowBinding = TXT2IMG_BINDING,
     source_image_name: str | None = None,
     control_image_name: str | None = None,
+    reference_image_name: str | None = None,
 ) -> dict[str, Any]:
     """テンプレートへSpecの値を注入した新しいWorkflowを返す。
 
@@ -357,8 +427,41 @@ def build_workflow(
     _inject_source_image(spec, binding, inputs_of, source_image_name)
     _inject_upscale(spec, binding, inputs_of, seed=seed)
     _inject_controlnet(spec, binding, inputs_of, control_image_name)
+    _inject_reference(spec, binding, inputs_of, reference_image_name)
 
     return workflow
+
+
+def _inject_reference(
+    spec: GenerationSpec,
+    binding: WorkflowBinding,
+    inputs_of: Callable[[str], dict[str, Any]],
+    reference_image_name: str | None,
+) -> None:
+    """IPAdapter用テンプレートへ参照画像と各パラメータを注入する。"""
+    if REFERENCE_APPLY_ROLE not in binding.nodes:
+        return
+
+    reference = spec.reference
+    if reference is None:
+        raise WorkflowValidationError(
+            f"Workflow ({binding.name}) はIPAdapter用ですが、Specに reference が指定されていません"
+        )
+    if not reference_image_name:
+        raise WorkflowValidationError(
+            f"Workflow ({binding.name}) の参照画像がComfyUIへアップロードされていません"
+        )
+
+    inputs_of(REFERENCE_IMAGE_ROLE)["image"] = reference_image_name
+    inputs_of(REFERENCE_LOADER_ROLE)["ipadapter_file"] = reference.model
+    inputs_of(REFERENCE_CLIP_VISION_ROLE)["clip_name"] = reference.clip_vision
+
+    apply_node = inputs_of(REFERENCE_APPLY_ROLE)
+    apply_node["weight"] = reference.weight
+    apply_node["weight_type"] = reference.weight_type
+    # ノード側の名前は start_at / end_at。Spec側はControlSpecと揃えて percent にしている
+    apply_node["start_at"] = reference.start_percent
+    apply_node["end_at"] = reference.end_percent
 
 
 def _inject_controlnet(
@@ -500,17 +603,29 @@ __all__ = [
     "HIRES_KSAMPLER_ROLE",
     "IMG2IMG_BINDING",
     "IMG2IMG_CONTROLNET_BINDING",
+    "IMG2IMG_CONTROLNET_IPADAPTER_BINDING",
     "IMG2IMG_HIRES_BINDING",
+    "IMG2IMG_IPADAPTER_BINDING",
     "IMG2IMG_LORA_BINDING",
     "IMG2IMG_LORA_CONTROLNET_BINDING",
+    "IMG2IMG_LORA_CONTROLNET_IPADAPTER_BINDING",
     "IMG2IMG_LORA_HIRES_BINDING",
+    "IMG2IMG_LORA_IPADAPTER_BINDING",
     "LORA_SLOT_ROLES",
+    "REFERENCE_APPLY_ROLE",
+    "REFERENCE_CLIP_VISION_ROLE",
+    "REFERENCE_IMAGE_ROLE",
+    "REFERENCE_LOADER_ROLE",
     "TXT2IMG_BINDING",
     "TXT2IMG_CONTROLNET_BINDING",
+    "TXT2IMG_CONTROLNET_IPADAPTER_BINDING",
     "TXT2IMG_HIRES_BINDING",
+    "TXT2IMG_IPADAPTER_BINDING",
     "TXT2IMG_LORA_BINDING",
     "TXT2IMG_LORA_CONTROLNET_BINDING",
+    "TXT2IMG_LORA_CONTROLNET_IPADAPTER_BINDING",
     "TXT2IMG_LORA_HIRES_BINDING",
+    "TXT2IMG_LORA_IPADAPTER_BINDING",
     "UPSCALE_ROLE",
     "LinkRef",
     "NodeRef",

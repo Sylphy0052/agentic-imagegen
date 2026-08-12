@@ -37,15 +37,17 @@ stdioで待ち受けるため、単体で実行しても何も表示されずに
 | `list_models` | 利用可能なcheckpoint名を返す | 必要 |
 | `list_loras` | 利用可能なLoRA名を返す | 必要 |
 | `list_controlnets` | 利用可能なControlNetモデル名を返す | 必要 |
+| `list_ipadapters` | 利用可能なIPAdapterモデル名を返す | 必要 |
+| `list_clip_visions` | 利用可能なCLIP Visionモデル名を返す | 必要 |
 | `list_workflows` | 実行を許可しているWorkflowテンプレート名を返す | 不要 |
 
 `validate_generation` はpresetを展開したうえで、選択されるテンプレート・解像度・LoRA構成・
-ControlNet (`control`) と hires fix (`generation.upscale`) の設定を返す。
+ControlNet (`control`)、IPAdapter (`reference`)、hires fix (`generation.upscale`) の設定を返す。
 不正なSpecでもエラーにはせず `valid: false` と理由を返すので、生成前の確認に使える。
 
 ### CLIとの機能差
 
-Specに書ける項目はCLIとMCPで同じものが使える。ControlNet・hires fix・LoRA・img2imgは
+Specに書ける項目はCLIとMCPで同じものが使える。ControlNet・IPAdapter・hires fix・LoRA・img2imgは
 いずれもSpecの内容で決まるため、MCP側に専用のパラメータは無い。使うWorkflowテンプレートも
 Specから自動的に決まる。
 
@@ -65,6 +67,20 @@ Specから自動的に決まる。
 
 ControlNetモデルは `list_controlnets` で実在するものを確認してから指定する。
 `control` の画像パスは作業ルートからの相対で書く (CLIと同じ規則)。
+
+IPAdapterを使う場合は `reference` を書く。モデル名は `list_ipadapters` / `list_clip_visions`
+で確認する。`list_ipadapters` が空ならカスタムノードが未導入で、`reference` は使えない。
+
+```json
+{
+  "reference": {
+    "image": "inputs/character.png",
+    "model": "ip-adapter-plus_sd15.safetensors",
+    "clip_vision": "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
+    "weight": 0.8
+  }
+}
+```
 
 ### 生成の流れ
 

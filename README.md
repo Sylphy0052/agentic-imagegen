@@ -267,6 +267,36 @@ ControlNet: inputs/pose.png (model=control_v11p_sd15_canny_fp16.safetensors, str
 
 線が強く出すぎる場合は `low_threshold` を上げるか `strength` を下げる。
 
+## IPAdapter (参照画像から特徴を引き継ぐ)
+
+参照画像をCLIP Visionで読み、その特徴を効かせたまま生成する。プロンプトだけでは揺れる
+人物の顔立ちや服装を固定できる。
+
+```yaml
+reference:
+  image: inputs/character.png
+  model: ip-adapter-plus_sd15.safetensors
+  clip_vision: CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors
+  weight: 0.8
+  weight_type: linear
+```
+
+```text
+$ uv run imagegen validate specs/generated/ipadapter-check.yaml
+Workflow: txt2img_ipadapter
+IPAdapter: inputs/character.png (model=ip-adapter-plus_sd15.safetensors, weight=0.8)
+```
+
+- txt2img / img2img のどちらでも使える。LoRA・ControlNetとも併用できる
+- 参照画像は生成前にComfyUIへ自動でアップロードされる
+- [ComfyUI_IPAdapter_plus](https://github.com/cubiq/ComfyUI_IPAdapter_plus) の導入が要る。
+  モデルは `~/ComfyUI/models/ipadapter/`、CLIP Visionは `~/ComfyUI/models/clip_vision/` へ置く
+- `weight_type` は `linear` / `style transfer` / `composition` など15種
+- `upscale` との同時指定は未対応
+
+ControlNetと併用すると、構図をControlNet、特徴をIPAdapterが担う。同一キャラクタを
+異なる構図で出したい場合はこの組み合わせを使う。
+
 ## hires fix (解像度を上げる)
 
 1段目の結果をlatentのまま拡大し、2段目のKSamplerで描き足す。アップスケールモデルは不要。
@@ -422,12 +452,14 @@ uv run imagegen-mcp   # stdioで待ち受ける (通常はクライアントが�
 | `list_models` | 利用可能なcheckpoint名 |
 | `list_loras` | 利用可能なLoRA名 |
 | `list_controlnets` | 利用可能なControlNetモデル名 |
+| `list_ipadapters` | 利用可能なIPAdapterモデル名 (カスタムノード未導入なら空) |
+| `list_clip_visions` | 利用可能なCLIP Visionモデル名 |
 | `list_workflows` | 実行を許可しているWorkflowテンプレート名 |
 
 生成は数十秒から数分かかるため、`generate_image` は完了を待たずに `job_id` を返し、
 `get_generation_status` で結果を受け取る。失敗時はCLIと同じ exit code を返す。
 
-ControlNet・hires fix・LoRA・img2imgはいずれもSpecの内容で決まるため、MCP側に専用の
+ControlNet・IPAdapter・hires fix・LoRA・img2imgはいずれもSpecの内容で決まるため、MCP側に専用の
 パラメータは無い。CLIで書けるSpecはそのままMCPでも使える。
 
 MCP層は薄いアダプタで、検証も生成もCLIと同じ Service / Domain を通る。
