@@ -20,13 +20,18 @@ from mcp.server.mcpserver import MCPServer
 
 from agentic_imagegen import __version__
 from agentic_imagegen.config import Settings
+from agentic_imagegen.domain.results import GenerationResult
 from agentic_imagegen.services import mcp_tools
+from agentic_imagegen.services.batch import BatchOutcome
 from agentic_imagegen.services.jobs import JobRegistry
 
 SERVER_NAME: Final = "agentic-imagegen"
 
 #: 実行中および完了済みの生成ジョブ。プロセス内に保持する。
-_registry: Final = JobRegistry()
+_registry: Final = JobRegistry[GenerationResult]()
+
+#: 一括生成のジョブ。結果の形が違うため単発とは別に持つ。
+_batch_registry: Final = JobRegistry[list[BatchOutcome]]()
 
 server: Final = MCPServer(
     name=SERVER_NAME,
@@ -34,7 +39,8 @@ server: Final = MCPServer(
     instructions=(
         "ComfyUI経由でStable Diffusion系モデルの画像生成を行う。"
         "生成前に validate_generation でSpecを確認し、"
-        "checkpointやLoRAは list_models / list_loras で実在するものだけを指定すること。"
+        "checkpointやLoRAは list_models / list_loras で、"
+        "ControlNetモデルは list_controlnets で実在するものだけを指定すること。"
     ),
 )
 
@@ -49,7 +55,8 @@ def project_root() -> Path:
 def validate_generation(spec: dict[str, Any]) -> dict[str, Any]:
     """GenerationSpecを検証する。画像は生成しない。
 
-    presetの展開結果、選択されるWorkflowテンプレート、解像度、LoRA構成を返す。
+    presetの展開結果、選択されるWorkflowテンプレート、解像度、LoRA構成、
+    ControlNet (control) と hires fix (generation.upscale) の設定を返す。
     不正な場合も例外にせず valid: false と理由を返す。
     """
     return mcp_tools.validate_generation(
@@ -70,11 +77,21 @@ async def list_loras() -> list[str]:
 
 
 @server.tool()
+async def list_controlnets() -> list[str]:
+    """ComfyUIが持っているControlNetモデル名の一覧を返す。"""
+    return await mcp_tools.list_controlnets(Settings.from_env())
+
+
+@server.tool()
 async def generate_image(spec: dict[str, Any]) -> dict[str, Any]:
     """GenerationSpecに従って画像生成を開始する。
 
     生成には数十秒から数分かかるため、完了は待たずに job_id を返す。
     結果は get_generation_status で受け取る。不正なSpecはここで拒否される。
+
+    Specに control を書けばControlNet (Canny) で構図を制御でき、
+    generation.upscale を書けば hires fix で解像度を上げられる。
+    使うWorkflowテンプレートはSpecの内容から自動的に決まる。
 
     このtoolは非同期にしておく必要がある。同期関数として登録すると
     実行中のイベントループが無い文脈で呼ばれ、ジョブを起動できない。
@@ -85,6 +102,40 @@ async def generate_image(spec: dict[str, Any]) -> dict[str, Any]:
         project_root=project_root(),
         registry=_registry,
     )
+
+
+@server.tool()
+async def generate_batch(
+    specs: list[dict[str, Any]], seeds: list[int] | None = None
+) -> dict[str, Any]:
+    """複数のGenerationSpecをまとめて生成する。
+
+    seeds を指定すると、Specごとに各seedを当てたものへ展開する
+    (Spec1件 + seed3つなら3枚)。完了は待たずに job_id を返し、
+    結果は get_batch_status で受け取る。
+
+    検証は投入前に全件行う。1件でも不正なら1件も生成しない。
+    生成は順に実行され、1件失敗しても残りは続く。
+
+    generate_image と同じく非同期にしておく必要がある。
+    """
+    return mcp_tools.submit_batch(
+        specs,
+        seeds=seeds,
+        settings=Settings.from_env(),
+        project_root=project_root(),
+        registry=_batch_registry,
+    )
+
+
+@server.tool()
+def get_batch_status(job_id: str) -> dict[str, Any]:
+    """generate_batch で開始した一括生成の状態を返す。
+
+    完了時は total / succeeded / failed と、1件ごとの結果を items で返す。
+    1件失敗しても残りは続くため、失敗が混ざっていても status は completed になる。
+    """
+    return mcp_tools.get_batch_status(job_id, registry=_batch_registry, project_root=project_root())
 
 
 @server.tool()
@@ -101,8 +152,8 @@ def get_generation_status(job_id: str) -> dict[str, Any]:
 def list_workflows() -> list[str]:
     """実行を許可しているWorkflowテンプレート名の一覧を返す。
 
-    どのテンプレートを使うかは task と LoRA指定の有無から自動的に決まるため、
-    呼び出し側が明示する必要はない。
+    どのテンプレートを使うかは task と LoRA / control / upscale の指定有無から
+    自動的に決まるため、呼び出し側が明示する必要はない。
     """
     return mcp_tools.list_workflows()
 

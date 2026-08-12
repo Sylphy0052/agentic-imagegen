@@ -12,7 +12,6 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Final
 
 from agentic_imagegen.domain.models import GenerationSpec
@@ -31,7 +30,9 @@ type ProgressCallback = Callable[[int, int, "BatchItem"], None]
 class BatchItem:
     """一括実行の1件。"""
 
-    spec_path: Path
+    #: Specの出どころ。CLIはファイルパス、MCPは受け取った並びの位置を入れる。
+    #: ここをパスに固定しないのは、MCP経由ではSpecがファイルとして存在しないため。
+    source: str
     spec: GenerationSpec
     #: seed掃引で上書きした場合のみ値が入る。表示の出し分けに使う。
     seed_override: int | None
@@ -40,8 +41,8 @@ class BatchItem:
     def label(self) -> str:
         """サマリ表示用のラベル。"""
         if self.seed_override is None:
-            return self.spec_path.as_posix()
-        return f"{self.spec_path.as_posix()} (seed={self.seed_override})"
+            return self.source
+        return f"{self.source} (seed={self.seed_override})"
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,7 +59,7 @@ class BatchOutcome:
 
 
 def expand_seeds(
-    pairs: Iterable[tuple[Path, GenerationSpec]], *, seeds: Sequence[int] | None
+    pairs: Iterable[tuple[str, GenerationSpec]], *, seeds: Sequence[int] | None
 ) -> list[BatchItem]:
     """Specとseedの組み合わせを展開する。
 
@@ -66,15 +67,15 @@ def expand_seeds(
     Specごとに各seedを当てたものを作る。
     """
     items: list[BatchItem] = []
-    for spec_path, spec in pairs:
+    for source, spec in pairs:
         if not seeds:
-            items.append(BatchItem(spec_path=spec_path, spec=spec, seed_override=None))
+            items.append(BatchItem(source=source, spec=spec, seed_override=None))
             continue
         for seed in seeds:
             generation = spec.generation.model_copy(update={"seed": seed})
             items.append(
                 BatchItem(
-                    spec_path=spec_path,
+                    source=source,
                     spec=spec.model_copy(update={"generation": generation}),
                     seed_override=seed,
                 )

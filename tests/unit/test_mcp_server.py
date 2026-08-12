@@ -19,8 +19,11 @@ EXPECTED_TOOLS = {
     "validate_generation",
     "generate_image",
     "get_generation_status",
+    "generate_batch",
+    "get_batch_status",
     "list_models",
     "list_loras",
+    "list_controlnets",
     "list_workflows",
 }
 
@@ -74,6 +77,27 @@ def test_generate_image_tool_is_async() -> None:
     ユニットテストはasync文脈から呼ぶため気づけず、実サーバー経路でだけ壊れる。
     """
     assert inspect.iscoroutinefunction(mcp_server.generate_image)
+
+
+def test_generate_batch_tool_is_async() -> None:
+    """一括生成も同じ理由で非同期にしておく。"""
+    assert inspect.iscoroutinefunction(mcp_server.generate_batch)
+
+
+async def test_generate_batch_schema_takes_specs() -> None:
+    tools = {tool.name: tool for tool in await mcp_server.server.list_tools()}
+
+    schema = tools["generate_batch"].input_schema
+
+    assert "specs" in schema["properties"]
+    assert "seeds" in schema["properties"]
+    # seedsは省略できる (指定しなければ掃引しない)
+    assert schema["required"] == ["specs"]
+
+
+async def test_get_batch_status_rejects_unknown_job() -> None:
+    with pytest.raises(ToolError, match="job_id"):
+        await mcp_server.server.call_tool("get_batch_status", {"job_id": "does-not-exist"})
 
 
 async def test_get_generation_status_rejects_unknown_job() -> None:
