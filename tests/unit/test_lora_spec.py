@@ -96,7 +96,14 @@ class TestName:
 
     @pytest.mark.parametrize(
         "name",
-        ["add_detail.safetensors", "style/anime.safetensors", "legacy.pt", "old.ckpt"],
+        [
+            "add_detail.safetensors",
+            "style/anime.safetensors",
+            "legacy.pt",
+            "old.ckpt",
+            # 実在ファイル名は大文字混じりのことがある
+            "Add_Detail.SafeTensors",
+        ],
     )
     def test_accepts_valid_names(self, name: str) -> None:
         spec = GenerationSpec.model_validate(_spec_dict(loras=[_lora(name)]))

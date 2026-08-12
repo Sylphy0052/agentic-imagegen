@@ -108,6 +108,17 @@ def test_accepts_bin_model() -> None:
     assert reference.model == "ip-adapter_sd15_light_v11.bin"
 
 
+def test_accepts_uppercase_suffix() -> None:
+    """実在ファイル名は大文字混じりのことがある。拡張子の大小では弾かない。"""
+    reference = GenerationSpec.model_validate(
+        _spec(model="IP-Adapter-Plus_SD15.SafeTensors", clip_vision="CLIP-ViT-H-14.SafeTensors")
+    ).reference
+
+    assert reference is not None
+    assert reference.model == "IP-Adapter-Plus_SD15.SafeTensors"
+    assert reference.clip_vision == "CLIP-ViT-H-14.SafeTensors"
+
+
 @pytest.mark.parametrize(
     "clip_vision", ["../clip.safetensors", "clip.exe", "/abs/clip.safetensors"]
 )

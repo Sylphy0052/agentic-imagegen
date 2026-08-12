@@ -86,7 +86,16 @@ class TestTextLayerContent:
 
 
 class TestTextLayerFont:
-    @pytest.mark.parametrize("name", ["NotoSansJP.ttf", "sub/NotoSansJP.otf", "yu.ttc"])
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "NotoSansJP.ttf",
+            "sub/NotoSansJP.otf",
+            "yu.ttc",
+            # 配布フォントは .TTF のように大文字の拡張子を持つことがある
+            "NotoSansJP.TTF",
+        ],
+    )
     def test_accepts_allowed_suffixes(self, name: str) -> None:
         assert TextLayer.model_validate(_layer(font=name)).font == name
 
