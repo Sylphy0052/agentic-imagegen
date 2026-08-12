@@ -128,7 +128,8 @@ class OutputSpec(_StrictModel):
     directory の実体解決とリポジトリ外への脱出検証は domain.policy が担う。
     """
 
-    directory: str = "outputs"
+    #: 未指定なら Settings.output_root (既定 outputs) を使う。
+    directory: str | None = None
     prefix: str = "imagegen"
 
     @field_validator("prefix")

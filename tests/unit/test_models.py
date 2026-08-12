@@ -63,7 +63,7 @@ def test_defaults_are_applied() -> None:
     assert spec.generation.steps == 20
     assert spec.generation.seed == -1
     assert spec.generation.batch_size == 1
-    assert spec.output.directory == "outputs"
+    assert spec.output.directory is None
 
 
 @pytest.mark.parametrize("width", [0, 32, 63, 100, 513, 8200])

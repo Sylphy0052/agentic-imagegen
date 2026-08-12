@@ -20,6 +20,7 @@ import websockets
 from websockets.exceptions import WebSocketException
 
 from agentic_imagegen.config import Settings
+from agentic_imagegen.domain.results import ImageRef
 from agentic_imagegen.errors import (
     ComfyUIUnavailable,
     GenerationFailed,
@@ -43,15 +44,6 @@ class HealthStatus:
     base_url: str
     comfyui_version: str | None
     devices: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ImageRef:
-    """ComfyUIのoutput上にある画像1件への参照。"""
-
-    filename: str
-    subfolder: str
-    type: str
 
 
 class ComfyUIClient:
