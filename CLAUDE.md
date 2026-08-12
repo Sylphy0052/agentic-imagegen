@@ -116,6 +116,19 @@ source:
 - 入力画像は `inputs/` へ置く (git管理外)。拡張子は `.png` / `.jpg` / `.jpeg` / `.webp`
 - 上限サイズは `IMAGEGEN_MAX_SOURCE_BYTES` (既定32MiB)
 
+## 複数枚をまとめて生成する
+
+同じSpecでseedを変えて何枚か出したい場合や、複数のSpecを流したい場合は `batch` を使う。
+
+```bash
+uv run imagegen batch specs/generated/a.yaml --seeds 111,222,333
+uv run imagegen batch specs/generated/a.yaml specs/generated/b.yaml
+```
+
+- 1件失敗しても残りは続き、最後にサマリが出る
+- Specの検証は実行前に全件行う。不正なSpecが混ざっていたら1件も生成しない
+- CPU推論では枚数分だけ時間がかかる。`steps` と解像度を落としてから使う
+
 ## 禁止事項
 
 - **`workflows/*.json` を勝手に書き換えない。** Workflowは人間がComfyUI GUIで作成しAPI形式で書き出す。

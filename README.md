@@ -142,6 +142,28 @@ uv run imagegen generate specs/examples/txt2img.yaml --timeout 600
 
 失敗時は原因ごとに異なるexit codeを返す (一覧は [CLAUDE.md](CLAUDE.md) を参照)。
 
+### 一括生成
+
+複数のSpecをまとめて実行する。seed掃引もできる。
+
+```bash
+uv run imagegen batch specs/generated/a.yaml specs/generated/b.yaml
+uv run imagegen batch specs/generated/a.yaml --seeds 111,222,333
+```
+
+```text
+[1/2] specs/generated/a.yaml (seed=111)
+  -> /path/to/outputs/2026-08-12/sample/image_0001.png
+[2/2] specs/generated/a.yaml (seed=222)
+  -> /path/to/outputs/2026-08-12/sample-2/image_0001.png
+成功 2 / 失敗 0
+```
+
+**1件失敗しても残りは続ける。** 途中で止まるとどこまで進んだのか分からなくなるため。
+全件終わったあとにサマリを出し、失敗があれば最初の失敗のexit codeで終了する。
+
+Specの検証は実行前に全件まとめて行う。不正なSpecが混ざっていた場合は1件も生成しない。
+
 ## GenerationSpec
 
 ```yaml

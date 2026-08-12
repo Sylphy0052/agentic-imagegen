@@ -22,7 +22,8 @@ from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.domain.policy import validate_against_limits
 from agentic_imagegen.domain.results import GenerationResult, HealthStatus
-from agentic_imagegen.errors import ComfyUIUnavailable, ImageGenError
+from agentic_imagegen.errors import ComfyUIUnavailable, ImageGenError, InvalidGenerationSpec
+from agentic_imagegen.services.batch import BatchItem, BatchOutcome, expand_seeds, run_batch
 from agentic_imagegen.services.generation import generate
 from agentic_imagegen.services.spec_loader import load_spec
 from agentic_imagegen.workflows.injector import resolve_workflow_name
@@ -145,6 +146,92 @@ def generate_images(
         for path in result.files:
             typer.echo(str(path))
         typer.echo(f"metadata: {result.metadata_path}")
+
+
+@app.command(name="batch")
+def batch_generate(
+    spec_paths: Annotated[
+        list[Path],
+        typer.Argument(help="実行するGenerationSpecのパス (複数指定可)"),
+    ],
+    seeds: Annotated[
+        str | None,
+        typer.Option("--seeds", help="seed掃引。カンマ区切りで指定する (例: 1,2,3)"),
+    ] = None,
+    timeout: Annotated[
+        float | None,
+        typer.Option("--timeout", help="1件あたりのタイムアウト秒 (既定は IMAGEGEN_TIMEOUT)"),
+    ] = None,
+    verbose: VerboseOption = False,
+) -> None:
+    """複数のSpecをまとめて生成する。1件失敗しても残りは続ける。"""
+    _configure_logging(verbose)
+
+    with _handled_errors():
+        settings = Settings.from_env()
+        parsed_seeds = _parse_seeds(seeds)
+        # 検証は全件を実行前に済ませる。途中で不正なSpecに当たって止まらないようにする
+        pairs = [(path, _load_and_validate(path, settings)) for path in spec_paths]
+        items = expand_seeds(pairs, seeds=parsed_seeds)
+
+        outcomes = asyncio.run(_run_batch(items, settings, timeout))
+
+    _echo_batch_summary(outcomes)
+
+    failures = [outcome for outcome in outcomes if not outcome.succeeded]
+    if failures:
+        raise typer.Exit(getattr(failures[0].error, "exit_code", 1))
+
+
+def _parse_seeds(raw: str | None) -> list[int] | None:
+    if raw is None:
+        return None
+    values: list[int] = []
+    for part in raw.split(","):
+        text = part.strip()
+        if not text:
+            continue
+        try:
+            values.append(int(text))
+        except ValueError as exc:
+            raise InvalidGenerationSpec(
+                f"--seeds は整数をカンマ区切りで指定してください (指定値: {raw!r})"
+            ) from exc
+    if not values:
+        raise InvalidGenerationSpec("--seeds に有効な値がありません")
+    return values
+
+
+def _echo_batch_summary(outcomes: list[BatchOutcome]) -> None:
+    for index, outcome in enumerate(outcomes, start=1):
+        typer.echo(f"[{index}/{len(outcomes)}] {outcome.item.label}")
+        if outcome.result is not None:
+            for path in outcome.result.files:
+                typer.echo(f"  -> {path}")
+        else:
+            code = getattr(outcome.error, "exit_code", 1)
+            typer.echo(f"  -> FAILED (exit {code}): {outcome.error}")
+
+    succeeded = sum(1 for outcome in outcomes if outcome.succeeded)
+    typer.echo(f"成功 {succeeded} / 失敗 {len(outcomes) - succeeded}")
+
+
+async def _run_batch(
+    items: list[BatchItem], settings: Settings, timeout: float | None
+) -> list[BatchOutcome]:
+    """バッチ全体で1つの接続を使い回す。"""
+    async with ComfyUIClient(settings) as client:
+
+        async def runner(item: BatchItem) -> GenerationResult:
+            return await generate(
+                item.spec,
+                settings,
+                backend=client,
+                project_root=Path.cwd(),
+                timeout=timeout,
+            )
+
+        return await run_batch(items, runner=runner)
 
 
 @contextmanager
