@@ -206,6 +206,7 @@ def compose_image(
             fonts_root=resolve_fonts_root(settings, project_root),
             output=destination,
             max_pixels=settings.max_pixels,
+            project_root=project_root,
         )
         typer.echo(str(result.output))
 

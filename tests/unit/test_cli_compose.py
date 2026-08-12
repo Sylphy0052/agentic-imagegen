@@ -144,6 +144,17 @@ class TestComposeErrors:
 
         assert result.exit_code == 10
 
+    def test_font_missing_message_shows_relative_root(self, workspace: Path) -> None:
+        # 作業ルート配下のフォントディレクトリなら、絶対パス (実行環境の構成) を
+        # 出さずに `fonts` のような相対パスで示す
+        (workspace / "fonts" / "test.ttf").unlink()
+        spec = _write(workspace / "text.yaml", TEXT_ONLY_SPEC)
+
+        result = runner.invoke(cli.app, ["compose", "inputs/base.png", str(spec)])
+
+        assert "探索ルート: fonts" in result.output
+        assert str(workspace) not in result.output
+
     def test_exits_2_when_image_missing(self, workspace: Path) -> None:
         spec = _write(workspace / "text.yaml", TEXT_ONLY_SPEC)
 

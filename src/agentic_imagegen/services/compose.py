@@ -133,10 +133,14 @@ def compose_text(
     fonts_root: Path,
     output: Path,
     max_pixels: int | None = None,
+    project_root: Path | None = None,
 ) -> ComposeResult:
     """画像へテキストを合成し、別ファイルとして書き出す。
 
     入力画像は変更しない。出力先が既にある場合は上書きせずに失敗する。
+
+    project_root はフォントが見つからないときのエラーメッセージ表示にのみ使う
+    (詳細は resolve_font を参照)。省略時は従来どおり絶対パスで表示する。
     """
     if output.exists() or output.is_symlink():
         # exists() はdangling symlinkをFalseとして扱う。放置すると _save の書き込みが
@@ -147,7 +151,7 @@ def compose_text(
     fonts = tuple(
         ResolvedFont(
             name=layer.font,
-            path=resolve_font(layer.font, fonts_root),
+            path=resolve_font(layer.font, fonts_root, project_root=project_root),
             index=layer.font_index,
         )
         for layer in spec.layers

@@ -84,6 +84,9 @@ text:
 ```bash
 uv run imagegen compose inputs/base.png specs/generated/caption.yaml
 # フォントが見つかりません: Missing.ttf
-#   探索ルート: /path/to/repo/fonts
+#   探索ルート: fonts
 #   利用できるフォント: NotoSansJP-Bold.ttf / NotoSansJP-Regular.ttf
 ```
+
+探索ルートは作業ルート配下なら `fonts` のように相対パスで表示する。
+`IMAGEGEN_FONTS_ROOT` で作業ルートの外を指した場合だけ絶対パスのまま表示する。

@@ -8,40 +8,23 @@ from pathlib import Path
 
 import pytest
 
-#: テキスト合成のテストで使うTrueTypeフォントの探索先。
-#: リポジトリへフォントを同梱しないため、環境にあるものを借りる。
-_FONT_SEARCH_ROOTS: tuple[Path, ...] = (
-    Path("fonts"),
-    Path("/usr/share/fonts"),
-    Path("/usr/local/share/fonts"),
-    Path.home() / ".local/share/fonts",
-    Path("/mnt/c/Windows/Fonts"),
-)
-
-_FONT_SUFFIXES: frozenset[str] = frozenset({".ttf", ".otf"})
-
-
-def _find_truetype_font() -> Path | None:
-    for root in _FONT_SEARCH_ROOTS:
-        if not root.is_dir():
-            continue
-        for path in sorted(root.rglob("*")):
-            if path.is_file() and path.suffix.lower() in _FONT_SUFFIXES:
-                return path
-    return None
+from synthetic_font import build_ttf_bytes
 
 
 @pytest.fixture(scope="session")
-def truetype_font_source() -> Path:
-    """環境にあるTrueTypeフォント1件。見つからなければテストをskipする。
+def truetype_font_source(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """テキスト合成のテストで使うTrueTypeフォント1件。
 
-    描画結果の検証にはグリフの見た目ではなくレイアウトを使うため、
-    日本語フォントである必要はない。
+    ホスト環境のフォントを探して借りると、フォント未導入の環境ではテストが
+    静かにskipされ「終了コードは0だが実際は検証されていない」状態になる。
+    それを避けるため、`fontTools` でその場に最小のTTFを組み立てる
+    (実体は tests/synthetic_font.py)。全文字が同じ幅の塗り潰し矩形として
+    描かれるため、描画結果の検証にはグリフの見た目ではなくレイアウトを使う
+    既存のテストとそのまま整合する。
     """
-    font = _find_truetype_font()
-    if font is None:
-        pytest.skip("TrueTypeフォントが見つからないため、テキスト合成のテストをskipします")
-    return font
+    font_path = tmp_path_factory.mktemp("synthetic-font") / "block.ttf"
+    font_path.write_bytes(build_ttf_bytes())
+    return font_path
 
 
 @pytest.fixture

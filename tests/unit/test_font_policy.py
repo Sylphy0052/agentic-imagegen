@@ -78,6 +78,40 @@ class TestResolveFont:
         assert "他" in str(excinfo.value)
 
 
+class TestResolveFontDisplayPath:
+    """project_root を渡したときの探索ルート表示。
+
+    ローカルCLIしか経路がない現状では実害は小さいが、compose を将来MCP tool化
+    したときにサーバーのディレクトリ構成が絶対パスとして漏れないようにする。
+    """
+
+    def test_shows_relative_path_when_root_is_inside_project_root(self, tmp_path: Path) -> None:
+        project_root = tmp_path
+        fonts_root = project_root / "fonts"
+        fonts_root.mkdir()
+
+        with pytest.raises(TextCompositionError) as excinfo:
+            resolve_font("Missing.ttf", fonts_root, project_root=project_root)
+
+        message = str(excinfo.value)
+        assert "探索ルート: fonts" in message
+        assert str(fonts_root) not in message
+
+    def test_shows_absolute_path_when_root_is_outside_project_root(self, tmp_path: Path) -> None:
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        fonts_root = tmp_path / "elsewhere" / "fonts"
+        fonts_root.mkdir(parents=True)
+
+        with pytest.raises(TextCompositionError, match=str(fonts_root)):
+            resolve_font("Missing.ttf", fonts_root, project_root=project_root)
+
+    def test_keeps_absolute_path_when_project_root_omitted(self, fonts_root: Path) -> None:
+        # project_root を渡さない既存の呼び出しは、これまでどおり絶対パスのまま出す
+        with pytest.raises(TextCompositionError, match=str(fonts_root)):
+            resolve_font("Missing.ttf", fonts_root)
+
+
 class TestFontsRootSetting:
     def test_default_is_fonts(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("IMAGEGEN_FONTS_ROOT", raising=False)

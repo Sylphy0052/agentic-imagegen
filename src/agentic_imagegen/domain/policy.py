@@ -111,7 +111,7 @@ def resolve_compose_output(path: str | Path, root: Path) -> Path:
     return resolved
 
 
-def resolve_font(name: str, root: Path) -> Path:
+def resolve_font(name: str, root: Path, *, project_root: Path | None = None) -> Path:
     """フォント名を root 配下の絶対パスへ解決する。
 
     パス形式のハード制約は TextLayer 側で済んでいる。ここでは実体に触れる検証
@@ -119,6 +119,10 @@ def resolve_font(name: str, root: Path) -> Path:
 
     見つからない場合は、別の書体へ暗黙にフォールバックせず失敗させる。意図しない
     書体で出力されるより、置き場所と候補を示して止める方が扱いやすい。
+
+    project_root を渡すと、見つからないときのメッセージに出す探索ルートを
+    作業ルートからの相対パスへ丸める (作業ルートの外を指す場合は絶対パスのまま)。
+    省略時は従来どおり絶対パスを出す。
     """
     resolved_root = root.resolve()
     resolved = (resolved_root / Path(name)).resolve()
@@ -129,10 +133,26 @@ def resolve_font(name: str, root: Path) -> Path:
     if not resolved.is_file():
         raise TextCompositionError(
             f"フォントが見つかりません: {name}\n"
-            f"  探索ルート: {resolved_root}\n"
+            f"  探索ルート: {_display_path(resolved_root, project_root)}\n"
             f"  {_describe_available_fonts(resolved_root)}"
         )
     return resolved
+
+
+def _display_path(path: Path, project_root: Path | None) -> str:
+    """パスを表示用の文字列へ丸める。
+
+    services/mcp_tools.py の `_relative` と同じ方式 (作業ルート配下なら相対パス、
+    解決できなければそのまま) で表示形式を揃える。ただしエラーメッセージ用のため、
+    ルート外を指す場合は `_relative` のようにファイル名だけへ丸めず、絶対パスを
+    そのまま示す (どこを指しているか分からなくなるのを避けるため)。
+    """
+    if project_root is None:
+        return str(path)
+    try:
+        return path.resolve().relative_to(project_root.resolve()).as_posix()
+    except ValueError:
+        return str(path.resolve())
 
 
 def _describe_available_fonts(root: Path) -> str:
