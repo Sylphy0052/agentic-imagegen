@@ -13,6 +13,7 @@ ENV_KEYS = [
     "IMAGEGEN_MAX_BATCH",
     "IMAGEGEN_TIMEOUT",
     "IMAGEGEN_OUTPUT_ROOT",
+    "IMAGEGEN_PRESETS_ROOT",
 ]
 
 
@@ -32,6 +33,7 @@ def test_defaults() -> None:
     assert settings.max_batch == 4
     assert settings.timeout_seconds == 300
     assert settings.output_root.name == "outputs"
+    assert settings.presets_root.name == "presets"
 
 
 def test_override_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -42,6 +44,7 @@ def test_override_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("IMAGEGEN_MAX_BATCH", "2")
     monkeypatch.setenv("IMAGEGEN_TIMEOUT", "30")
     monkeypatch.setenv("IMAGEGEN_OUTPUT_ROOT", "tmp-outputs")
+    monkeypatch.setenv("IMAGEGEN_PRESETS_ROOT", "tmp-presets")
 
     settings = Settings.from_env()
 
@@ -52,6 +55,14 @@ def test_override_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.max_batch == 2
     assert settings.timeout_seconds == 30
     assert settings.output_root.name == "tmp-outputs"
+    assert settings.presets_root.name == "tmp-presets"
+
+
+def test_empty_presets_root_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("IMAGEGEN_PRESETS_ROOT", "  ")
+
+    with pytest.raises(InvalidConfiguration, match="IMAGEGEN_PRESETS_ROOT"):
+        Settings.from_env()
 
 
 @pytest.mark.parametrize(

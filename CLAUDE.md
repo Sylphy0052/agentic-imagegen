@@ -36,6 +36,35 @@ ComfyUIが起動していない場合は `uv run imagegen health` で状態を�
 
 Specの書き方は [specs/examples/txt2img.yaml](specs/examples/txt2img.yaml) を参照。
 
+## Presetを使う
+
+繰り返し使う指定は preset にまとめてSpecから名前で参照する。軸は3つで、
+1軸につき1つまで指定できる。
+
+| 軸 | 置き場 | 書く内容 |
+| --- | --- | --- |
+| `character` | `presets/characters/<name>.yaml` | 人物の外見的特徴 |
+| `scene` | `presets/scenes/<name>.yaml` | 場所・時間帯・構図 |
+| `style` | `presets/styles/<name>.yaml` | 画風・品質タグ・サンプラー設定 |
+
+```yaml
+presets:
+  character: anime-girl-blue
+  scene: rooftop-sunset
+  style: anime-soft
+```
+
+解決規則は次のとおり。
+
+- **prompt**: `character` -> `scene` -> `style` -> Spec本体 の順にカンマ連結し、
+  重複トークンは最初の1つを残して除去する (大文字小文字と余分な空白は無視)。negativeも同じ
+- **generation**: presetの指定を取り込んだうえで、Spec本体の指定を優先する
+  (優先順位は spec > style > scene > character)
+- 適用したpreset名は解決後のSpecに残り、`metadata.json` にも記録される
+
+新しいpresetを作るときは軸の責務を混ぜない。解像度とseedは再現性に直結するため
+presetには書かず、Spec側で指定する。
+
 ## 禁止事項
 
 - **`workflows/*.json` を勝手に書き換えない。** Workflowは人間がComfyUI GUIで作成しAPI形式で書き出す
@@ -113,6 +142,9 @@ uv run mypy src
 | `src/agentic_imagegen/workflows/` | Workflowテンプレートの読み込みとallowlist |
 | `src/agentic_imagegen/adapters/comfyui/` | ComfyUI固有のHTTP / WebSocket / JSON形状 |
 | `workflows/` | API形式のWorkflowテンプレート (人間が作成) |
+| `presets/characters/` | キャラクタpreset (外見的特徴) |
+| `presets/scenes/` | シーンpreset (場所・時間帯・構図) |
+| `presets/styles/` | 画風preset (画風・品質タグ・サンプラー設定) |
 | `specs/examples/` | サンプルSpec |
 | `specs/generated/` | Claude Codeが生成したSpec (git管理外) |
 | `outputs/` | 生成結果 (git管理外) |
@@ -128,6 +160,7 @@ uv run mypy src
 | `IMAGEGEN_MAX_BATCH` | 4 | batch_sizeの上限 |
 | `IMAGEGEN_TIMEOUT` | 300 | 生成のタイムアウト秒 |
 | `IMAGEGEN_OUTPUT_ROOT` | `outputs` | 出力ルート |
+| `IMAGEGEN_PRESETS_ROOT` | `presets` | presetの探索ルート |
 
 ## exit code
 

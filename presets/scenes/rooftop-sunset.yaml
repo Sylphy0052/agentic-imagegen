@@ -1,0 +1,8 @@
+# シーンpresetの例。
+# 場所・時間帯・構図を書く。人物の外見は character 側の責務とする。
+
+description: 夕暮れの屋上、上半身の構図
+
+prompt:
+  positive: >
+    rooftop, sunset, orange sky, wind, upper body, looking at viewer

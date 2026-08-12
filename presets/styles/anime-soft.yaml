@@ -1,0 +1,18 @@
+# 画風presetの例。
+# 画風と品質タグ、それに合うサンプラー設定を書く。
+# 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
+
+description: 柔らかい光のアニメ調。SD1.5想定
+
+prompt:
+  positive: >
+    anime illustration, soft lighting, masterpiece, best quality
+
+  negative: >
+    low quality, worst quality, blurry, text, watermark, signature
+
+generation:
+  sampler: dpmpp_2m
+  scheduler: karras
+  cfg: 5.5
+  steps: 20
