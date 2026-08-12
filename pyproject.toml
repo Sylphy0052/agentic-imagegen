@@ -60,6 +60,8 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]  # テストでのassertを許可
+# 例外名は要件で指定されたもの (InvalidGenerationSpec / ComfyUIUnavailable 等) を使う
+"src/agentic_imagegen/errors.py" = ["N818"]
 
 [tool.mypy]
 python_version = "3.12"

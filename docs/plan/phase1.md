@@ -145,9 +145,11 @@ agentic-imagegen/
 │   ├── errors.py
 │   ├── domain/
 │   │   ├── __init__.py
-│   │   └── models.py
+│   │   ├── models.py
+│   │   └── policy.py
 │   ├── services/
 │   │   ├── __init__.py
+│   │   ├── spec_loader.py
 │   │   └── generation.py
 │   ├── workflows/
 │   │   ├── __init__.py
@@ -246,13 +248,14 @@ class NodeRef:
     node_id: str
     class_type: str
 
+
 TXT2IMG_NODES: dict[str, NodeRef] = {
-    "checkpoint":      NodeRef("4", "CheckpointLoaderSimple"),
+    "checkpoint": NodeRef("4", "CheckpointLoaderSimple"),
     "positive_prompt": NodeRef("6", "CLIPTextEncode"),
     "negative_prompt": NodeRef("7", "CLIPTextEncode"),
-    "latent":          NodeRef("5", "EmptyLatentImage"),
-    "ksampler":        NodeRef("3", "KSampler"),
-    "save_image":      NodeRef("9", "SaveImage"),
+    "latent": NodeRef("5", "EmptyLatentImage"),
+    "ksampler": NodeRef("3", "KSampler"),
+    "save_image": NodeRef("9", "SaveImage"),
 }
 ```
 
@@ -318,7 +321,8 @@ ImageGenError (基底)
 ├── WorkflowSubmissionError
 ├── GenerationTimeout
 ├── GenerationFailed
-└── OutputNotFound
+├── OutputNotFound
+└── InvalidConfiguration
 ```
 
 | exit code | 条件 |
@@ -332,6 +336,7 @@ ImageGenError (基底)
 | 6 | GenerationTimeout |
 | 7 | GenerationFailed |
 | 8 | OutputNotFound |
+| 9 | InvalidConfiguration (環境変数の設定値が不正) |
 
 CLIには原因が特定できる短いメッセージを表示し、内部トレースバックをそのまま大量表示しない (詳細は `--verbose` 時のみ)。
 
