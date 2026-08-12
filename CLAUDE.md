@@ -139,6 +139,32 @@ control:
 線が強く出すぎる場合は `low_threshold` を上げて細かい線を捨てるか、`strength` を下げる。
 写真やイラストをそのまま渡すと輪郭を拾いすぎ、元絵のエッジが残ったような絵になりやすい。
 
+## 参照画像から特徴を引き継ぐ (IPAdapter)
+
+参照画像をCLIP Visionで読み、その特徴 (人物の顔立ち・服装・画風) を効かせたまま生成する。
+プロンプトだけでは揺れる要素を固定できるため、同一キャラクタを別の構図で出すときに使う。
+
+```yaml
+reference:
+  image: inputs/character.png                            # リポジトリ配下に置く
+  model: ip-adapter-plus_sd15.safetensors                # ~/ComfyUI/models/ipadapter/
+  clip_vision: CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors  # ~/ComfyUI/models/clip_vision/
+  weight: 0.8          # 効かせる強さ (0.0-3.0)
+  weight_type: linear  # 効かせ方 (style transfer / composition など15種)
+  start_percent: 0.0   # 効かせ始める進行度
+  end_percent: 1.0     # 効かせ終える進行度
+```
+
+- 指定するとテンプレートが `*_ipadapter` へ自動的に切り替わる。txt2img / img2img の両方で使える
+- 参照画像は生成前にComfyUIへ自動でアップロードされる
+- **ComfyUI_IPAdapter_plus (カスタムノード) が要る。** 未導入だとノードが無く投入が拒否される
+- ControlNetと併用できる (`*_controlnet_ipadapter`)。構図をControlNet、特徴をIPAdapterが担う
+- `upscale` との同時指定は未対応 (ControlNetと同じ理由)
+- モデルとCLIP Visionは対応関係がある。`ip-adapter-plus_sd15` には ViT-H を使う
+
+`weight` は0.6-0.9が扱いやすい。1.0を超えると参照画像へ寄りすぎ、プロンプトが効かなくなる。
+顔立ちだけ借りて服装や背景はプロンプトへ従わせたい場合は `weight_type: style transfer` を使う。
+
 ## 解像度を上げる (hires fix)
 
 `generation.upscale` を指定すると、1段目の結果をlatentのまま拡大し、2段目のKSamplerで

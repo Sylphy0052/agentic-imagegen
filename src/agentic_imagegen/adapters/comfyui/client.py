@@ -40,6 +40,8 @@ HEALTH_TIMEOUT_SECONDS: Final = 5.0
 _CHECKPOINT_LOADER: Final = "CheckpointLoaderSimple"
 _LORA_LOADER: Final = "LoraLoader"
 _CONTROLNET_LOADER: Final = "ControlNetLoader"
+_IPADAPTER_LOADER: Final = "IPAdapterModelLoader"
+_CLIP_VISION_LOADER: Final = "CLIPVisionLoader"
 
 #: アップロードした入力画像に付ける接頭辞。ComfyUIのinput配下で由来を判別できるようにする。
 _UPLOAD_PREFIX: Final = "imagegen_"
@@ -141,6 +143,20 @@ class ComfyUIClient:
         """
         payload = await self._get_json(f"/object_info/{_CONTROLNET_LOADER}")
         return _extract_option_names(payload, node=_CONTROLNET_LOADER, field="control_net_name")
+
+    async def available_ipadapters(self) -> tuple[str, ...]:
+        """利用可能なIPAdapterモデル名の一覧を取得する。
+
+        IPAdapterはカスタムノード (ComfyUI_IPAdapter_plus) 由来のため、
+        未導入ならノード自体が存在せず、応答は空になる。
+        """
+        payload = await self._get_json(f"/object_info/{_IPADAPTER_LOADER}")
+        return _extract_option_names(payload, node=_IPADAPTER_LOADER, field="ipadapter_file")
+
+    async def available_clip_visions(self) -> tuple[str, ...]:
+        """利用可能なCLIP Visionモデル名の一覧を取得する。"""
+        payload = await self._get_json(f"/object_info/{_CLIP_VISION_LOADER}")
+        return _extract_option_names(payload, node=_CLIP_VISION_LOADER, field="clip_name")
 
     async def upload_image(self, path: Path) -> str:
         """画像をComfyUIのinputへアップロードし、LoadImageで参照する名前を返す。

@@ -50,10 +50,16 @@ CONTROL_LOAD_IMAGE = "40"
 CONTROL_PREPROCESSOR = "41"
 CONTROL_LOADER = "42"
 CONTROL_APPLY = "43"
+REFERENCE_LOAD_IMAGE = "50"
+REFERENCE_LOADER = "51"
+REFERENCE_CLIP_VISION = "52"
+REFERENCE_APPLY = "53"
 
 DEFAULT_LORA = "add_detail.safetensors"
 DEFAULT_SOURCE_IMAGE = "example.png"
 DEFAULT_CONTROLNET = "control_v11p_sd15_canny_fp16.safetensors"
+DEFAULT_IPADAPTER = "ip-adapter-plus_sd15.safetensors"
+DEFAULT_CLIP_VISION = "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors"
 
 #: 出力スロット数。範囲外の参照を検出するために使う
 OUTPUT_COUNTS = {
@@ -70,6 +76,9 @@ OUTPUT_COUNTS = {
     "Canny": 1,
     "ControlNetLoader": 1,
     "ControlNetApplyAdvanced": 2,
+    "IPAdapterModelLoader": 1,
+    "CLIPVisionLoader": 1,
+    "IPAdapterAdvanced": 1,
 }
 
 Graph = dict[str, dict[str, Any]]
@@ -204,6 +213,56 @@ def with_controlnet(graph: Graph) -> Graph:
     return graph
 
 
+def with_ipadapter(graph: Graph) -> Graph:
+    """KSamplerが受け取るMODELを IPAdapterAdvanced 経由に差し替える。
+
+    参照画像はCLIP Visionで特徴量へ落としてからモデルへ適用する。
+    ControlNetがpositive / negativeを差し替えるのに対し、こちらはmodelだけを
+    差し替えるため、両方を同時にかけても干渉しない。
+    """
+    graph = copy.deepcopy(graph)
+    for node_id in (
+        REFERENCE_LOAD_IMAGE,
+        REFERENCE_LOADER,
+        REFERENCE_CLIP_VISION,
+        REFERENCE_APPLY,
+    ):
+        if node_id in graph:
+            raise ValueError(f"IPAdapter用のノードID {node_id} が既に使われている")
+
+    graph[REFERENCE_LOAD_IMAGE] = {
+        "class_type": "LoadImage",
+        "inputs": {"image": DEFAULT_SOURCE_IMAGE},
+    }
+    graph[REFERENCE_LOADER] = {
+        "class_type": "IPAdapterModelLoader",
+        "inputs": {"ipadapter_file": DEFAULT_IPADAPTER},
+    }
+    graph[REFERENCE_CLIP_VISION] = {
+        "class_type": "CLIPVisionLoader",
+        "inputs": {"clip_name": DEFAULT_CLIP_VISION},
+    }
+    graph[REFERENCE_APPLY] = {
+        "class_type": "IPAdapterAdvanced",
+        "inputs": {
+            # LoRAチェーンがある場合はその末尾を受ける
+            "model": graph[KSAMPLER]["inputs"]["model"],
+            "ipadapter": [REFERENCE_LOADER, 0],
+            "image": [REFERENCE_LOAD_IMAGE, 0],
+            "clip_vision": [REFERENCE_CLIP_VISION, 0],
+            "weight": 1.0,
+            "weight_type": "linear",
+            # 参照画像は1枚のみ扱うため、埋め込みの合成方法は既定のままにする
+            "combine_embeds": "concat",
+            "start_at": 0.0,
+            "end_at": 1.0,
+            "embeds_scaling": "V only",
+        },
+    }
+    graph[KSAMPLER]["inputs"]["model"] = [REFERENCE_APPLY, 0]
+    return graph
+
+
 def build_all(base: Graph) -> dict[str, Graph]:
     """ベースから全テンプレートを組み立てる。"""
     txt2img = copy.deepcopy(base)
@@ -224,6 +283,21 @@ def build_all(base: Graph) -> dict[str, Graph]:
         "txt2img_lora_controlnet": with_controlnet(with_lora_chain(txt2img, LORA_IDS)),
         "img2img_controlnet": with_controlnet(img2img),
         "img2img_lora_controlnet": with_controlnet(with_lora_chain(img2img, IMG2IMG_LORA_IDS)),
+        # IPAdapter も hires とは組み合わせない (ControlNetと同じ理由)
+        "txt2img_ipadapter": with_ipadapter(txt2img),
+        "txt2img_lora_ipadapter": with_ipadapter(with_lora_chain(txt2img, LORA_IDS)),
+        "img2img_ipadapter": with_ipadapter(img2img),
+        "img2img_lora_ipadapter": with_ipadapter(with_lora_chain(img2img, IMG2IMG_LORA_IDS)),
+        # 構図 (ControlNet) と人物特徴 (IPAdapter) の併用。同一キャラクタを
+        # 異なる構図で出すために要る
+        "txt2img_controlnet_ipadapter": with_ipadapter(with_controlnet(txt2img)),
+        "txt2img_lora_controlnet_ipadapter": with_ipadapter(
+            with_controlnet(with_lora_chain(txt2img, LORA_IDS))
+        ),
+        "img2img_controlnet_ipadapter": with_ipadapter(with_controlnet(img2img)),
+        "img2img_lora_controlnet_ipadapter": with_ipadapter(
+            with_controlnet(with_lora_chain(img2img, IMG2IMG_LORA_IDS))
+        ),
     }
 
 

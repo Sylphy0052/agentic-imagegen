@@ -73,6 +73,34 @@ MAX_UPSCALE_SCALE: Final = 4.0
 #: ControlNetモデルとして受け付ける拡張子。.pth 配布があるためcheckpointより広い。
 ALLOWED_CONTROLNET_SUFFIXES: Final = frozenset({".safetensors", ".pth", ".ckpt"})
 
+#: IPAdapterモデルとして受け付ける拡張子。light 系は .bin で配布される。
+ALLOWED_IPADAPTER_SUFFIXES: Final = frozenset({".safetensors", ".bin", ".pth", ".ckpt"})
+
+#: CLIP Visionモデルとして受け付ける拡張子。
+ALLOWED_CLIP_VISION_SUFFIXES: Final = frozenset({".safetensors", ".bin", ".pt", ".ckpt"})
+
+#: IPAdapterの効かせ方。ComfyUI側 (IPAdapterAdvanced) の選択肢と一致させる。
+IPAdapterWeightType = Literal[
+    "linear",
+    "ease in",
+    "ease out",
+    "ease in-out",
+    "reverse in-out",
+    "weak input",
+    "weak output",
+    "weak middle",
+    "strong middle",
+    "style transfer",
+    "composition",
+    "strong style transfer",
+    "style and composition",
+    "style transfer precise",
+    "composition precise",
+]
+
+#: weightの実用上の上限。ノード自体は5.0まで許すが、破綻するため絞る。
+MAX_REFERENCE_WEIGHT: Final = 3.0
+
 #: img2imgの入力画像として受け付ける拡張子。
 ALLOWED_SOURCE_IMAGE_SUFFIXES: Final = frozenset({".png", ".jpg", ".jpeg", ".webp"})
 
@@ -298,6 +326,49 @@ class ControlSpec(_StrictModel):
         return self
 
 
+class ReferenceSpec(_StrictModel):
+    """IPAdapterの指定。参照画像から人物や画風の特徴を寄せる。
+
+    ComfyUIの IPAdapterUnifiedLoader は preset名からモデルを暗黙に選ぶが、
+    ここでは使わない。checkpoint / LoRA / ControlNet と同じく、
+    実際に読み込むファイル名をSpecへ明示する。
+    """
+
+    #: 特徴の元になる画像。リポジトリ配下の相対パス。
+    image: str = Field(min_length=1)
+    #: ComfyUIの models/ipadapter 配下のファイル名。
+    model: str = Field(min_length=1)
+    #: ComfyUIの models/clip_vision 配下のファイル名。IPAdapterモデルと対応するものを選ぶ。
+    clip_vision: str = Field(min_length=1)
+    #: 効かせる強さ。1.0前後が目安で、上げすぎると参照画像へ寄りすぎて構図が崩れる。
+    weight: Annotated[float, Field(ge=0.0, le=MAX_REFERENCE_WEIGHT)] = 1.0
+    weight_type: IPAdapterWeightType = "linear"
+    #: 効かせ始める / 終える進行度。
+    start_percent: Annotated[float, Field(ge=0.0, le=1.0)] = 0.0
+    end_percent: Annotated[float, Field(ge=0.0, le=1.0)] = 1.0
+
+    @field_validator("image")
+    @classmethod
+    def _reject_unsafe_image(cls, value: str) -> str:
+        return _validate_relative_image_path(value)
+
+    @field_validator("model")
+    @classmethod
+    def _reject_unsafe_model(cls, value: str) -> str:
+        return _validate_model_filename(value, allowed_suffixes=ALLOWED_IPADAPTER_SUFFIXES)
+
+    @field_validator("clip_vision")
+    @classmethod
+    def _reject_unsafe_clip_vision(cls, value: str) -> str:
+        return _validate_model_filename(value, allowed_suffixes=ALLOWED_CLIP_VISION_SUFFIXES)
+
+    @model_validator(mode="after")
+    def _validate_ranges(self) -> ReferenceSpec:
+        if self.start_percent >= self.end_percent:
+            raise ValueError("start_percent は end_percent より小さくしてください")
+        return self
+
+
 class PresetRefs(_StrictModel):
     """適用するpresetの参照。軸ごとに1つまで。
 
@@ -327,18 +398,22 @@ class GenerationSpec(_StrictModel):
     source: SourceSpec | None = None
     #: 指定するとControlNetで構図を制御する。txt2img / img2img のどちらでも使える。
     control: ControlSpec | None = None
+    #: 指定するとIPAdapterで参照画像の特徴を寄せる。controlとは併用できる。
+    reference: ReferenceSpec | None = None
     output: OutputSpec = Field(default_factory=OutputSpec)
 
     @model_validator(mode="after")
     def _validate_task_combination(self) -> GenerationSpec:
-        if self.generation.upscale is not None and self.control is not None:
-            # 両方かけると生成時間が現実的でないため、テンプレートを用意していない
-            raise ValueError("upscale と control の同時指定は未対応です")
         """taskと他フィールドの組み合わせを検証する。
 
         指定しても効かない項目は黙って無視せず拒否する。書いたのに反映されていない
         状態は、生成結果を見ても原因が分かりにくいため。
         """
+        if self.generation.upscale is not None and self.control is not None:
+            # 両方かけると生成時間が現実的でないため、テンプレートを用意していない
+            raise ValueError("upscale と control の同時指定は未対応です")
+        if self.generation.upscale is not None and self.reference is not None:
+            raise ValueError("upscale と reference の同時指定は未対応です")
         if self.task == "img2img":
             self._validate_img2img()
         elif self.source is not None:
@@ -367,6 +442,7 @@ __all__ = [
     "OutputSpec",
     "PresetRefs",
     "PromptSpec",
+    "ReferenceSpec",
     "SamplerName",
     "SchedulerName",
     "SourceSpec",

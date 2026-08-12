@@ -152,6 +152,25 @@ def test_validate_reports_lora_workflow(tmp_path: Path) -> None:
     assert "model=0.8" in result.output
 
 
+def test_validate_reports_reference(tmp_path: Path) -> None:
+    """IPAdapterの指定はテンプレート切り替えと合わせて出力される。"""
+    spec = _write_spec(
+        tmp_path,
+        VALID_SPEC + "\nreference:\n"
+        "  image: inputs/character.png\n"
+        "  model: ip-adapter-plus_sd15.safetensors\n"
+        "  clip_vision: CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors\n"
+        "  weight: 0.8\n",
+    )
+
+    result = runner.invoke(cli.app, ["validate", str(spec)])
+
+    assert result.exit_code == 0
+    assert "Workflow: txt2img_ipadapter" in result.output
+    assert "IPAdapter: inputs/character.png" in result.output
+    assert "weight=0.8" in result.output
+
+
 def test_validate_rejects_too_many_loras(tmp_path: Path) -> None:
     entries = "\n".join(f"    - name: lora{index}.safetensors" for index in range(MAX_LORAS + 1))
     spec = _write_spec(

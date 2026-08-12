@@ -40,7 +40,9 @@ server: Final = MCPServer(
         "ComfyUI経由でStable Diffusion系モデルの画像生成を行う。"
         "生成前に validate_generation でSpecを確認し、"
         "checkpointやLoRAは list_models / list_loras で、"
-        "ControlNetモデルは list_controlnets で実在するものだけを指定すること。"
+        "ControlNetモデルは list_controlnets で、"
+        "IPAdapterは list_ipadapters / list_clip_visions で"
+        "実在するものだけを指定すること。"
     ),
 )
 
@@ -56,7 +58,8 @@ def validate_generation(spec: dict[str, Any]) -> dict[str, Any]:
     """GenerationSpecを検証する。画像は生成しない。
 
     presetの展開結果、選択されるWorkflowテンプレート、解像度、LoRA構成、
-    ControlNet (control) と hires fix (generation.upscale) の設定を返す。
+    ControlNet (control)、IPAdapter (reference)、hires fix (generation.upscale)
+    の設定を返す。
     不正な場合も例外にせず valid: false と理由を返す。
     """
     return mcp_tools.validate_generation(
@@ -83,6 +86,24 @@ async def list_controlnets() -> list[str]:
 
 
 @server.tool()
+async def list_ipadapters() -> list[str]:
+    """ComfyUIが持っているIPAdapterモデル名の一覧を返す。
+
+    空の場合はカスタムノードが未導入で、reference (IPAdapter) を使えない。
+    """
+    return await mcp_tools.list_ipadapters(Settings.from_env())
+
+
+@server.tool()
+async def list_clip_visions() -> list[str]:
+    """ComfyUIが持っているCLIP Visionモデル名の一覧を返す。
+
+    reference.clip_vision にはここに出る名前だけを指定する。
+    """
+    return await mcp_tools.list_clip_visions(Settings.from_env())
+
+
+@server.tool()
 async def generate_image(spec: dict[str, Any]) -> dict[str, Any]:
     """GenerationSpecに従って画像生成を開始する。
 
@@ -90,6 +111,7 @@ async def generate_image(spec: dict[str, Any]) -> dict[str, Any]:
     結果は get_generation_status で受け取る。不正なSpecはここで拒否される。
 
     Specに control を書けばControlNet (Canny) で構図を制御でき、
+    reference を書けばIPAdapterで参照画像の特徴を引き継げる。
     generation.upscale を書けば hires fix で解像度を上げられる。
     使うWorkflowテンプレートはSpecの内容から自動的に決まる。
 

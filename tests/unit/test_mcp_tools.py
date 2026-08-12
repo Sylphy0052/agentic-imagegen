@@ -141,6 +141,14 @@ class TestListWorkflows:
             "txt2img_lora_controlnet",
             "img2img_controlnet",
             "img2img_lora_controlnet",
+            "txt2img_ipadapter",
+            "txt2img_lora_ipadapter",
+            "img2img_ipadapter",
+            "img2img_lora_ipadapter",
+            "txt2img_controlnet_ipadapter",
+            "txt2img_lora_controlnet_ipadapter",
+            "img2img_controlnet_ipadapter",
+            "img2img_lora_controlnet_ipadapter",
         }
 
     def test_is_sorted(self) -> None:
@@ -173,6 +181,26 @@ class TestValidateReportsAdvancedOptions:
         assert result["control"]["image"] == "inputs/pose.png"
         assert result["control"]["model"] == "control_v11p_sd15_canny_fp16.safetensors"
         assert result["control"]["strength"] == 0.9
+
+    def test_reports_reference(self, settings: Settings, tmp_path: Path) -> None:
+        spec = {
+            **VALID_SPEC,
+            "reference": {
+                "image": "inputs/character.png",
+                "model": "ip-adapter-plus_sd15.safetensors",
+                "clip_vision": "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
+                "weight": 0.8,
+            },
+        }
+
+        result = validate_generation(spec, settings=settings, project_root=tmp_path)
+
+        assert result["valid"] is True
+        assert result["workflow"] == "txt2img_ipadapter"
+        assert result["reference"] is not None
+        assert result["reference"]["image"] == "inputs/character.png"
+        assert result["reference"]["model"] == "ip-adapter-plus_sd15.safetensors"
+        assert result["reference"]["weight"] == 0.8
 
     def test_reports_upscale(self, settings: Settings, tmp_path: Path) -> None:
         spec = {
