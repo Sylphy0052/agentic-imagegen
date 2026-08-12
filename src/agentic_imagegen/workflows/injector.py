@@ -14,9 +14,13 @@ from typing import Any, Final
 
 from agentic_imagegen.adapters.comfyui.workflow import (
     IMG2IMG_BINDING,
+    IMG2IMG_HIRES_BINDING,
     IMG2IMG_LORA_BINDING,
+    IMG2IMG_LORA_HIRES_BINDING,
     TXT2IMG_BINDING,
+    TXT2IMG_HIRES_BINDING,
     TXT2IMG_LORA_BINDING,
+    TXT2IMG_LORA_HIRES_BINDING,
     WorkflowBinding,
     build_workflow,
     resolve_seed,
@@ -33,6 +37,10 @@ ALLOWED_WORKFLOWS: Final[dict[str, WorkflowBinding]] = {
     "txt2img_lora": TXT2IMG_LORA_BINDING,
     "img2img": IMG2IMG_BINDING,
     "img2img_lora": IMG2IMG_LORA_BINDING,
+    "txt2img_hires": TXT2IMG_HIRES_BINDING,
+    "txt2img_lora_hires": TXT2IMG_LORA_HIRES_BINDING,
+    "img2img_hires": IMG2IMG_HIRES_BINDING,
+    "img2img_lora_hires": IMG2IMG_LORA_HIRES_BINDING,
 }
 
 
@@ -42,9 +50,12 @@ def resolve_workflow_name(spec: GenerationSpec) -> str:
     `task` は論理的なタスク名であり、テンプレートはそれとLoRA指定の有無で決まる。
     LoRA未指定でLoRA用テンプレートを使う意味はないため、素のテンプレートを選ぶ。
     """
+    suffix = ""
     if spec.model.loras:
-        return f"{spec.task}_lora"
-    return spec.task
+        suffix += "_lora"
+    if spec.generation.upscale is not None:
+        suffix += "_hires"
+    return f"{spec.task}{suffix}"
 
 
 def get_binding(name: str) -> WorkflowBinding:

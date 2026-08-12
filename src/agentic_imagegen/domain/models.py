@@ -65,6 +65,11 @@ MAX_LORAS: Final = 3
 #: strengthの実用上の範囲。ComfyUI自体は±100を許すが、事故を防ぐため絞る。
 LORA_STRENGTH_LIMIT: Final = 10.0
 
+UpscaleMethod = Literal["nearest-exact", "bilinear", "area", "bicubic", "bislerp"]
+
+#: hires fix の拡大倍率の上限。これ以上は生成時間が現実的でない。
+MAX_UPSCALE_SCALE: Final = 4.0
+
 #: img2imgの入力画像として受け付ける拡張子。
 ALLOWED_SOURCE_IMAGE_SUFFIXES: Final = frozenset({".png", ".jpg", ".jpeg", ".webp"})
 
@@ -109,6 +114,26 @@ class PromptSpec(_StrictModel):
     negative: str = ""
 
 
+class UpscaleSpec(_StrictModel):
+    """hires fix の設定。
+
+    1段目の生成結果をlatentのまま拡大し、2段目のKSamplerで描き足す。
+    アップスケールモデルは使わない。
+    """
+
+    #: 拡大倍率。1.0以下は拡大にならないため許可しない。
+    scale: Annotated[float, Field(gt=1.0, le=MAX_UPSCALE_SCALE)] = 1.5
+    #: 2段目のdenoise。低いほど元の絵を保つ。
+    denoise: Annotated[float, Field(ge=0.0, le=1.0)] = 0.5
+    #: 2段目のsteps。未指定なら1段目と同じ値を使う。
+    steps: Annotated[int, Field(ge=1, le=100)] | None = None
+    method: UpscaleMethod = "nearest-exact"
+
+    def effective_steps(self, base_steps: int) -> int:
+        """2段目で実際に使うsteps。"""
+        return self.steps if self.steps is not None else base_steps
+
+
 class GenerationParams(_StrictModel):
     """生成パラメータ。"""
 
@@ -120,6 +145,8 @@ class GenerationParams(_StrictModel):
     batch_size: Annotated[int, Field(ge=1, le=4)] = 1
     sampler: SamplerName = "euler"
     scheduler: SchedulerName = "normal"
+    #: 指定するとhires fix (latent拡大 + 2段目のKSampler) を行う。
+    upscale: UpscaleSpec | None = None
 
     @field_validator("width", "height")
     @classmethod
@@ -287,4 +314,6 @@ __all__ = [
     "SamplerName",
     "SchedulerName",
     "SourceSpec",
+    "UpscaleMethod",
+    "UpscaleSpec",
 ]

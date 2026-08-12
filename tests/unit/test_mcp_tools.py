@@ -128,7 +128,16 @@ class TestListWorkflows:
     def test_returns_allowed_workflows(self) -> None:
         names = list_workflows()
 
-        assert set(names) == {"txt2img", "txt2img_lora", "img2img", "img2img_lora"}
+        assert set(names) == {
+            "txt2img",
+            "txt2img_lora",
+            "txt2img_hires",
+            "txt2img_lora_hires",
+            "img2img",
+            "img2img_lora",
+            "img2img_hires",
+            "img2img_lora_hires",
+        }
 
     def test_is_sorted(self) -> None:
         names = list_workflows()
