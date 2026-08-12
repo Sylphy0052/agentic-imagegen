@@ -2,9 +2,10 @@
 
 - 対象: Phase 1 (Claude Code -> GenerationSpec -> Python CLI -> ComfyUI API -> 画像生成)
 - 作成日: 2026-08-12
-- ステータス: Step 1-6 / 8-9 完了。Step 7 はIntegration Testとセットアップ手順を実装済みだが、
-  ComfyUI環境が未構築のため未実行。Step 10 (E2E) 未実施
-- 関連Issue: [#1 Roadmap](https://github.com/Sylphy0052/agentic-imagegen/issues/1) / [#2 推論高速化検証](https://github.com/Sylphy0052/agentic-imagegen/issues/2)
+- ステータス: Step 1-9 完了。Step 7 のIntegration Testは実機ComfyUIに対して全件PASS済み
+- 関連Issue: [#1 Roadmap](https://github.com/Sylphy0052/agentic-imagegen/issues/1) /
+  [#2 推論高速化検証](https://github.com/Sylphy0052/agentic-imagegen/issues/2) /
+  [#6 Hassaku (Anima) 対応調査](https://github.com/Sylphy0052/agentic-imagegen/issues/6)
 
 ---
 
@@ -59,8 +60,31 @@ Phase 1の完了条件は「一気通貫で実行できること」であり、�
 ### 採用: CPU推論 (Phase 1本編)
 
 - WSL上にComfyUIをclone、`torch` はCPU版のみ導入する。追加ドライバ不要で確実に動作する。
-- モデルはSD1.5系に固定する。SDXLはCPUでは1枚5-15分となりPhase 1の反復速度に見合わない。
-- 想定所要時間 (SD1.5 / 512x512 / 20 steps): 約1-2.5分/枚。Integration Test設定 (512x512 / steps 2-4) では約10-20秒。
+- Integration TestとE2Eの反復にはSD1.5系を使う。SDXL / Illustrious系はCPUでは1枚10-20分となり、反復速度に見合わない。
+
+構築実績 (2026-08-12):
+
+| 項目 | 実測 |
+| --- | --- |
+| ComfyUI | 0.32.0 |
+| PyTorch | 2.13.0+cpu (Python 3.12.13) |
+| Integration Test | 4件PASS / 91.67秒 (モデルロード込み、512x512 / steps 2) |
+| E2E (512x768 / steps 20 / SD1.5) | 約12分 (36秒/step) |
+
+当初は「SD1.5 / 512x768 / 20 steps で1-2.5分」と見積もっていたが、実測は約12分だった。
+CPU推論では1stepあたり数十秒かかるため、反復作業ではstepsまたは解像度を下げる。
+
+配置したcheckpoint:
+
+| モデル | baseModel | サイズ | 位置づけ |
+| --- | --- | --- | --- |
+| MeinaMix V12 | SD 1.5 | 2.0GB | Integration Test / E2Eの標準 |
+| Nova Anime XL IL v19.0 | Illustrious (SDXL系) | 6.5GB | 仕上がり確認用 |
+| Hassaku (Anima) v1.3 int8 | Anima (DiT) | 2.1GB | 未対応。[#6](https://github.com/Sylphy0052/agentic-imagegen/issues/6) で調査 |
+
+Hassaku (Anima) はSDXL系ではなくDiT系のため、同梱の `workflows/txt2img.json`
+(CheckpointLoaderSimple + KSampler構成) では動かない可能性が高い。推奨サンプラー `er_sde` も
+`SamplerName` に未登録であり、対応にはworkflow追加とSpec拡張が要る。
 
 ### 後続: Intel XPU (Level Zero) による高速化
 

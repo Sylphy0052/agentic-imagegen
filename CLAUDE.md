@@ -64,6 +64,10 @@ CPU推論のため、既定は控えめにする。
 | cfg | 5.0-8.0 | 30 |
 | batch_size | 1 | 4 |
 
+**所要時間に注意する。** CPU推論のため、SD1.5 / 512x768 / 20 steps で **約12分** かかる (実測)。
+生成時は `IMAGEGEN_TIMEOUT` を十分に取る (例: `IMAGEGEN_TIMEOUT=1200`)。
+SDXL / Illustrious系 (`novaAnimeXL_ilV190.safetensors`) はさらに遅く、常用しない。
+
 seedに `-1` を指定するとランダムな値へ解決され、実際に使われた値が `metadata.json` に記録される。
 同じ画を再現したい場合は、その値をSpecへ書き戻す。
 
