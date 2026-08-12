@@ -25,6 +25,9 @@ outputs/*
 specs/generated/*
 !specs/generated/.gitkeep
 
+# Claude Codeの作業用worktree (skillなど .claude/ 配下の他のファイルは追跡する)
+.claude/worktrees/
+
 # エディタ・OS
 .vscode/
 .idea/

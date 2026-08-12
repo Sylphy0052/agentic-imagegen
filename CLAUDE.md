@@ -16,6 +16,11 @@ Claude Code -> GenerationSpec -> Python CLI (imagegen) -> ComfyUI API -> 画像�
 
 ## 画像生成要求を受けたときの手順
 
+詳細な手順とpresetの選び方は [.claude/skills/imagegen/SKILL.md](.claude/skills/imagegen/SKILL.md)
+にある。失敗時の切り分けは
+[.claude/skills/imagegen/references/troubleshooting.md](.claude/skills/imagegen/references/troubleshooting.md)
+を参照する。
+
 ユーザーから「〇〇な画像を生成して」と指示された場合、次の順で実行する。
 
 1. **GenerationSpecを作る** — 自然言語の要求をSpecの各フィールドへ落とし込む
