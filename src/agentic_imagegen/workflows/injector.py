@@ -14,6 +14,7 @@ from typing import Any, Final
 
 from agentic_imagegen.adapters.comfyui.workflow import (
     IMG2IMG_BINDING,
+    IMG2IMG_LORA_BINDING,
     TXT2IMG_BINDING,
     TXT2IMG_LORA_BINDING,
     WorkflowBinding,
@@ -31,6 +32,7 @@ ALLOWED_WORKFLOWS: Final[dict[str, WorkflowBinding]] = {
     "txt2img": TXT2IMG_BINDING,
     "txt2img_lora": TXT2IMG_LORA_BINDING,
     "img2img": IMG2IMG_BINDING,
+    "img2img_lora": IMG2IMG_LORA_BINDING,
 }
 
 
@@ -40,8 +42,8 @@ def resolve_workflow_name(spec: GenerationSpec) -> str:
     `task` は論理的なタスク名であり、テンプレートはそれとLoRA指定の有無で決まる。
     LoRA未指定でLoRA用テンプレートを使う意味はないため、素のテンプレートを選ぶ。
     """
-    if spec.task == "txt2img" and spec.model.loras:
-        return "txt2img_lora"
+    if spec.model.loras:
+        return f"{spec.task}_lora"
     return spec.task
 
 

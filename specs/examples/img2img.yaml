@@ -38,6 +38,11 @@ generation:
 model:
   checkpoint: meinamix_v12Final.safetensors
 
+  # LoRAを足すとテンプレートが img2img_lora へ切り替わる (同時3件まで)。
+  # loras:
+  #   - name: add_detail.safetensors
+  #     strength_model: 0.7
+
 output:
   directory: outputs
   prefix: img2img_sample

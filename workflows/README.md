@@ -20,6 +20,7 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `txt2img.json` | text-to-image (ComfyUI標準のtxt2imgグラフと同じノード構成) |
 | `txt2img_lora.json` | LoRA付きtext-to-image (`txt2img` に `LoraLoader` を3段挟んだ構成) |
 | `img2img.json` | image-to-image (`EmptyLatentImage` を `LoadImage` + `VAEEncode` へ置き換えた構成) |
+| `img2img_lora.json` | LoRA付き image-to-image (`img2img` に `LoraLoader` を3段挟んだ構成) |
 
 どれを使うかは `task` と `model.loras` の有無で自動的に決まる。定義は
 [src/agentic_imagegen/workflows/injector.py](../src/agentic_imagegen/workflows/injector.py)
@@ -65,6 +66,19 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 候補に現れない。入力画像は生成前に `POST /upload/image` で直下へ送っており、名前は
 `imagegen_<内容ダイジェスト>_<元のファイル名>` になる。同じ画像なら同じ名前へ落ち着く。
 
+`img2img_lora.json` は `img2img.json` へ `LoraLoader` を3段挟んだもの。
+**ノードIDは20-22を使う。** `txt2img_lora.json` と同じ10-12にすると
+`LoadImage` (10) と `VAEEncode` (11) を上書きしてしまうため。
+
+| ノードID | class_type | 役割 |
+| --- | --- | --- |
+| 20 | `LoraLoader` | 1本目 (`CheckpointLoaderSimple` から MODEL / CLIP を受ける) |
+| 21 | `LoraLoader` | 2本目 (20から受ける) |
+| 22 | `LoraLoader` | 3本目 (21から受ける) |
+
+`LoraLoader` はVAEを出さないため、`VAEEncode.vae` と `VAEDecode.vae` は
+`CheckpointLoaderSimple` 直結のままにする。
+
 ## GUIから書き出す手順
 
 ComfyUI環境に合わせて作り直す場合の手順。
@@ -83,7 +97,10 @@ GUIから書き出すのが原則だが、既存テンプレートに定型の�
    (例: `CheckpointLoaderSimple` は 0=MODEL / 1=CLIP / 2=VAE、`LoraLoader` は 0=MODEL / 1=CLIP)
 2. 既存テンプレートを読み込んで接続だけを差し替える。手書きしない
 3. 生成後にノード参照の整合性を検査する (存在しないノードID・範囲外の出力スロットがないか)
-4. **実機のComfyUIへ投入し、生成が成功することを確認する**
+4. **既存ノードを上書きしていないことを検査する。** 追加するノードIDが既存と衝突すると、
+   参照の形は正しいまま意味だけが壊れる。`img2img_lora.json` を作った際、
+   `txt2img_lora` と同じ10-12を使って `LoadImage` と `VAEEncode` を潰す事故が実際に起きた
+5. **実機のComfyUIへ投入し、生成が成功することを確認する**
 
 `txt2img_lora.json` と `img2img.json` はこの手順で作成し、実機 (ComfyUI 0.32.0 / Intel XPU) で
 生成成功を確認している。ノードや接続を実行時に組み立てる設計は引き続き採らない。

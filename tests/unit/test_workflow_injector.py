@@ -62,7 +62,7 @@ def test_repository_template_is_loadable() -> None:
     assert (WORKFLOWS_DIR / "txt2img.json").is_file()
 
 
-@pytest.mark.parametrize("name", ["txt2video", "unknown", "TXT2IMG", "img2img_lora"])
+@pytest.mark.parametrize("name", ["txt2video", "unknown", "TXT2IMG", "img2img_preset"])
 def test_unknown_workflow_name_rejected(name: str) -> None:
     with pytest.raises(WorkflowValidationError, match="許可されていません"):
         load_workflow_template(name)

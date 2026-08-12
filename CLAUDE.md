@@ -112,7 +112,7 @@ source:
 - 入力画像は生成前にComfyUIへ自動でアップロードされる。`~/ComfyUI/input/` へ手で置く必要はない
 - **解像度は入力画像のサイズをそのまま使う。** `width` / `height` を書くと拒否される
   (書いたのに効かない状態を作らないため)
-- `batch_size` は1のみ。LoRAとの併用は未対応
+- `batch_size` は1のみ。LoRAは併用できる (`img2img_lora` テンプレートへ切り替わる)
 - 入力画像は `inputs/` へ置く (git管理外)。拡張子は `.png` / `.jpg` / `.jpeg` / `.webp`
 - 上限サイズは `IMAGEGEN_MAX_SOURCE_BYTES` (既定32MiB)
 

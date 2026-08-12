@@ -130,17 +130,19 @@ class TestUnsupportedCombinations:
         with pytest.raises(ValidationError, match="batch_size"):
             GenerationSpec.model_validate(_spec_dict(generation={"batch_size": 2}))
 
-    def test_rejects_loras(self) -> None:
-        """img2imgとLoRAの組み合わせは未対応。黙って無視せず拒否する。"""
-        with pytest.raises(ValidationError, match="LoRA"):
-            GenerationSpec.model_validate(
-                _spec_dict(
-                    model={
-                        "checkpoint": "v1-5-pruned-emaonly.safetensors",
-                        "loras": [{"name": "add_detail.safetensors"}],
-                    }
-                )
+    def test_accepts_loras(self) -> None:
+        """img2imgでもLoRAを併用できる (専用テンプレートへ切り替わる)。"""
+        spec = GenerationSpec.model_validate(
+            _spec_dict(
+                model={
+                    "checkpoint": "v1-5-pruned-emaonly.safetensors",
+                    "loras": [{"name": "add_detail.safetensors", "strength_model": 0.7}],
+                }
             )
+        )
+
+        assert spec.model.loras[0].name == "add_detail.safetensors"
+        assert spec.model.loras[0].strength_model == 0.7
 
 
 def test_unknown_source_key_rejected() -> None:
