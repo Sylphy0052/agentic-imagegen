@@ -25,6 +25,7 @@ from agentic_imagegen.domain.results import GenerationResult, HealthStatus
 from agentic_imagegen.errors import ComfyUIUnavailable, ImageGenError
 from agentic_imagegen.services.generation import generate
 from agentic_imagegen.services.spec_loader import load_spec
+from agentic_imagegen.workflows.injector import resolve_workflow_name
 
 logger: Final = logging.getLogger(__name__)
 
@@ -96,9 +97,14 @@ def validate(spec_path: SpecArgument, verbose: VerboseOption = False) -> None:
 
         typer.echo("OK")
         typer.echo(f"Spec: {spec_path}")
-        typer.echo(f"Workflow: {spec.task}")
+        # task ではなく実際に使うテンプレート名を出す (LoRA指定で切り替わるため)
+        typer.echo(f"Workflow: {resolve_workflow_name(spec)}")
         typer.echo(f"Resolution: {params.width}x{params.height} (batch {params.batch_size})")
         typer.echo(f"Checkpoint: {spec.model.checkpoint}")
+        for lora in spec.model.loras:
+            typer.echo(
+                f"LoRA: {lora.name} (model={lora.strength_model}, clip={lora.strength_clip})"
+            )
         if not spec.presets.is_empty():
             applied = ", ".join(
                 f"{kind}={name}"

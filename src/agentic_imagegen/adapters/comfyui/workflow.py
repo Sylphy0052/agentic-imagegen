@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import copy
 import secrets
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -72,6 +72,40 @@ TXT2IMG_BINDING: Final = WorkflowBinding(
         LinkRef("ksampler", "model", "checkpoint"),
     ),
 )
+
+
+#: LoRAスロットの役割名。テンプレートのLoraLoaderの段数と一致させる。
+LORA_SLOT_ROLES: Final = ("lora_1", "lora_2", "lora_3")
+
+_LORA_INPUTS: Final = ("lora_name", "strength_model", "strength_clip")
+
+
+def _lora_binding() -> WorkflowBinding:
+    """txt2imgの構成に LoraLoader を3段挟んだbindingを組み立てる。
+
+    checkpoint -> lora_1 -> lora_2 -> lora_3 -> KSampler / CLIPTextEncode の順で
+    繋がっていることまで検証する。1段でも迂回していればLoRAが効かないため、
+    構造検証で落とす。
+    """
+    nodes = dict(TXT2IMG_BINDING.nodes)
+    for index, role in enumerate(LORA_SLOT_ROLES):
+        nodes[role] = NodeRef(str(10 + index), "LoraLoader", _LORA_INPUTS)
+
+    links = [link for link in TXT2IMG_BINDING.links if link.input_key != "model"]
+    # LoRAチェーンの接続を先頭から順に検証する
+    upstream = "checkpoint"
+    for role in LORA_SLOT_ROLES:
+        links.append(LinkRef(role, "model", upstream))
+        links.append(LinkRef(role, "clip", upstream))
+        upstream = role
+    links.append(LinkRef("ksampler", "model", upstream))
+    links.append(LinkRef("positive_prompt", "clip", upstream))
+    links.append(LinkRef("negative_prompt", "clip", upstream))
+
+    return WorkflowBinding(name="txt2img_lora", nodes=nodes, links=tuple(links))
+
+
+TXT2IMG_LORA_BINDING: Final = _lora_binding()
 
 
 def resolve_seed(seed: int) -> int:
@@ -184,11 +218,53 @@ def build_workflow(
 
     inputs_of("save_image")["filename_prefix"] = spec.output.prefix
 
+    _inject_loras(spec, binding, inputs_of)
+
     return workflow
 
 
+def _inject_loras(
+    spec: GenerationSpec,
+    binding: WorkflowBinding,
+    inputs_of: Callable[[str], dict[str, Any]],
+) -> None:
+    """LoRAスロットを持つテンプレートへ、指定されたLoRAを順に割り当てる。
+
+    余ったスロットは強度0で無効化する。ComfyUIは lora_name に実在するファイル名を
+    要求するため空にはできず、直前のLoRA名を使い回す。
+    """
+    slots = tuple(role for role in LORA_SLOT_ROLES if role in binding.nodes)
+    if not slots:
+        return
+
+    loras = spec.model.loras
+    if not loras:
+        raise WorkflowValidationError(
+            f"Workflow ({binding.name}) はLoRA用ですが、Specに model.loras が指定されていません"
+        )
+    if len(loras) > len(slots):
+        raise WorkflowValidationError(
+            f"Workflow ({binding.name}) のLoRAスロットは{len(slots)}件ですが、"
+            f"{len(loras)}件指定されています"
+        )
+
+    for index, role in enumerate(slots):
+        node = inputs_of(role)
+        if index < len(loras):
+            lora = loras[index]
+            node["lora_name"] = lora.name
+            node["strength_model"] = lora.strength_model
+            node["strength_clip"] = lora.strength_clip
+        else:
+            node["lora_name"] = loras[-1].name
+            node["strength_model"] = 0.0
+            node["strength_clip"] = 0.0
+
+
 __all__ = [
+    "LORA_SLOT_ROLES",
     "TXT2IMG_BINDING",
+    "TXT2IMG_LORA_BINDING",
     "LinkRef",
     "NodeRef",
     "WorkflowBinding",

@@ -82,6 +82,7 @@ async def generate(
         prompt_id=prompt_id,
         seed=seed,
         files=files,
+        workflow_name=prepared.workflow_name,
         workflow_hash=prepared.template_hash,
         backend_info=await _collect_backend_info(backend),
     )
@@ -148,12 +149,14 @@ def _write_metadata(
     prompt_id: str,
     seed: int,
     files: tuple[Path, ...],
+    workflow_name: str,
     workflow_hash: str,
     backend_info: dict[str, Any] | None,
 ) -> Path:
     metadata = {
         "prompt_id": prompt_id,
-        "workflow": spec.task,
+        # 論理タスク名 (spec.task) ではなく、実際に使ったテンプレート名を残す
+        "workflow": workflow_name,
         "workflow_hash": workflow_hash,
         "created_at": datetime.now().astimezone().isoformat(),
         "resolved_seed": seed,
