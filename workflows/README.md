@@ -8,8 +8,10 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 - コードから差し替えてよいのは、許可済みパラメータのみ。
   - `positive_prompt` / `negative_prompt` / `checkpoint` / `seed` / `steps` / `cfg`
   - `sampler` / `scheduler` / `width` / `height` / `batch_size` / `filename_prefix`
-- 実行を許可するworkflowは allowlist で管理する (Phase 1は `txt2img` のみ)。
-  定義は [src/agentic_imagegen/workflows/injector.py](../src/agentic_imagegen/workflows/injector.py) を参照。
+  - LoRA用テンプレートでは `lora_name` / `strength_model` / `strength_clip`
+- 実行を許可するworkflowは allowlist で管理する。定義は
+  [src/agentic_imagegen/workflows/injector.py](../src/agentic_imagegen/workflows/injector.py)
+  の `ALLOWED_WORKFLOWS` を参照。
 
 ## 同梱テンプレート
 
