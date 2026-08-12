@@ -1,0 +1,135 @@
+# CLAUDE.md
+
+Claude Codeがこのリポジトリを操作するときのルール。
+
+## このプロジェクトは何か
+
+AIコーディングエージェントから、ComfyUI経由でStable Diffusion系モデルによる画像生成を実行する基盤。
+
+```text
+Claude Code -> GenerationSpec -> Python CLI (imagegen) -> ComfyUI API -> 画像生成
+```
+
+現在はPhase 1 (txt2imgのみ)。設計と進捗は
+[docs/plan/phase1.md](docs/plan/phase1.md) と
+[Issue #1](https://github.com/Sylphy0052/agentic-imagegen/issues/1) を参照。
+
+## 画像生成要求を受けたときの手順
+
+ユーザーから「〇〇な画像を生成して」と指示された場合、次の順で実行する。
+
+1. **GenerationSpecを作る** — 自然言語の要求をSpecの各フィールドへ落とし込む
+2. **`specs/generated/` へ保存する** — ファイル名は内容が分かるものにする (例: `specs/generated/blue-hair-girl.yaml`)
+3. **validateを実行する**
+   ```bash
+   uv run imagegen validate specs/generated/<name>.yaml
+   ```
+4. **generateを実行する**
+   ```bash
+   uv run imagegen generate specs/generated/<name>.yaml
+   ```
+5. **結果を確認する** — exit codeが0であること、出力ファイルが存在すること
+6. **output pathをユーザーへ返す** — 生成された画像のパスとseedを伝える
+
+ComfyUIが起動していない場合は `uv run imagegen health` で状態を確認し、
+[docs/comfyui-setup.md](docs/comfyui-setup.md) の手順を案内する。
+
+Specの書き方は [specs/examples/txt2img.yaml](specs/examples/txt2img.yaml) を参照。
+
+## 禁止事項
+
+- **`workflows/*.json` を勝手に書き換えない。** Workflowは人間がComfyUI GUIで作成しAPI形式で書き出す
+- **ComfyUI workflowをLLMで動的生成しない。** ノードや接続を組み立てる設計は採らない
+- **未知のcheckpointを勝手に使用しない。** ComfyUIに実在するファイル名だけを指定する
+- **validationを迂回しない。** `validate` をスキップしたり、検証を緩めて通したりしない
+- **巨大解像度・大量batchを実行しない。** CPU推論のため負荷が直接時間に跳ね返る
+- **ComfyUI APIへCLI/Coreを迂回して直接curlしない。** 障害切り分けが崩れる
+
+## 設計上守ること
+
+- **GenerationSpecが内部API契約。** Claude Code固有形式やComfyUI固有JSONを層間インターフェースにしない
+- **ComfyUI依存は `src/agentic_imagegen/adapters/comfyui/` に閉じ込める。** Domain / Service層はNode IDやHTTP仕様を知らない
+- **Node IDとclass_typeのマッピングは1か所に集約する。** 定義は `adapters/comfyui/workflow.py` の `TXT2IMG_BINDING`
+- **CLIはMCP導入後も残す。** ローカルデバッグ・CI・Integration Test・障害切り分けに使う
+- **Phase 1でMCPのためだけの抽象層を作らない。**
+
+## 生成パラメータの目安
+
+CPU推論のため、既定は控えめにする。
+
+| 項目 | 推奨 | 上限 |
+| --- | --- | --- |
+| 解像度 | 512x512 / 512x768 | `IMAGEGEN_MAX_WIDTH` / `IMAGEGEN_MAX_HEIGHT` (既定2048) |
+| steps | 20前後 | 100 |
+| cfg | 5.0-8.0 | 30 |
+| batch_size | 1 | 4 |
+
+seedに `-1` を指定するとランダムな値へ解決され、実際に使われた値が `metadata.json` に記録される。
+同じ画を再現したい場合は、その値をSpecへ書き戻す。
+
+## 開発時のルール
+
+### 品質ゲート (commit前に全て通す)
+
+```bash
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy src
+```
+
+カバレッジは80%以上を維持する (`uv run pytest --cov`)。
+
+### テスト
+
+- **Unit Testから実ComfyUIへ接続しない。** `httpx.MockTransport` とフィクスチャで代替する
+- ComfyUIが必要なテストには `@pytest.mark.integration` を付ける。通常の `uv run pytest` ではskipされる
+- Integration Testは低負荷設定 (512x512 / steps 2-4 / batch_size 1) にする
+
+### 実装方針
+
+- 型ヒントは原則必須。`Any` の濫用を避ける
+- 新機能はTDD (RED -> GREEN -> REFACTOR) で進める
+- 巨大な単一モジュールを作らない。過剰な抽象化もしない
+
+## ディレクトリ
+
+| パス | 役割 |
+| --- | --- |
+| `src/agentic_imagegen/domain/` | GenerationSpec、検証規則、結果の型。外部依存を持たない |
+| `src/agentic_imagegen/services/` | ユースケースの組み立て |
+| `src/agentic_imagegen/workflows/` | Workflowテンプレートの読み込みとallowlist |
+| `src/agentic_imagegen/adapters/comfyui/` | ComfyUI固有のHTTP / WebSocket / JSON形状 |
+| `workflows/` | API形式のWorkflowテンプレート (人間が作成) |
+| `specs/examples/` | サンプルSpec |
+| `specs/generated/` | Claude Codeが生成したSpec (git管理外) |
+| `outputs/` | 生成結果 (git管理外) |
+
+## 環境変数
+
+| 変数 | 既定値 | 用途 |
+| --- | --- | --- |
+| `COMFYUI_BASE_URL` | `http://127.0.0.1:8188` | ComfyUI接続先 |
+| `IMAGEGEN_MAX_WIDTH` | 2048 | 幅の上限 |
+| `IMAGEGEN_MAX_HEIGHT` | 2048 | 高さの上限 |
+| `IMAGEGEN_MAX_PIXELS` | 4194304 | 総pixel数の上限 (batch込み) |
+| `IMAGEGEN_MAX_BATCH` | 4 | batch_sizeの上限 |
+| `IMAGEGEN_TIMEOUT` | 300 | 生成のタイムアウト秒 |
+| `IMAGEGEN_OUTPUT_ROOT` | `outputs` | 出力ルート |
+
+## exit code
+
+失敗時は原因ごとに異なるexit codeを返す。自動化する場合はこれで分岐する。
+
+| code | 意味 |
+| --- | --- |
+| 0 | 成功 |
+| 1 | 想定外の内部エラー |
+| 2 | Specが不正 (`InvalidGenerationSpec`) |
+| 3 | ComfyUIへ到達できない (`ComfyUIUnavailable`) |
+| 4 | Workflowテンプレートが不正 (`WorkflowValidationError`) |
+| 5 | Workflowの投入が拒否された (`WorkflowSubmissionError`) |
+| 6 | 生成がタイムアウトした (`GenerationTimeout`) |
+| 7 | ComfyUI側で実行が失敗した (`GenerationFailed`) |
+| 8 | 出力画像が見つからない (`OutputNotFound`) |
+| 9 | 環境変数の設定値が不正 (`InvalidConfiguration`) |
