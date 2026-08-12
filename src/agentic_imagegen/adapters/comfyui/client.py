@@ -38,6 +38,7 @@ logger: Final = logging.getLogger(__name__)
 HEALTH_TIMEOUT_SECONDS: Final = 5.0
 
 _CHECKPOINT_LOADER: Final = "CheckpointLoaderSimple"
+_LORA_LOADER: Final = "LoraLoader"
 
 #: アップロードした入力画像に付ける接頭辞。ComfyUIのinput配下で由来を判別できるようにする。
 _UPLOAD_PREFIX: Final = "imagegen_"
@@ -116,12 +117,21 @@ class ComfyUIClient:
         取得できたが形状が想定と違う場合は空タプルを返し、検証をスキップさせる。
         """
         payload = await self._get_json(f"/object_info/{_CHECKPOINT_LOADER}")
-        names = _extract_checkpoint_names(payload)
+        names = _extract_option_names(payload, node=_CHECKPOINT_LOADER, field="ckpt_name")
         if not names:
             logger.warning(
                 "ComfyUIからcheckpoint一覧を取得できませんでした (レスポンス形式が想定外)"
             )
         return names
+
+    async def available_loras(self) -> tuple[str, ...]:
+        """利用可能なLoRA名の一覧を取得する。
+
+        LoRAが1つも置かれていない場合も空タプルになる。取得失敗と区別しないのは、
+        どちらの場合も「指定できるLoRAがない」という結論が同じため。
+        """
+        payload = await self._get_json(f"/object_info/{_LORA_LOADER}")
+        return _extract_option_names(payload, node=_LORA_LOADER, field="lora_name")
 
     async def upload_image(self, path: Path) -> str:
         """画像をComfyUIのinputへアップロードし、LoadImageで参照する名前を返す。
@@ -321,12 +331,12 @@ class ComfyUIClient:
         return payload
 
 
-def _extract_checkpoint_names(payload: dict[str, Any]) -> tuple[str, ...]:
-    """object_infoのレスポンスからcheckpoint名の一覧を取り出す。
+def _extract_option_names(payload: dict[str, Any], *, node: str, field: str) -> tuple[str, ...]:
+    """object_infoのレスポンスから、あるノードの選択肢一覧を取り出す。
 
     ComfyUIの応答は入れ子が深く欠損もありうるため、防御的に取り出す。
     """
-    loader = payload.get(_CHECKPOINT_LOADER)
+    loader = payload.get(node)
     if not isinstance(loader, dict):
         return ()
     required = loader.get("input", {})
@@ -335,7 +345,7 @@ def _extract_checkpoint_names(payload: dict[str, Any]) -> tuple[str, ...]:
     fields = required.get("required")
     if not isinstance(fields, dict):
         return ()
-    entry = fields.get("ckpt_name")
+    entry = fields.get(field)
     if not isinstance(entry, list) or not entry:
         return ()
     candidates = entry[0]

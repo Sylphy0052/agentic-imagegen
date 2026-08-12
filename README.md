@@ -332,6 +332,25 @@ scene だけを差し替える。失敗時の切り分けは
 Claude Codeが守るルール (Workflowを勝手に書き換えない、validationを迂回しないなど) は
 [CLAUDE.md](CLAUDE.md) に定義している。
 
+## MCP Server
+
+Claude Code / Codex の双方から同じ基盤を使える。手順は
+[docs/mcp-setup.md](docs/mcp-setup.md) を参照。
+
+```bash
+uv run imagegen-mcp   # stdioで待ち受ける (通常はクライアントが子プロセスとして起動する)
+```
+
+| tool | 用途 |
+| --- | --- |
+| `validate_generation` | GenerationSpecを検証する (生成はしない) |
+| `list_models` | 利用可能なcheckpoint名 |
+| `list_loras` | 利用可能なLoRA名 |
+| `list_workflows` | 実行を許可しているWorkflowテンプレート名 |
+
+MCP層は薄いアダプタで、検証も生成もCLIと同じ Service / Domain を通る。
+MCP経由で検証を迂回できる経路は作っていない。
+
 ## アーキテクチャ
 
 ```text
