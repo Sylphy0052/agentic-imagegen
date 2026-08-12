@@ -19,6 +19,7 @@ from agentic_imagegen.workflows.injector import (
     WORKFLOWS_DIR,
     load_workflow_template,
     prepare_workflow,
+    template_digest,
 )
 
 
@@ -241,19 +242,42 @@ def test_resolve_seed_randomizes_minus_one() -> None:
 
 
 def test_prepare_workflow_returns_workflow_and_seed() -> None:
-    workflow, seed = prepare_workflow(_spec())
+    prepared = prepare_workflow(_spec())
 
-    assert workflow["6"]["inputs"]["text"] == "1girl, blue hair"
-    assert seed == 12345
+    assert prepared.workflow["6"]["inputs"]["text"] == "1girl, blue hair"
+    assert prepared.seed == 12345
 
 
 def test_prepare_workflow_resolves_random_seed() -> None:
-    _, seed = prepare_workflow(_spec(generation={"seed": -1}))
+    prepared = prepare_workflow(_spec(generation={"seed": -1}))
 
-    assert 0 <= seed <= 2**63 - 1
+    assert 0 <= prepared.seed <= 2**63 - 1
 
 
 def test_prepare_workflow_output_is_json_serializable() -> None:
-    workflow, _ = prepare_workflow(_spec())
+    prepared = prepare_workflow(_spec())
 
-    assert json.loads(json.dumps(workflow)) == workflow
+    assert json.loads(json.dumps(prepared.workflow)) == prepared.workflow
+
+
+def test_prepare_workflow_reports_template_hash() -> None:
+    prepared = prepare_workflow(_spec())
+
+    assert prepared.template_hash.startswith("sha256:")
+    assert len(prepared.template_hash) == len("sha256:") + 64
+
+
+def test_template_hash_is_stable_across_formatting() -> None:
+    """整形や鍵の順序が変わっただけではダイジェストを動かさない。"""
+    template = load_workflow_template("txt2img")
+    reordered = dict(reversed(list(template.items())))
+
+    assert template_digest(template) == template_digest(reordered)
+
+
+def test_template_hash_changes_when_content_changes() -> None:
+    template = load_workflow_template("txt2img")
+    modified = json.loads(json.dumps(template))
+    modified["3"]["inputs"]["steps"] = 999
+
+    assert template_digest(template) != template_digest(modified)

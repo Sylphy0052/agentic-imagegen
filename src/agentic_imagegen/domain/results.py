@@ -19,6 +19,19 @@ class ImageRef:
 
 
 @dataclass(frozen=True, slots=True)
+class HealthStatus:
+    """バックエンドへの到達確認結果。
+
+    ComfyUI固有の情報ではなく「どの実行基盤で動いているか」を表す中立な値として扱う。
+    生成時のmetadataへ記録し、あとから実行環境を追えるようにする。
+    """
+
+    base_url: str
+    comfyui_version: str | None
+    devices: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class GenerationResult:
     """1回の生成の結果。"""
 
@@ -29,4 +42,4 @@ class GenerationResult:
     metadata_path: Path
 
 
-__all__ = ["GenerationResult", "ImageRef"]
+__all__ = ["GenerationResult", "HealthStatus", "ImageRef"]

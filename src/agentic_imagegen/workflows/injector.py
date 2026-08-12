@@ -6,7 +6,9 @@ ComfyUI固有の構造検証と注入処理は adapters.comfyui.workflow へ委�
 
 from __future__ import annotations
 
+import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
 
@@ -65,23 +67,48 @@ def load_workflow_template(name: str, *, workflows_dir: Path | None = None) -> d
     return template
 
 
+def template_digest(template: dict[str, Any]) -> str:
+    """テンプレート内容のダイジェスト。
+
+    ファイルのバイト列ではなく正規化したJSONから取る。インデントや鍵の順序が
+    変わっただけの差分でハッシュが動かないようにするため。
+    """
+    canonical = json.dumps(template, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedWorkflow:
+    """実行可能な状態まで組み立てたWorkflow。
+
+    seedとテンプレートのダイジェストは、生成後にmetadataへ記録して
+    同じ結果を再現できるようにするために持ち回る。
+    """
+
+    workflow: dict[str, Any]
+    seed: int
+    template_hash: str
+
+
 def prepare_workflow(
     spec: GenerationSpec, *, workflows_dir: Path | None = None
-) -> tuple[dict[str, Any], int]:
-    """Specから実行可能なWorkflowと、解決済みseedを組み立てる。
+) -> PreparedWorkflow:
+    """Specから実行可能なWorkflowと、解決済みseed・テンプレートのダイジェストを組み立てる。
 
     seedが -1 の場合はここでランダム値へ解決し、metadataへ記録できるよう返す。
     """
     template = load_workflow_template(spec.task, workflows_dir=workflows_dir)
     seed = resolve_seed(spec.generation.seed)
     workflow = build_workflow(template, spec, seed=seed, binding=get_binding(spec.task))
-    return workflow, seed
+    return PreparedWorkflow(workflow=workflow, seed=seed, template_hash=template_digest(template))
 
 
 __all__ = [
     "ALLOWED_WORKFLOWS",
     "WORKFLOWS_DIR",
+    "PreparedWorkflow",
     "get_binding",
     "load_workflow_template",
     "prepare_workflow",
+    "template_digest",
 ]
