@@ -10,10 +10,11 @@ AIコーディングエージェントから、ComfyUI経由でStable Diffusion�
 Claude Code -> GenerationSpec -> Python CLI (imagegen) -> ComfyUI API -> 画像生成
 ```
 
-Phase 1 (txt2img) は完了。現在はPhase 2 (preset / LoRA / img2img) を実装中。
+Phase 1 (txt2img) から Phase 3 (MCP Server) までは完了。現在はPhase 4
+(ControlNet / IPAdapter / batch / hires fix) を実装中。
 Phase 1の設計は [docs/plan/phase1.md](docs/plan/phase1.md)、
 進捗は [Issue #1](https://github.com/Sylphy0052/agentic-imagegen/issues/1) と
-[Issue #3](https://github.com/Sylphy0052/agentic-imagegen/issues/3) を参照。
+[Issue #5](https://github.com/Sylphy0052/agentic-imagegen/issues/5) を参照。
 
 ## 画像生成要求を受けたときの手順
 
@@ -163,7 +164,23 @@ reference:
 - モデルとCLIP Visionは対応関係がある。`ip-adapter-plus_sd15` には ViT-H を使う
 
 `weight` は0.6-0.9が扱いやすい。1.0を超えると参照画像へ寄りすぎ、プロンプトが効かなくなる。
-顔立ちだけ借りて服装や背景はプロンプトへ従わせたい場合は `weight_type: style transfer` を使う。
+
+**背景まで参照画像に引きずられる場合は `weight_type: style transfer` を使う。**
+既定の `linear` は参照画像を背景ごと読むため、プロンプトで別の場所を指定しても
+元絵の背景が出る。weightを下げても背景が変わる前に服装や顔立ちが崩れるだけで、
+切り分けは `weight_type` で行う。
+
+## 同じキャラクタを別の構図で出す
+
+「さっきの子で別の場面を」と言われた場合は、基準画像を1枚作り、それを `reference` に
+指定したうえで scene preset だけ差し替える。preset だけでは顔立ちまでは固定できない。
+手順は
+[.claude/skills/imagegen/references/character-consistency.md](.claude/skills/imagegen/references/character-consistency.md)
+にある。
+
+- 基準画像は顔がはっきり写っているものを選ぶ (全身絵や後ろ姿は特徴を拾えない)
+- checkpoint は基準画像と同じものを使う。変えると画風ごと変わる
+- `character` preset は残したまま `scene` だけ差し替える
 
 ## 解像度を上げる (hires fix)
 

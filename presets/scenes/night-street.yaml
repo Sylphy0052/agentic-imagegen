@@ -1,0 +1,8 @@
+# 夜の街路のシーンpreset。
+# 場所・時間帯・構図を書く。人物の外見は character 側の責務とする。
+
+description: 夜の街路、ネオンの明かり、全身の構図
+
+prompt:
+  positive: >
+    city street at night, neon lights, rain reflection, cowboy shot, looking at viewer

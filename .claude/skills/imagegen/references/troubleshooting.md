@@ -58,6 +58,20 @@ uv run imagegen health
 | 8 | VAEDecode |
 | 9 | SaveImage |
 
+## code 5: 投入が拒否された (ControlNet / IPAdapter)
+
+ComfyUIがWorkflowの投入を拒否した。カスタムノードとモデルの有無をまず疑う。
+
+- IPAdapterを使う場合、[ComfyUI_IPAdapter_plus](https://github.com/cubiq/ComfyUI_IPAdapter_plus)
+  が要る。未導入だと `IPAdapterModelLoader` などのノード自体が存在しない。
+  `uv run python -c "..."` ではなくMCPの `list_ipadapters` で確認できる (空なら未導入)
+- モデル名が実在しないと拒否される。ControlNetは `ls ~/ComfyUI/models/controlnet/`、
+  IPAdapterは `ls ~/ComfyUI/models/ipadapter/` と `ls ~/ComfyUI/models/clip_vision/` で確認する
+- IPAdapterモデルとCLIP Visionには対応関係がある。`ip-adapter-plus_sd15` には
+  ViT-H (`CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors`) を使う
+- checkpointのアーキテクチャとも対応が要る。SD1.5用のIPAdapterをSDXLのcheckpointへ
+  かけると次元が合わずに失敗する
+
 ## code 6: タイムアウト
 
 CPU推論では時間がかかる。まず `imagegen health` の `Devices:` を見る。
@@ -93,3 +107,9 @@ ComfyUIの起動ログを見る。よくある原因:
 - `metadata.json` の `backend` で実行基盤 (ComfyUI版とデバイス) を確認できる。
   XPUとCPUではfp16とfp32の違いがあり、同じseedでも完全には一致しない
 - 構図だけ変えたい場合は scene preset を差し替える。character presetは変えない
+- 同一キャラクタのはずが別人になる場合は
+  [character-consistency.md](character-consistency.md) の手順を使う。
+  presetだけでは顔立ちまでは固定できない
+- IPAdapterを指定したのに参照画像が効かない場合、`metadata.json` の `workflow` が
+  `*_ipadapter` になっているか確認する。`reference` の書き忘れでは
+  テンプレート自体が切り替わらない

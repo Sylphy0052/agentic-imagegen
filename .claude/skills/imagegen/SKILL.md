@@ -122,6 +122,55 @@ source:
 - `batch_size` は1のみ。LoRAは併用できる (`img2img_lora` テンプレートへ切り替わる)
 - 入力画像は `inputs/` へ置く。既存の生成結果を使う場合はそこからコピーする
 
+### 構図を指定する場合 (ControlNet)
+
+参考画像から線画 (Canny) を取り、その構図を保ったまま生成する。
+
+```yaml
+control:
+  image: inputs/pose.png                             # リポジトリ配下に置く
+  model: control_v11p_sd15_canny_fp16.safetensors    # ls ~/ComfyUI/models/controlnet/ で確認
+  strength: 0.9
+  low_threshold: 0.3
+  high_threshold: 0.7
+```
+
+- 前処理は Canny のみ。pose / depth はカスタムノードが要るため使えない
+- 線が強く出すぎる場合は `low_threshold` を上げるか `strength` を下げる
+- `generation.upscale` との同時指定は拒否される
+
+### 参照画像の特徴を引き継ぐ場合 (IPAdapter)
+
+参照画像をCLIP Visionで読み、人物の顔立ちや服装をプロンプトより強く固定する。
+
+```yaml
+reference:
+  image: inputs/character.png                              # リポジトリ配下に置く
+  model: ip-adapter-plus_sd15.safetensors                  # ls ~/ComfyUI/models/ipadapter/
+  clip_vision: CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors # ls ~/ComfyUI/models/clip_vision/
+  weight: 0.8
+```
+
+- `weight` は0.6-0.9が扱いやすい。1.0を超えるとプロンプトが効かなくなる
+- 背景まで参照画像に引きずられる場合は `weight_type: style transfer` を足す
+- ControlNetと併用できる。構図をControlNet、特徴をIPAdapterが担う
+- 同一キャラクタを別の構図で出す手順は
+  [references/character-consistency.md](references/character-consistency.md) を参照
+
+### 解像度を上げる場合 (hires fix)
+
+```yaml
+generation:
+  width: 512
+  height: 768
+  upscale:
+    scale: 1.5      # 1.0より大きく4.0以下
+    denoise: 0.45   # 低いほど元の絵を保つ。0.3-0.5が扱いやすい
+```
+
+**生成時間は倍以上になる。** 2段目は拡大後の解像度で走る。
+ControlNet / IPAdapter との同時指定は拒否される。
+
 パラメータの目安 (CPU推論では時間が跳ね返るため控えめにする):
 
 | 項目 | 推奨 | 上限 |
@@ -153,6 +202,18 @@ uv run imagegen generate specs/generated/<name>.yaml
 | CPU | 約12分 | 1200 |
 
 長くかかる場合はバックグラウンド実行にして、完了を待ってから報告する。
+ControlNet / IPAdapter を使うと1-2割、hires fix を使うと倍以上に伸びる。
+
+seedを変えて何枚か出す場合や、複数のSpecを流す場合は `batch` を使う。
+
+```bash
+uv run imagegen batch specs/generated/<name>.yaml --seeds 111,222,333
+uv run imagegen batch specs/generated/a.yaml specs/generated/b.yaml
+```
+
+1件失敗しても残りは続き、最後にサマリが出る。Specの検証は実行前に全件行うため、
+不正なSpecが混ざっていたら1件も生成しない。枚数分だけ時間がかかるので、
+`steps` と解像度を落としてから使う。
 
 ### 7. 結果を報告する
 
