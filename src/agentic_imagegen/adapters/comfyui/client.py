@@ -42,6 +42,9 @@ _LORA_LOADER: Final = "LoraLoader"
 _CONTROLNET_LOADER: Final = "ControlNetLoader"
 _IPADAPTER_LOADER: Final = "IPAdapterModelLoader"
 _CLIP_VISION_LOADER: Final = "CLIPVisionLoader"
+_UNET_LOADER: Final = "UNETLoader"
+_TEXT_ENCODER_LOADER: Final = "CLIPLoader"
+_VAE_LOADER: Final = "VAELoader"
 
 #: アップロードした入力画像に付ける接頭辞。ComfyUIのinput配下で由来を判別できるようにする。
 _UPLOAD_PREFIX: Final = "imagegen_"
@@ -157,6 +160,25 @@ class ComfyUIClient:
         """利用可能なCLIP Visionモデル名の一覧を取得する。"""
         payload = await self._get_json(f"/object_info/{_CLIP_VISION_LOADER}")
         return _extract_option_names(payload, node=_CLIP_VISION_LOADER, field="clip_name")
+
+    async def available_diffusion_models(self) -> tuple[str, ...]:
+        """UNet単体で配布されているモデル名の一覧を取得する。
+
+        DiT系モデル (Anima など) はUNetとtext encoder / VAEが別ファイルのため、
+        checkpointとは別のフォルダ (models/diffusion_models/) を見る。
+        """
+        payload = await self._get_json(f"/object_info/{_UNET_LOADER}")
+        return _extract_option_names(payload, node=_UNET_LOADER, field="unet_name")
+
+    async def available_text_encoders(self) -> tuple[str, ...]:
+        """単体で配布されているtext encoder名の一覧を取得する。"""
+        payload = await self._get_json(f"/object_info/{_TEXT_ENCODER_LOADER}")
+        return _extract_option_names(payload, node=_TEXT_ENCODER_LOADER, field="clip_name")
+
+    async def available_vaes(self) -> tuple[str, ...]:
+        """単体で配布されているVAE名の一覧を取得する。"""
+        payload = await self._get_json(f"/object_info/{_VAE_LOADER}")
+        return _extract_option_names(payload, node=_VAE_LOADER, field="vae_name")
 
     async def upload_image(self, path: Path) -> str:
         """画像をComfyUIのinputへアップロードし、LoadImageで参照する名前を返す。

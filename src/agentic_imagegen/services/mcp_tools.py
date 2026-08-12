@@ -65,6 +65,28 @@ async def list_clip_visions(settings: Settings) -> list[str]:
         return list(await client.available_clip_visions())
 
 
+async def list_diffusion_models(settings: Settings) -> list[str]:
+    """ComfyUIが持っているUNet単体のモデル名を返す。
+
+    DiT系モデルはUNetとtext encoder / VAEが別ファイルで、checkpointとは別に置く。
+    ここに出る名前を model.unet へ指定する。
+    """
+    async with ComfyUIClient(settings) as client:
+        return list(await client.available_diffusion_models())
+
+
+async def list_text_encoders(settings: Settings) -> list[str]:
+    """ComfyUIが持っているtext encoder名を返す。model.clip へ指定する。"""
+    async with ComfyUIClient(settings) as client:
+        return list(await client.available_text_encoders())
+
+
+async def list_vaes(settings: Settings) -> list[str]:
+    """ComfyUIが持っているVAE名を返す。model.vae へ指定する。"""
+    async with ComfyUIClient(settings) as client:
+        return list(await client.available_vaes())
+
+
 async def _default_runner(
     spec: GenerationSpec, *, settings: Settings, project_root: Path
 ) -> GenerationResult:
@@ -352,6 +374,9 @@ def _failure(errors: list[str]) -> dict[str, Any]:
         "workflow": None,
         "resolution": None,
         "checkpoint": None,
+        "unet": None,
+        "clip": None,
+        "vae": None,
         "loras": [],
         "presets": {},
         "prompt": None,
@@ -382,6 +407,10 @@ def _success(spec: GenerationSpec) -> dict[str, Any]:
         "workflow": resolve_workflow_name(spec),
         "resolution": resolution,
         "checkpoint": spec.model.checkpoint,
+        # DiT系はUNet / text encoder / VAE を別々に指定する
+        "unet": spec.model.unet,
+        "clip": spec.model.clip,
+        "vae": spec.model.vae,
         "loras": [lora.model_dump(mode="json") for lora in spec.model.loras],
         "presets": {
             key: value

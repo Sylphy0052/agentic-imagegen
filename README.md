@@ -205,6 +205,7 @@ output:
 - 解像度は64-8192かつ8の倍数、steps 1-100、cfg 0-30、batch_size 1-4
 - 環境変数による上限 (`IMAGEGEN_MAX_*`) を超える指定は拒否する
 - checkpoint名・LoRA名はPath Traversal・絶対パス・想定外の拡張子を拒否する
+- `checkpoint` と `unet` / `clip` / `vae` は排他。後者は3つセットで指定する
 - LoRAは同時3件まで、同じLoRAの重複指定は拒否、strengthは±10.0まで
 - preset名は英数字始まりの `[A-Za-z0-9._-]` のみ
 - 出力先が作業ルートの外を指す場合は拒否する
@@ -515,6 +516,9 @@ uv run imagegen-mcp   # stdioで待ち受ける (通常はクライアントが�
 | `list_controlnets` | 利用可能なControlNetモデル名 |
 | `list_ipadapters` | 利用可能なIPAdapterモデル名 (カスタムノード未導入なら空) |
 | `list_clip_visions` | 利用可能なCLIP Visionモデル名 |
+| `list_diffusion_models` | 利用可能なUNet単体のモデル名 (DiT系) |
+| `list_text_encoders` | 利用可能なtext encoder名 (DiT系) |
+| `list_vaes` | 利用可能なVAE名 (DiT系) |
 | `list_workflows` | 実行を許可しているWorkflowテンプレート名 |
 
 生成は数十秒から数分かかるため、`generate_image` は完了を待たずに `job_id` を返し、

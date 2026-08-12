@@ -31,7 +31,8 @@ def test_example_loads(example: Path) -> None:
     spec = load_spec(example, presets_root=PRESETS_ROOT)
 
     assert spec.prompt.positive
-    assert spec.model.checkpoint
+    # checkpoint 1ファイル形式と、UNet / CLIP / VAE を分ける形式のどちらか
+    assert spec.model.checkpoint or spec.model.uses_separate_loaders
 
 
 @pytest.mark.parametrize("example", _examples(), ids=lambda p: p.name)

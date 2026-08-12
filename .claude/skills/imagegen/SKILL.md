@@ -38,6 +38,12 @@ ls ~/ComfyUI/models/loras/
 ls presets/characters presets/scenes presets/styles
 ```
 
+DiT系モデル (Anima など) はUNet単体で配布され、checkpointとは別の場所に置く。
+
+```bash
+ls ~/ComfyUI/models/diffusion_models/ ~/ComfyUI/models/text_encoders/ ~/ComfyUI/models/vae/
+```
+
 ### 3. presetを選ぶか、新しく作る
 
 要求に合う preset があれば名前で参照する。軸は3つで、1軸につき1つまで。
@@ -179,6 +185,29 @@ ControlNet / IPAdapter との同時指定は拒否される。
 | steps | 20前後 | 100 |
 | cfg | 5.0-8.0 | 30 |
 | batch_size | 1 | 4 |
+
+### DiT系モデルを使う場合 (Anima)
+
+`checkpoint` の代わりに3つを別々に指定する。
+
+```yaml
+generation:
+  width: 832        # 1024x1024前後が前提。832x1216が扱いやすい
+  height: 1216
+  steps: 28
+  cfg: 4.0          # SD1.5系より低め。5を超えると崩れやすい
+  sampler: er_sde
+  scheduler: simple
+
+model:
+  unet: hassakuAnima_v13_int8.safetensors   # ~/ComfyUI/models/diffusion_models/
+  clip: qwen_3_06b_base.safetensors         # ~/ComfyUI/models/text_encoders/
+  vae: qwen_image_vae.safetensors           # ~/ComfyUI/models/vae/
+```
+
+テンプレートは `txt2img_unet` へ切り替わる。**`checkpoint` とは排他で、3つは揃えて指定する。**
+LoRA / img2img / hires fix / ControlNet / IPAdapter との併用は拒否される。
+text encoderとVAEはUNetと対応関係があるため、勝手に別のものへ差し替えない。
 
 ### 画像に日本語を入れる場合
 

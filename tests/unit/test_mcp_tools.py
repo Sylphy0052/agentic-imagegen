@@ -149,6 +149,7 @@ class TestListWorkflows:
             "txt2img_lora_controlnet_ipadapter",
             "img2img_controlnet_ipadapter",
             "img2img_lora_controlnet_ipadapter",
+            "txt2img_unet",
         }
 
     def test_is_sorted(self) -> None:

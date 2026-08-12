@@ -152,6 +152,28 @@ def test_validate_reports_lora_workflow(tmp_path: Path) -> None:
     assert "model=0.8" in result.output
 
 
+def test_validate_reports_separate_loaders(tmp_path: Path) -> None:
+    """unet / clip / vae を指定した場合はローダーごとに出力する。"""
+    spec = _write_spec(
+        tmp_path,
+        VALID_SPEC.replace(
+            "  checkpoint: v1-5-pruned-emaonly.safetensors",
+            "  unet: hassakuAnima_v13_int8.safetensors\n"
+            "  clip: qwen_3_06b_base.safetensors\n"
+            "  vae: qwen_image_vae.safetensors",
+        ),
+    )
+
+    result = runner.invoke(cli.app, ["validate", str(spec)])
+
+    assert result.exit_code == 0
+    assert "Workflow: txt2img_unet" in result.output
+    assert "UNet: hassakuAnima_v13_int8.safetensors" in result.output
+    assert "CLIP: qwen_3_06b_base.safetensors" in result.output
+    assert "VAE: qwen_image_vae.safetensors" in result.output
+    assert "Checkpoint:" not in result.output
+
+
 def test_validate_reports_reference(tmp_path: Path) -> None:
     """IPAdapterの指定はテンプレート切り替えと合わせて出力される。"""
     spec = _write_spec(
