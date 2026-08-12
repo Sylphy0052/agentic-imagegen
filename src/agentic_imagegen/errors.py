@@ -61,6 +61,16 @@ class InvalidConfiguration(ImageGenError):
     exit_code = 9
 
 
+class TextCompositionError(ImageGenError):
+    """生成後のテキスト合成に失敗した。
+
+    フォントが見つからない、画像を開けない、描画できないといった、
+    生成そのものではなく後処理に起因する失敗を表す。
+    """
+
+    exit_code = 10
+
+
 __all__ = [
     "ComfyUIUnavailable",
     "GenerationFailed",
@@ -69,6 +79,7 @@ __all__ = [
     "InvalidConfiguration",
     "InvalidGenerationSpec",
     "OutputNotFound",
+    "TextCompositionError",
     "WorkflowSubmissionError",
     "WorkflowValidationError",
 ]

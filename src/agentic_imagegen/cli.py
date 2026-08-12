@@ -20,12 +20,13 @@ from agentic_imagegen import __version__
 from agentic_imagegen.adapters.comfyui.client import ComfyUIClient
 from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.models import GenerationSpec
-from agentic_imagegen.domain.policy import validate_against_limits
+from agentic_imagegen.domain.policy import resolve_source_image, validate_against_limits
 from agentic_imagegen.domain.results import GenerationResult, HealthStatus
 from agentic_imagegen.errors import ComfyUIUnavailable, ImageGenError, InvalidGenerationSpec
 from agentic_imagegen.services.batch import BatchItem, BatchOutcome, expand_seeds, run_batch
-from agentic_imagegen.services.generation import generate
-from agentic_imagegen.services.spec_loader import load_spec
+from agentic_imagegen.services.compose import compose_text
+from agentic_imagegen.services.generation import TEXT_SUFFIX, generate, resolve_fonts_root
+from agentic_imagegen.services.spec_loader import load_spec, load_text_spec
 from agentic_imagegen.workflows.injector import resolve_workflow_name
 
 logger: Final = logging.getLogger(__name__)
@@ -115,6 +116,9 @@ def validate(spec_path: SpecArgument, verbose: VerboseOption = False) -> None:
             typer.echo(
                 f"LoRA: {lora.name} (model={lora.strength_model}, clip={lora.strength_clip})"
             )
+        if spec.text is not None:
+            fonts = ", ".join(sorted({layer.font for layer in spec.text.layers}))
+            typer.echo(f"Text: {len(spec.text.layers)} layer(s) (fonts: {fonts})")
         if not spec.presets.is_empty():
             applied = ", ".join(
                 f"{kind}={name}"
@@ -151,6 +155,55 @@ def generate_images(
         for path in result.files:
             typer.echo(str(path))
         typer.echo(f"metadata: {result.metadata_path}")
+
+
+@app.command(name="compose")
+def compose_image(
+    image_path: Annotated[
+        Path,
+        typer.Argument(metavar="IMAGE", help="テキストを合成する画像 (作業ルート配下)"),
+    ],
+    spec_path: Annotated[
+        Path,
+        typer.Argument(metavar="SPEC", help="テキスト定義のYAML (生成用Specのtext:でもよい)"),
+    ],
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="出力先 (既定は <元の名前>_text.<元の拡張子>)"),
+    ] = None,
+    verbose: VerboseOption = False,
+) -> None:
+    """既存の画像へテキストを合成する。入力画像は変更しない。"""
+    _configure_logging(verbose)
+
+    with _handled_errors():
+        settings = Settings.from_env()
+        project_root = Path.cwd()
+        source = resolve_source_image(
+            _relative_to_root(image_path, project_root),
+            project_root,
+            max_bytes=settings.max_source_bytes,
+        )
+        spec = load_text_spec(spec_path)
+        destination = output or source.with_name(f"{source.stem}{TEXT_SUFFIX}{source.suffix}")
+
+        result = compose_text(
+            image=source,
+            spec=spec,
+            fonts_root=resolve_fonts_root(settings, project_root),
+            output=destination,
+        )
+        typer.echo(str(result.output))
+
+
+def _relative_to_root(path: Path, project_root: Path) -> str:
+    """作業ルートからの相対パスへ直す。外を指す場合は拒否する。"""
+    try:
+        return path.resolve().relative_to(project_root.resolve()).as_posix()
+    except ValueError as exc:
+        raise InvalidGenerationSpec(
+            f"画像は作業ルート配下を指定してください (指定値: {path})"
+        ) from exc
 
 
 @app.command(name="batch")

@@ -289,6 +289,55 @@ generation:
 実測 (Intel XPU / SD1.5 / 512x512 -> 768x768): 43.7秒。
 **生成時間は倍以上になる。** 2段目は拡大後の解像度で走る。
 
+## 日本語テキストの合成
+
+SD1.5 / SDXL 系のモデルは日本語をほぼ描けない。読める文字が必要な場合は生成に任せず、
+生成後に合成する。フォント・位置・大きさを完全に制御できる。
+
+```yaml
+text:
+  layers:
+    - content: 夜の街
+      font: NotoSansJP-Bold.ttf   # fonts/ 配下のファイル名
+      size: 72
+      color: "#ffffff"
+      anchor: top-center          # 9分割の基準位置
+      offset: [0, 48]
+      max_width: 0.8              # 折り返し幅。1.0以下は画像幅に対する比率
+      align: center
+      rotation: -5.0
+      direction: horizontal       # vertical で縦書き
+      stroke:
+        width: 4
+        color: "#101020"
+      shadow:
+        offset: [0, 6]
+        blur: 8
+        opacity: 0.6
+      box:
+        color: "#000000"
+        opacity: 0.55
+        padding: [24, 16]
+        radius: 12
+```
+
+レイヤは指定順に描画し、後のものが上へ重なる (最大10件)。生成そのままの画像は残り、
+合成結果は `image_0001_text.png` として別に出力される。
+
+フォントは `fonts/` へ置く (git管理外)。置き方は [docs/fonts-setup.md](docs/fonts-setup.md)。
+見つからないフォントは別の書体へ代替せず exit code 10 で失敗する。
+
+生成済みの画像へ後から合成する場合は `compose` を使う。入力画像は変更しない。
+
+```bash
+uv run imagegen compose inputs/base.png specs/generated/caption.yaml
+uv run imagegen compose inputs/base.png specs/generated/caption.yaml -o outputs/caption.png
+```
+
+日本語を直接描けるモデル (Qwen-Image) の評価と導入条件は
+[docs/plan/phase5-japanese-text.md](docs/plan/phase5-japanese-text.md) を参照。
+現在の実行環境ではメモリが足りず動かせないため、合成方式を既定とする。
+
 ## img2img
 
 既存の画像を入力にして描き直す。
@@ -320,6 +369,7 @@ outputs/
 └── 2026-08-12/
     └── blue_hair/
         ├── image_0001.png
+        ├── image_0001_text.png   # text を指定した場合のみ
         └── metadata.json
 ```
 
@@ -335,6 +385,7 @@ outputs/
 | `backend` | 実行基盤 (`comfyui_version` / `devices`) |
 | `spec` | preset展開後のSpec全体 |
 | `outputs` | 出力ファイル名 |
+| `text` | テキスト合成の結果 (解決したフォントの実パスと合成後のファイル名) |
 
 同じ日に同じprefixで再実行した場合は連番ディレクトリを作り、既存の結果を上書きしない。
 
@@ -354,6 +405,7 @@ outputs/
 | `IMAGEGEN_OUTPUT_ROOT` | `outputs` | 出力ルート |
 | `IMAGEGEN_PRESETS_ROOT` | `presets` | presetの探索ルート |
 | `IMAGEGEN_MAX_SOURCE_BYTES` | 33554432 | img2imgの入力画像の上限バイト数 |
+| `IMAGEGEN_FONTS_ROOT` | `fonts` | テキスト合成に使うフォントの探索ルート |
 
 秘密情報は扱わないため、環境変数ファイルは必須ではない。
 

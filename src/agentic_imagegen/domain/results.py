@@ -40,6 +40,9 @@ class GenerationResult:
     directory: Path
     files: tuple[Path, ...]
     metadata_path: Path
+    #: テキストを合成した画像。text を指定しなかった場合は空。
+    #: files の生成そのままの画像は残したままにする。
+    text_files: tuple[Path, ...] = ()
 
 
 __all__ = ["GenerationResult", "HealthStatus", "ImageRef"]

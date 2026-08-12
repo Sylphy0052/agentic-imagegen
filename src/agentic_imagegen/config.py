@@ -21,6 +21,7 @@ DEFAULT_MAX_BATCH: Final = 4
 DEFAULT_TIMEOUT_SECONDS: Final = 300
 DEFAULT_OUTPUT_ROOT: Final = "outputs"
 DEFAULT_PRESETS_ROOT: Final = "presets"
+DEFAULT_FONTS_ROOT: Final = "fonts"
 
 #: img2imgの入力画像として受け付ける最大バイト数 (32MiB)。
 #: 巨大画像はそのままの解像度で生成されるため、時間とメモリを直撃する。
@@ -77,6 +78,8 @@ class Settings:
     #: presetの探索ルート。既存の呼び出しを壊さないよう既定値を持たせている。
     presets_root: Path = Path(DEFAULT_PRESETS_ROOT)
     max_source_bytes: int = DEFAULT_MAX_SOURCE_BYTES
+    #: テキスト合成に使うフォントの探索ルート。
+    fonts_root: Path = Path(DEFAULT_FONTS_ROOT)
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -88,6 +91,10 @@ class Settings:
         presets_root = os.environ.get("IMAGEGEN_PRESETS_ROOT", DEFAULT_PRESETS_ROOT).strip()
         if not presets_root:
             raise InvalidConfiguration("IMAGEGEN_PRESETS_ROOT に空文字は指定できません")
+
+        fonts_root = os.environ.get("IMAGEGEN_FONTS_ROOT", DEFAULT_FONTS_ROOT).strip()
+        if not fonts_root:
+            raise InvalidConfiguration("IMAGEGEN_FONTS_ROOT に空文字は指定できません")
 
         return cls(
             comfyui_base_url=_base_url("COMFYUI_BASE_URL", DEFAULT_BASE_URL),
@@ -101,6 +108,7 @@ class Settings:
             output_root=Path(output_root),
             presets_root=Path(presets_root),
             max_source_bytes=_positive_int("IMAGEGEN_MAX_SOURCE_BYTES", DEFAULT_MAX_SOURCE_BYTES),
+            fonts_root=Path(fonts_root),
         )
 
 

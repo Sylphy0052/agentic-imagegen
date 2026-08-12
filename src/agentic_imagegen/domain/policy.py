@@ -7,10 +7,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Final
 
 from agentic_imagegen.config import Settings
-from agentic_imagegen.domain.models import GenerationSpec
-from agentic_imagegen.errors import InvalidGenerationSpec
+from agentic_imagegen.domain.models import ALLOWED_FONT_SUFFIXES, GenerationSpec
+from agentic_imagegen.errors import InvalidGenerationSpec, TextCompositionError
+
+#: フォントが見つからないときに列挙する候補の件数。多すぎると読めない。
+_MAX_FONT_CANDIDATES: Final = 10
 
 
 def validate_against_limits(spec: GenerationSpec, settings: Settings) -> None:
@@ -91,7 +95,53 @@ def resolve_source_image(image: str, root: Path, *, max_bytes: int) -> Path:
     return resolved
 
 
+def resolve_font(name: str, root: Path) -> Path:
+    """フォント名を root 配下の絶対パスへ解決する。
+
+    パス形式のハード制約は TextLayer 側で済んでいる。ここでは実体に触れる検証
+    (rootの外を指していないか、実在するか) を担う。
+
+    見つからない場合は、別の書体へ暗黙にフォールバックせず失敗させる。意図しない
+    書体で出力されるより、置き場所と候補を示して止める方が扱いやすい。
+    """
+    resolved_root = root.resolve()
+    resolved = (resolved_root / Path(name)).resolve()
+
+    if resolved_root not in resolved.parents:
+        raise TextCompositionError(f"フォントの指定がフォントルートの外を指しています: {name}")
+
+    if not resolved.is_file():
+        raise TextCompositionError(
+            f"フォントが見つかりません: {name}\n"
+            f"  探索ルート: {resolved_root}\n"
+            f"  {_describe_available_fonts(resolved_root)}"
+        )
+    return resolved
+
+
+def _describe_available_fonts(root: Path) -> str:
+    """フォントルート配下にある候補を人が読める形へまとめる。"""
+    if not root.is_dir():
+        return "フォントルートが存在しません。ディレクトリを作成してフォントを置いてください"
+
+    candidates = sorted(
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file() and path.suffix.lower() in ALLOWED_FONT_SUFFIXES
+    )
+    if not candidates:
+        return "フォントルートにフォントがありません。フォントを置いてください"
+
+    shown = candidates[:_MAX_FONT_CANDIDATES]
+    listed = " / ".join(shown)
+    remainder = len(candidates) - len(shown)
+    if remainder > 0:
+        listed = f"{listed} 他{remainder}件"
+    return f"利用できるフォント: {listed}"
+
+
 __all__ = [
+    "resolve_font",
     "resolve_output_directory",
     "resolve_source_image",
     "validate_against_limits",
