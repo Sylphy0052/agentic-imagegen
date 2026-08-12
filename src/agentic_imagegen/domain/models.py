@@ -438,6 +438,7 @@ __all__ = [
     "ControlSpec",
     "GenerationParams",
     "GenerationSpec",
+    "IPAdapterWeightType",
     "ModelSpec",
     "OutputSpec",
     "PresetRefs",

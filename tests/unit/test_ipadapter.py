@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from agentic_imagegen.adapters.comfyui.workflow import (
+    LORA_SLOT_ROLES,
     REFERENCE_APPLY_ROLE,
     REFERENCE_CLIP_VISION_ROLE,
     REFERENCE_IMAGE_ROLE,
@@ -246,6 +247,39 @@ class TestCombinedWithControlNet:
         assert workflow[ksampler_id]["inputs"]["model"] == [apply_id, 0]
         assert workflow[ksampler_id]["inputs"]["positive"] == [control_apply_id, 0]
         assert workflow[ksampler_id]["inputs"]["negative"] == [control_apply_id, 1]
+
+    def test_full_combination_is_wired(self) -> None:
+        """最も複雑な構成 (img2img + LoRA + ControlNet + IPAdapter) の配線を固定する。
+
+        テンプレート生成スクリプトを変えたときに、形は正しいまま経路だけ
+        壊れる退行を検知するため。
+        """
+        spec = _spec(
+            task="img2img",
+            source={"image": "inputs/base.png"},
+            loras=[LORA],
+            control=CONTROL,
+        )
+
+        prepared = prepare_workflow(
+            spec,
+            source_image_name="uploaded_base.png",
+            control_image_name="uploaded_pose.png",
+            reference_image_name="uploaded_character.png",
+        )
+
+        assert prepared.workflow_name == "img2img_lora_controlnet_ipadapter"
+        binding = ALLOWED_WORKFLOWS[prepared.workflow_name]
+        node_id = binding.nodes
+        ksampler = prepared.workflow[node_id["ksampler"].node_id]["inputs"]
+        apply_node = prepared.workflow[node_id[REFERENCE_APPLY_ROLE].node_id]["inputs"]
+
+        assert ksampler["model"] == [node_id[REFERENCE_APPLY_ROLE].node_id, 0]
+        assert ksampler["positive"] == [node_id["control_apply"].node_id, 0]
+        assert ksampler["negative"] == [node_id["control_apply"].node_id, 1]
+        assert ksampler["latent_image"] == [node_id["vae_encode"].node_id, 0]
+        # IPAdapterはLoRAの最終段からMODELを受ける (LoRAを飛ばすと強度が効かない)
+        assert apply_node["model"] == [node_id[LORA_SLOT_ROLES[-1]].node_id, 0]
 
 
 def test_rejects_upscale_and_reference_together() -> None:
