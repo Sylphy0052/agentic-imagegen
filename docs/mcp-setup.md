@@ -67,23 +67,33 @@ exit codeはCLIと同じ体系 (2: Specが不正 / 3: ComfyUIへ到達できな�
 
 ## Claude Code から使う
 
-プロジェクトルートに `.mcp.json` を置く。
+**リポジトリに [.mcp.json](../.mcp.json) を同梱しているため、設定は不要。**
+このリポジトリをClaude Codeで開くと検出される。
 
 ```json
 {
   "mcpServers": {
     "agentic-imagegen": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/agentic-imagegen", "imagegen-mcp"],
-      "env": {
-        "IMAGEGEN_PROJECT_ROOT": "/path/to/agentic-imagegen"
-      }
+      "args": ["run", "imagegen-mcp"]
     }
   }
 }
 ```
 
-コマンドで登録することもできる。
+パスを書いていないのは、Claude Codeがプロジェクトルートをカレントディレクトリとして
+サーバーを起動するため。環境に依存しないのでそのままコミットできる。
+
+初回は承認が要る。承認前は次のように表示される。
+
+```bash
+$ claude mcp list
+agentic-imagegen: uv run imagegen-mcp - ⏸ Pending approval (run `claude` to approve)
+```
+
+`claude` を起動して承認すると使えるようになる。
+
+別ディレクトリから使う場合はコマンドで登録する。
 
 ```bash
 claude mcp add agentic-imagegen -- uv run --directory /path/to/agentic-imagegen imagegen-mcp
@@ -91,13 +101,51 @@ claude mcp add agentic-imagegen -- uv run --directory /path/to/agentic-imagegen 
 
 ## Codex から使う
 
-`~/.codex/config.toml` (プロジェクト単位なら `.codex/config.toml`) へ追記する。
+```bash
+codex mcp add agentic-imagegen -- uv run --directory /path/to/agentic-imagegen imagegen-mcp
+```
+
+`~/.codex/config.toml` へ次の形で書き込まれる。手で編集してもよい。
 
 ```toml
 [mcp_servers.agentic-imagegen]
 command = "uv"
 args = ["run", "--directory", "/path/to/agentic-imagegen", "imagegen-mcp"]
+```
 
+登録を確認する。
+
+```bash
+codex mcp get agentic-imagegen
+codex mcp list
+```
+
+外すときは `codex mcp remove agentic-imagegen`。
+
+### 非対話実行 (`codex exec`) では使えない
+
+`codex exec` からMCP toolを呼ぶと、承認プロンプトを出せないため必ずキャンセルされる。
+
+```text
+mcp: agentic-imagegen/list_workflows started
+mcp: agentic-imagegen/list_workflows (failed)
+user cancelled MCP tool call
+```
+
+これはCodex側の既知の制限で、`approval_policy` や `default_tools_approval_mode` を
+変えても回避できない ([openai/codex#24135](https://github.com/openai/codex/issues/24135) /
+[#16685](https://github.com/openai/codex/issues/16685))。
+サーバー自体は起動しており、toolも認識されている (上記ログの `started` がその証拠)。
+
+**対話セッション (`codex`) で承認すれば使える。**
+自動化したい場合の回避策は `--dangerously-bypass-approvals-and-sandbox` のみだが、
+サンドボックスごと無効化するため常用しない。
+
+`uv run --directory` はカレントディレクトリも変更するため、作業ルートは
+リポジトリルートに解決される。`IMAGEGEN_PROJECT_ROOT` の指定は不要。
+
+```toml
+# 作業ルートを明示したい場合のみ
 [mcp_servers.agentic-imagegen.env]
 IMAGEGEN_PROJECT_ROOT = "/path/to/agentic-imagegen"
 ```
@@ -129,6 +177,8 @@ CLIと共通。詳細は [README](../README.md) を参照。
 | 症状 | 原因と対処 |
 | --- | --- |
 | toolが表示されない | クライアント側でサーバーの起動に失敗している。`uv run imagegen-mcp` を手で実行してエラーを確認する |
+| Claude Codeで `Pending approval` のまま | `.mcp.json` は検出できている。`claude` を起動して承認する |
+| Codexで `user cancelled MCP tool call` | `codex exec` (非対話) の既知の制限。対話セッション (`codex`) で承認して使う。詳細は下記 |
 | `list_models` が失敗する | ComfyUIが未起動。`uv run imagegen health` で確認する |
 | presetが見つからない | 作業ルートがずれている。`IMAGEGEN_PROJECT_ROOT` を明示する |
 | 出力先がおかしい | 同上。出力は作業ルート配下へ解決される |
