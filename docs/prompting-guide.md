@@ -72,7 +72,13 @@ Specの書き方そのものは [CLAUDE.md](../CLAUDE.md)、失敗時の切り�
 - **重み付けはSDXL系より強い値が要る。** `(chibi:2)` のような指定でようやく効く
 - tag dropoutで学習されているため、関連タグを網羅する必要はない
 
-モデル配布元が推奨する `beta57` scheduler は本CLIのallowlistに無い。`simple` を使う。
+**モデル配布元が推奨する `beta57` は KSampler の scheduler ではない。**
+ComfyUIのschedulerは `simple` / `sgm_uniform` / `karras` / `exponential` / `ddim_uniform` /
+`beta` / `normal` / `linear_quadratic` / `kl_optimal` の9種で、`beta57` はこの中に無い。
+`beta` scheduler の alpha=0.5 / beta=0.7 を指す通称であり、指定するには `BetaSamplingScheduler`
+ノードを持つWorkflowが要る。本リポジトリのテンプレートはKSamplerベースのため使えない。
+`simple` を使う。
+
 Anima向けのstyle presetは [presets/styles/anima-base.yaml](../presets/styles/anima-base.yaml)
 にある。
 
