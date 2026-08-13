@@ -87,6 +87,16 @@ async def list_vaes(settings: Settings) -> list[str]:
         return list(await client.available_vaes())
 
 
+async def list_upscale_models(settings: Settings) -> list[str]:
+    """ComfyUIが持っているアップスケールモデル名を返す。
+
+    generation.upscale.model へ指定する。1つも置いていなければ空になり、
+    その場合はlatent拡大 (model未指定) だけが使える。
+    """
+    async with ComfyUIClient(settings) as client:
+        return list(await client.available_upscale_models())
+
+
 async def list_embeddings(settings: Settings) -> list[str]:
     """ComfyUIが持っているTextual Inversion embedding名 (拡張子なし) を返す。
 

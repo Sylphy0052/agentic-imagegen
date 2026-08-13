@@ -304,7 +304,7 @@ generation:
   latent拡大を同じ`denoise`で使うと、拡大の粗さを2段目が補いきれず絵が崩れることがある
 - pixelへ戻す往復 (VAEDecode / VAEEncode) が挟まるぶん所要時間が伸びる。
   実測は [xpu-setup.md](xpu-setup.md#所要時間とタイムアウトの目安) を参照
-- モデルは`~/ComfyUI/models/upscale_models/`へ置く。MCPのモデル一覧ツールには出ない
+- モデルは`~/ComfyUI/models/upscale_models/`へ置く。配置済みの名前はMCPの`list_upscale_models`で確認する
 
 ## model
 

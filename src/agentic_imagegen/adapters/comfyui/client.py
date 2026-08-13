@@ -45,6 +45,7 @@ _CLIP_VISION_LOADER: Final = "CLIPVisionLoader"
 _UNET_LOADER: Final = "UNETLoader"
 _TEXT_ENCODER_LOADER: Final = "CLIPLoader"
 _VAE_LOADER: Final = "VAELoader"
+_UPSCALE_MODEL_LOADER: Final = "UpscaleModelLoader"
 
 #: embeddingはobject_info経由のノード選択肢ではなく専用エンドポイントで取得する。
 #: CLIPTextEncodeはテキスト中の `embedding:<name>` を実行時に解決するだけで、
@@ -184,6 +185,14 @@ class ComfyUIClient:
         """単体で配布されているVAE名の一覧を取得する。"""
         payload = await self._get_json(f"/object_info/{_VAE_LOADER}")
         return _extract_option_names(payload, node=_VAE_LOADER, field="vae_name")
+
+    async def available_upscale_models(self) -> tuple[str, ...]:
+        """アップスケールモデル (ESRGAN系) 名の一覧を取得する。
+
+        1つも置かれていない場合も空タプルになる。
+        """
+        payload = await self._get_json(f"/object_info/{_UPSCALE_MODEL_LOADER}")
+        return _extract_option_names(payload, node=_UPSCALE_MODEL_LOADER, field="model_name")
 
     async def available_embeddings(self) -> tuple[str, ...]:
         """利用可能なTextual Inversion embedding名 (拡張子なし) の一覧を取得する。
@@ -407,6 +416,12 @@ def _extract_option_names(payload: dict[str, Any], *, node: str, field: str) -> 
     """object_infoのレスポンスから、あるノードの選択肢一覧を取り出す。
 
     ComfyUIの応答は入れ子が深く欠損もありうるため、防御的に取り出す。
+    選択肢の並びには2つの形があり、どちらで来るかはノードの定義側で決まる。
+
+    - 旧来のノード (nodes.py 由来): ``[["a.safetensors", "b.safetensors"]]``
+    - 新しい定義APIのノード (comfy_extras 由来): ``["COMBO", {"options": [...]}]``
+
+    UpscaleModelLoader は後者で返る。前者だけを読むと選択肢を取りこぼす。
     """
     loader = payload.get(node)
     if not isinstance(loader, dict):
@@ -421,9 +436,13 @@ def _extract_option_names(payload: dict[str, Any], *, node: str, field: str) -> 
     if not isinstance(entry, list) or not entry:
         return ()
     candidates = entry[0]
-    if not isinstance(candidates, list):
-        return ()
-    return tuple(name for name in candidates if isinstance(name, str))
+    if isinstance(candidates, list):
+        return tuple(name for name in candidates if isinstance(name, str))
+    if len(entry) > 1 and isinstance(entry[1], dict):
+        options = entry[1].get("options")
+        if isinstance(options, list):
+            return tuple(name for name in options if isinstance(name, str))
+    return ()
 
 
 def _to_websocket_url(base_url: str, client_id: str) -> str:
