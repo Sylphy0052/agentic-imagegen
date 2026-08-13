@@ -42,6 +42,7 @@ server: Final = MCPServer(
         "checkpointやLoRAは list_models / list_loras で、"
         "ControlNetモデルは list_controlnets で、"
         "IPAdapterは list_ipadapters / list_clip_visions で、"
+        "generation.upscale.model は list_upscale_models で、"
         "promptに embedding:<name> を書く場合は list_embeddings で"
         "実在するものだけを指定すること。"
     ),
@@ -123,6 +124,15 @@ async def list_text_encoders() -> list[str]:
 async def list_vaes() -> list[str]:
     """ComfyUIが持っているVAE名の一覧を返す。model.vae へ指定する。"""
     return await mcp_tools.list_vaes(Settings.from_env())
+
+
+@server.tool()
+async def list_upscale_models() -> list[str]:
+    """ComfyUIが持っているアップスケールモデル名の一覧を返す。
+
+    generation.upscale.model へ指定する。空ならlatent拡大だけが使える。
+    """
+    return await mcp_tools.list_upscale_models(Settings.from_env())
 
 
 @server.tool()

@@ -42,6 +42,8 @@ stdioで待ち受けるため、単体で実行しても何も表示されずに
 | `list_diffusion_models` | 利用可能なUNet単体のモデル名を返す (DiT系) | 必要 |
 | `list_text_encoders` | 利用可能なtext encoder名を返す (DiT系) | 必要 |
 | `list_vaes` | 利用可能なVAE名を返す (DiT系) | 必要 |
+| `list_upscale_models` | 利用可能なアップスケールモデル名を返す | 必要 |
+| `list_embeddings` | 利用可能なTextual Inversion embedding名を返す | 必要 |
 | `list_workflows` | 実行を許可しているWorkflowテンプレート名を返す | 不要 |
 
 `validate_generation` はpresetを展開したうえで、選択されるテンプレート・解像度・LoRA構成・

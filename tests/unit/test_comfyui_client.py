@@ -287,6 +287,21 @@ VAE_OBJECT_INFO = {
     "VAELoader": {"input": {"required": {"vae_name": [["qwen_image_vae.safetensors"], {}]}}}
 }
 
+#: UpscaleModelLoaderは新しいノード定義API由来で、選択肢がCOMBO形式で返る
+#: (実機のComfyUIで確認済み)。旧来のローダとは形が違う。
+UPSCALE_MODEL_OBJECT_INFO = {
+    "UpscaleModelLoader": {
+        "input": {
+            "required": {
+                "model_name": [
+                    "COMBO",
+                    {"multiselect": False, "options": ["RealESRGAN_x4plus_anime_6B.pth"]},
+                ]
+            }
+        }
+    }
+}
+
 
 async def test_available_diffusion_models() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
@@ -313,6 +328,91 @@ async def test_available_vaes() -> None:
 
     async with _client(handler) as client:
         assert await client.available_vaes() == ("qwen_image_vae.safetensors",)
+
+
+async def test_available_upscale_models() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/object_info/UpscaleModelLoader"
+        return httpx.Response(200, json=UPSCALE_MODEL_OBJECT_INFO)
+
+    async with _client(handler) as client:
+        assert await client.available_upscale_models() == ("RealESRGAN_x4plus_anime_6B.pth",)
+
+
+async def test_available_upscale_models_empty_when_none_placed() -> None:
+    """1つも置かれていない環境でもエラーにせず空で返す。"""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={})
+
+    async with _client(handler) as client:
+        assert await client.available_upscale_models() == ()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        # COMBO形式だがメタデータが無い
+        {"UpscaleModelLoader": {"input": {"required": {"model_name": ["COMBO"]}}}},
+        # メタデータが辞書でない
+        {"UpscaleModelLoader": {"input": {"required": {"model_name": ["COMBO", "x"]}}}},
+        # optionsがリストでない
+        {
+            "UpscaleModelLoader": {
+                "input": {"required": {"model_name": ["COMBO", {"options": None}]}}
+            }
+        },
+        {
+            "UpscaleModelLoader": {
+                "input": {"required": {"model_name": ["COMBO", {"options": {"a": 1}}]}}
+            }
+        },
+        # COMBO以外の型がoptionsという名前のメタデータを持っていても選択肢とは見ない
+        {
+            "UpscaleModelLoader": {
+                "input": {"required": {"model_name": ["STRING", {"options": ["x.pth"]}]}}
+            }
+        },
+    ],
+)
+async def test_available_upscale_models_unexpected_shape_returns_empty(
+    payload: dict[str, Any],
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=payload)
+
+    async with _client(handler) as client:
+        assert await client.available_upscale_models() == ()
+
+
+async def test_available_upscale_models_skips_non_string_options() -> None:
+    """optionsに文字列以外が混ざっていても落とさず、文字列だけを返す。"""
+    payload = {
+        "UpscaleModelLoader": {
+            "input": {
+                "required": {"model_name": ["COMBO", {"options": ["a.pth", 1, None, "b.pth"]}]}
+            }
+        }
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=payload)
+
+    async with _client(handler) as client:
+        assert await client.available_upscale_models() == ("a.pth", "b.pth")
+
+
+async def test_available_upscale_models_with_combo_options_empty() -> None:
+    """モデルを置いていない環境ではoptionsが空で返る。"""
+    payload = {
+        "UpscaleModelLoader": {"input": {"required": {"model_name": ["COMBO", {"options": []}]}}}
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=payload)
+
+    async with _client(handler) as client:
+        assert await client.available_upscale_models() == ()
 
 
 async def test_available_diffusion_models_empty_when_none_placed() -> None:
