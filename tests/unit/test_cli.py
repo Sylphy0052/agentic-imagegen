@@ -244,19 +244,27 @@ def _stub_generate(result: GenerationResult | Exception) -> Any:
     return _generate
 
 
-def _result(tmp_path: Path) -> GenerationResult:
+def _result(tmp_path: Path, *, with_text: bool = False) -> GenerationResult:
     directory = tmp_path / "outputs" / "2026-08-12" / "blue_hair"
     directory.mkdir(parents=True)
     image = directory / "image_0001.png"
     image.write_bytes(b"png")
     metadata = directory / "metadata.json"
     metadata.write_text("{}", encoding="utf-8")
+
+    text_files: tuple[Path, ...] = ()
+    if with_text:
+        composed = directory / "image_0001_text.png"
+        composed.write_bytes(b"png")
+        text_files = (composed,)
+
     return GenerationResult(
         prompt_id="pid-1",
         seed=4242,
         directory=directory,
         files=(image,),
         metadata_path=metadata,
+        text_files=text_files,
     )
 
 
@@ -269,6 +277,21 @@ def test_generate_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     assert result.exit_code == 0
     assert "image_0001.png" in result.output
     assert "pid-1" in result.output
+
+
+def test_generate_reports_composed_text_images(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """テキスト合成の結果は生成そのままの画像と区別して出す。"""
+    monkeypatch.setattr(cli, "ComfyUIClient", FakeClient)
+    monkeypatch.setattr(cli, "generate", _stub_generate(_result(tmp_path, with_text=True)))
+
+    result = runner.invoke(cli.app, ["generate", str(_write_spec(tmp_path))])
+
+    assert result.exit_code == 0
+    assert "image_0001.png" in result.output
+    assert "text: " in result.output
+    assert "image_0001_text.png" in result.output
 
 
 def test_generate_validates_spec_before_connecting(tmp_path: Path) -> None:

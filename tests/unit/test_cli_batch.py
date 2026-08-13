@@ -37,13 +37,14 @@ def _write_spec(tmp_path: Path, name: str = "spec.yaml") -> Path:
     return path
 
 
-def _result(tmp_path: Path, seed: int) -> GenerationResult:
+def _result(tmp_path: Path, seed: int, *, with_text: bool = False) -> GenerationResult:
     return GenerationResult(
         prompt_id=f"p-{seed}",
         seed=seed,
         directory=tmp_path,
         files=(tmp_path / f"image_{seed}.png",),
         metadata_path=tmp_path / "metadata.json",
+        text_files=(tmp_path / f"image_{seed}_text.png",) if with_text else (),
     )
 
 
@@ -77,6 +78,25 @@ def test_runs_each_spec(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     assert result.exit_code == 0
     assert len(captured[0]) == 2
     assert "成功 2 / 失敗 0" in result.output
+
+
+def test_reports_composed_text_images(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """テキスト合成の結果もサマリへ出す。"""
+    spec = _write_spec(tmp_path)
+    _patch_batch(
+        monkeypatch,
+        lambda items: [
+            BatchOutcome(item=item, result=_result(tmp_path, 100, with_text=True), error=None)
+            for item in items
+        ],
+    )
+
+    result = runner.invoke(cli.app, ["batch", str(spec)])
+
+    assert result.exit_code == 0
+    assert "image_100.png" in result.output
+    assert "text: " in result.output
+    assert "image_100_text.png" in result.output
 
 
 def test_expands_seeds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
