@@ -34,6 +34,45 @@ Specの書き方そのものは [spec-reference.md](spec-reference.md)、失敗�
   watermark, signature` のような定型から始める
 - **embeddingはcheckpointの世代に固定される。** SD1.5向けのembeddingはSDXLでは機能しない
 
+### 配置済みのSD1.5系モデル
+
+`~/ComfyUI/models/checkpoints/` にあるSD1.5系のcheckpointと、配布元・利用者が挙げている
+推奨設定。Specでは `model.checkpoint` にファイル名をそのまま書く。
+どれもdanbooruタグ主体で書く点は共通で、差が出るのはcfgの実用域と塗りの傾向。
+
+| checkpoint | 傾向 | sampler / scheduler | steps | cfg |
+| --- | --- | --- | --- | --- |
+| `meinamix_v12Final.safetensors` | アニメ調。プロンプトが短くてもまとまる | `dpmpp_2m` / `karras` | 20-60 | 4-9 |
+| `counterfeitV30_v30.safetensors` | アニメ調。背景と色彩の描き込みが厚い | `dpmpp_2m` / `karras` | 20-30 | 8-10 |
+| `abyssorangemix3AOM3_aom3a1b.safetensors` | アニメ調。イラスト寄りの塗り | `dpmpp_sde` / `karras` | 20-30 | 6以上 |
+| `anyloraCheckpoint_bakedvaeBlessedFp16.safetensors` | ニュートラルなアニメ調。LoRAの土台向け | `dpmpp_2m` / `karras` | 20-30 | 7前後 |
+| `cetusMix_Whalefall2.safetensors` | フラットなアニメ調。人物と背景の分離が良い | `dpmpp_2m` / `karras` | 20以上 | 4-8 |
+| `darkSushiMixMix_225D.safetensors` | 2.25D (2Dと2.5Dの中間) | `dpmpp_sde` / `karras` | 20-60 | 7.5 |
+| `hassakuSD15_v13.safetensors` | 明るくコントラストの強いアニメ調 | `ddim` / `normal` | 20 | 8 |
+| `chilloutmix_NiPrunedFp16Fix.safetensors` | 写実寄り。人物の肌と質感に振れる | `dpmpp_sde` / `karras` | 20前後 | 7前後 |
+
+- **cfgの実用域はモデルごとに違う。** `counterfeitV30` の8-10と `cetusMix` の4-8では、
+  同じ7でも意味が変わる。style presetを流用するときはcfgとstepsだけ見直す
+- **`chilloutmix` だけ写実寄り。** アニメ調のstyle preset (`anime-soft` / `anime-detailed`) を
+  当てると打ち消し合う。使うなら品質タグを写実側の語彙へ差し替える
+- **`anylora` はLoRAを載せる土台としてニュートラルに作られている。** 単体で使うより
+  `model.loras` と組み合わせる方が本来の用途
+- **`AnythingXL_xl.safetensors` はSDXL系。** 同じ `checkpoints/` に置かれているが、
+  SD1.5向けのstyle presetと設定を流用しない。目安は後述の
+  [SDXL / Illustrious系](#sdxl--illustrious系-novaanimexl_ilv190など)を参照
+
+配布元の推奨のうち、現状の実装では指定できないものが3つある。
+
+- **clip skipは大半のモデルが2を推奨する。** 現行のテンプレートは1相当で固定
+  ([Issue #60](https://github.com/Sylphy0052/agentic-imagegen/issues/60))。
+  1で運用する分には現状の出力と一致するが、配布元のサンプル画像へ絵柄を寄せたい場合は差が出る
+- **外部VAEの差し替えを前提にするモデルが多い**
+  (`kl-f8-anime2` / `vae-ft-mse-840000-ema` / `Pastel-Waifu-Diffusion`)。
+  現行未対応 ([Issue #57](https://github.com/Sylphy0052/agentic-imagegen/issues/57))。
+  `anylora` はVAEを焼き込み済みのため差し替え不要
+- **hires fixのアップスケーラは `R-ESRGAN 4x+Anime6B` が定番**
+  ([Issue #58](https://github.com/Sylphy0052/agentic-imagegen/issues/58))
+
 ### タグをブロックで組む
 
 タグを役割ごとにまとめて並べると、書き換える箇所と使い回せる箇所が分かれる。
@@ -68,12 +107,8 @@ A1111 / Forgeでは品質タグを先頭へ置く書き方が通例だが、pres
   上げるほど元の構図から離れ、下げるほど拡大しただけの絵に近づく
 - `upscale.steps`は1段目の1/3程度 (steps 30なら10) から始める
 - 2段目のcfgとsamplerは1段目と同じ値を使う。片方だけ変える手段は用意していない
-- **`R-ESRGAN 4x+Anime6B`のようなアップスケールモデルは使えない**
-  (latent拡大のみ。[Issue #58](https://github.com/Sylphy0052/agentic-imagegen/issues/58))
-- **外部VAEの差し替えとclip skipの指定も未対応**
-  ([Issue #57](https://github.com/Sylphy0052/agentic-imagegen/issues/57) /
-  [Issue #60](https://github.com/Sylphy0052/agentic-imagegen/issues/60))。
-  clip skipは既定が1相当のため、1で運用している分には差が出ない
+- アップスケーラは使えずlatent拡大だけになる。外部VAEとclip skipも指定できない
+  (前掲の[配置済みのSD1.5系モデル](#配置済みのsd15系モデル)を参照)
 
 ## SDXL / Illustrious系 (novaAnimeXL_ilV190など)
 
@@ -147,6 +182,13 @@ Anima向けのstyle presetは [presets/styles/anima-base.yaml](../presets/styles
 ## 参考
 
 - [Stable Diffusion prompt: a definitive guide](https://stable-diffusion-art.com/prompt-guide/)
+- [MeinaMix (Civitai)](https://civitai.com/models/7240)
+- [Counterfeit-V3.0 (Civitai)](https://civitai.com/models/4468/counterfeit-v30)
+- [AbyssOrangeMix3 (CivArchive)](https://civarchive.com/models/9942)
+- [AnyLoRA - Checkpoint (Civitai)](https://civitai.com/models/23900/anylora-checkpoint)
+- [Cetus-Mix (Civitai)](https://civitai.com/models/6755/cetus-mix)
+- [Dark Sushi Mix (Civitai)](https://civitai.com/models/24779/dark-sushi-mix-mix)
+- [Hassaku (SD1.5) (Civitai)](https://civitai.com/models/2583)
 - [Arctenox's Simple Prompt Guide for Illustrious](https://civitai.com/articles/23210/arctenoxs-simple-prompt-guide-for-illustrious)
 - [Comprehensive Guide of Illustrious XL](https://tensor.art/articles/831123524065191393)
 - [circlestone-labs/Anima (model card)](https://huggingface.co/circlestone-labs/Anima)

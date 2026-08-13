@@ -31,6 +31,8 @@ generation:
     steps: 10
 
 model:
+  # 別のcheckpointへ差し替えるときは cfg / steps の実用域も見直す。
+  # モデルごとの目安は docs/prompting-guide.md にある。
   checkpoint: meinamix_v12Final.safetensors
 
 output:

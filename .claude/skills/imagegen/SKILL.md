@@ -35,6 +35,8 @@ cd ~/ComfyUI && ./.venv/bin/python main.py --listen 127.0.0.1 --port 8188
 ### 2. 使えるcheckpointとpresetを確かめる
 
 存在しないcheckpointを指定しない。実在するものだけを使う。
+どのcheckpointがどういう絵柄で、cfgとstepsの実用域がどこかは
+[配置済みのSD1.5系モデル](../../../docs/prompting-guide.md#配置済みのsd15系モデル)にまとめてある。
 
 ```bash
 ls ~/ComfyUI/models/checkpoints/

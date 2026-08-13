@@ -220,6 +220,9 @@ generation:
 | `vae` | string | `null` | `~/ComfyUI/models/vae/`のファイル名 |
 | `loras` | list | `[]` | 適用するLoRA。同時3件まで |
 
+配置済みのcheckpointごとの絵柄とcfg / stepsの目安は
+[prompting-guide.md](prompting-guide.md#配置済みのsd15系モデル)にある。
+
 `checkpoint` / `unet` / `clip` / `vae`の拡張子は`.safetensors` / `.ckpt`。
 モデル名は共通して次を拒否する。
 
