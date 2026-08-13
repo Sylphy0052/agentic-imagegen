@@ -39,6 +39,7 @@ from agentic_imagegen.adapters.comfyui.workflow import (
     resolve_seed,
 )
 from agentic_imagegen.domain.models import GenerationSpec
+from agentic_imagegen.domain.policy import display_path
 from agentic_imagegen.errors import WorkflowValidationError
 
 #: リポジトリ同梱のWorkflowテンプレート置き場。
@@ -104,27 +105,34 @@ def get_binding(name: str) -> WorkflowBinding:
     return binding
 
 
-def load_workflow_template(name: str, *, workflows_dir: Path | None = None) -> dict[str, Any]:
-    """許可済みworkflowのテンプレートJSONを読み込む。"""
+def load_workflow_template(
+    name: str, *, workflows_dir: Path | None = None, project_root: Path | None = None
+) -> dict[str, Any]:
+    """許可済みworkflowのテンプレートJSONを読み込む。
+
+    project_root を渡すと、エラーメッセージへ出すテンプレートの位置を作業ルート
+    からの相対パスへ丸める (作業ルートの外を指す場合は絶対パスのまま)。
+    """
     binding = get_binding(name)
     directory = workflows_dir if workflows_dir is not None else WORKFLOWS_DIR
     path = directory / f"{binding.name}.json"
+    shown = display_path(path, project_root)
 
     if not path.is_file():
-        raise WorkflowValidationError(f"Workflowテンプレートが見つかりません: {path}")
+        raise WorkflowValidationError(f"Workflowテンプレートが見つかりません: {shown}")
 
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise WorkflowValidationError(
-            f"WorkflowテンプレートのJSON解析に失敗しました: {path}"
+            f"WorkflowテンプレートのJSON解析に失敗しました: {shown}"
         ) from exc
     except OSError as exc:
-        raise WorkflowValidationError(f"Workflowテンプレートを読み込めません: {path}") from exc
+        raise WorkflowValidationError(f"Workflowテンプレートを読み込めません: {shown}") from exc
 
     if not isinstance(raw, dict):
         raise WorkflowValidationError(
-            f"Workflowテンプレートはマッピングである必要があります: {path}"
+            f"Workflowテンプレートはマッピングである必要があります: {shown}"
         )
     template: dict[str, Any] = raw
     return template
@@ -158,6 +166,7 @@ def prepare_workflow(
     spec: GenerationSpec,
     *,
     workflows_dir: Path | None = None,
+    project_root: Path | None = None,
     source_image_name: str | None = None,
     control_image_name: str | None = None,
     reference_image_name: str | None = None,
@@ -168,7 +177,7 @@ def prepare_workflow(
     img2imgでは、ComfyUIへアップロード済みの入力画像名を source_image_name で渡す。
     """
     name = resolve_workflow_name(spec)
-    template = load_workflow_template(name, workflows_dir=workflows_dir)
+    template = load_workflow_template(name, workflows_dir=workflows_dir, project_root=project_root)
     seed = resolve_seed(spec.generation.seed)
     workflow = build_workflow(
         template,

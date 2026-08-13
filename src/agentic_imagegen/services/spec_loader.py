@@ -20,12 +20,20 @@ from agentic_imagegen.services.preset_loader import PRESETS_KEY, apply_presets
 TEXT_KEY = "text"
 
 
-def load_spec(path: Path, *, presets_root: Path | None = None) -> GenerationSpec:
+def load_spec(
+    path: Path, *, presets_root: Path | None = None, project_root: Path | None = None
+) -> GenerationSpec:
     """YAMLファイルからGenerationSpecを読み込んで検証する。
 
     presets: ブロックがある場合は presets_root 配下のpresetを解決してから検証する。
+    project_root はpresetのエラーメッセージに出すパスを丸めるためだけに使う。
     """
-    return parse_spec(_load_mapping(path), source=path, presets_root=presets_root)
+    return parse_spec(
+        _load_mapping(path),
+        source=path,
+        presets_root=presets_root,
+        project_root=project_root,
+    )
 
 
 def parse_spec(
@@ -33,6 +41,7 @@ def parse_spec(
     *,
     source: Path | None = None,
     presets_root: Path | None = None,
+    project_root: Path | None = None,
 ) -> GenerationSpec:
     """辞書からGenerationSpecを組み立てる。CLI以外の入力経路からも利用する。
 
@@ -46,7 +55,7 @@ def parse_spec(
             raise InvalidGenerationSpec(
                 "presets: が指定されていますが、presetの探索ルートが渡されていません"
             )
-        resolved, applied = apply_presets(payload, root=presets_root)
+        resolved, applied = apply_presets(payload, root=presets_root, project_root=project_root)
         if applied:
             resolved[PRESETS_KEY] = applied
 

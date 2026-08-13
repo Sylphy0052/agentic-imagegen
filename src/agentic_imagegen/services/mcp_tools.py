@@ -114,7 +114,7 @@ def submit_generation(
     if not isinstance(spec, dict):
         raise InvalidGenerationSpec("Specはマッピングである必要があります")
 
-    parsed = parse_spec(spec, presets_root=settings.presets_root)
+    parsed = parse_spec(spec, presets_root=settings.presets_root, project_root=project_root)
     validate_against_limits(parsed, settings)
 
     execute = runner if runner is not None else _default_runner_for(settings, project_root)
@@ -153,7 +153,7 @@ def submit_batch(
 
     seedsを指定するとSpecごとに各seedを当てたものへ展開する。
     """
-    items = _batch_items(specs, seeds=seeds, settings=settings)
+    items = _batch_items(specs, seeds=seeds, settings=settings, project_root=project_root)
 
     async def factory() -> list[BatchOutcome]:
         if runner is not None:
@@ -179,7 +179,9 @@ def submit_batch(
     }
 
 
-def _batch_items(specs: Any, *, seeds: Sequence[int] | None, settings: Settings) -> list[BatchItem]:
+def _batch_items(
+    specs: Any, *, seeds: Sequence[int] | None, settings: Settings, project_root: Path
+) -> list[BatchItem]:
     """受け取ったSpecの並びを検証し、seed掃引まで展開する。"""
     if isinstance(specs, dict | str) or not isinstance(specs, Sequence):
         raise InvalidGenerationSpec("specs はSpecの配列である必要があります")
@@ -190,7 +192,7 @@ def _batch_items(specs: Any, *, seeds: Sequence[int] | None, settings: Settings)
     for index, raw in enumerate(specs):
         if not isinstance(raw, dict):
             raise InvalidGenerationSpec(f"spec[{index}] はマッピングである必要があります")
-        parsed = parse_spec(raw, presets_root=settings.presets_root)
+        parsed = parse_spec(raw, presets_root=settings.presets_root, project_root=project_root)
         validate_against_limits(parsed, settings)
         # ファイルとして存在しないため、並びの位置を出どころとして残す
         pairs.append((f"spec[{index}]", parsed))
@@ -359,7 +361,7 @@ def validate_generation(spec: Any, *, settings: Settings, project_root: Path) ->
         return _failure(["Specはマッピングである必要があります"])
 
     try:
-        parsed = parse_spec(spec, presets_root=settings.presets_root)
+        parsed = parse_spec(spec, presets_root=settings.presets_root, project_root=project_root)
         validate_against_limits(parsed, settings)
     except ImageGenError as exc:
         return _failure(str(exc).splitlines())
