@@ -9,7 +9,7 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
   - `positive_prompt` / `negative_prompt` / `checkpoint` / `seed` / `steps` / `cfg`
   - `sampler` / `scheduler` / `width` / `height` / `batch_size` / `filename_prefix`
   - LoRA用テンプレートでは `lora_name` / `strength_model` / `strength_clip`
-- 実行を許可するworkflowは allowlist で管理する。定義は
+- 実行を許可するworkflowはallowlistで管理する。定義は
   [src/agentic_imagegen/workflows/injector.py](../src/agentic_imagegen/workflows/injector.py)
   の `ALLOWED_WORKFLOWS` を参照。
 
@@ -20,24 +20,24 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `txt2img.json` | text-to-image (ComfyUI標準のtxt2imgグラフと同じノード構成) |
 | `txt2img_lora.json` | LoRA付きtext-to-image (`txt2img` に `LoraLoader` を3段挟んだ構成) |
 | `img2img.json` | image-to-image (`EmptyLatentImage` を `LoadImage` + `VAEEncode` へ置き換えた構成) |
-| `img2img_lora.json` | LoRA付き image-to-image (`img2img` に `LoraLoader` を3段挟んだ構成) |
-| `txt2img_hires.json` | hires fix 付き text-to-image |
+| `img2img_lora.json` | LoRA付きimage-to-image (`img2img` に `LoraLoader` を3段挟んだ構成) |
+| `txt2img_hires.json` | hires fix付きtext-to-image |
 | `txt2img_lora_hires.json` | LoRA + hires fix |
-| `img2img_hires.json` | hires fix 付き image-to-image |
+| `img2img_hires.json` | hires fix付きimage-to-image |
 | `img2img_lora_hires.json` | LoRA + hires fix (img2img) |
-| `txt2img_controlnet.json` | ControlNet付き text-to-image |
+| `txt2img_controlnet.json` | ControlNet付きtext-to-image |
 | `txt2img_lora_controlnet.json` | LoRA + ControlNet |
-| `img2img_controlnet.json` | ControlNet付き image-to-image |
+| `img2img_controlnet.json` | ControlNet付きimage-to-image |
 | `img2img_lora_controlnet.json` | LoRA + ControlNet (img2img) |
-| `txt2img_ipadapter.json` | IPAdapter付き text-to-image |
+| `txt2img_ipadapter.json` | IPAdapter付きtext-to-image |
 | `txt2img_lora_ipadapter.json` | LoRA + IPAdapter |
-| `img2img_ipadapter.json` | IPAdapter付き image-to-image |
+| `img2img_ipadapter.json` | IPAdapter付きimage-to-image |
 | `img2img_lora_ipadapter.json` | LoRA + IPAdapter (img2img) |
 | `txt2img_controlnet_ipadapter.json` | ControlNet + IPAdapter |
 | `txt2img_lora_controlnet_ipadapter.json` | LoRA + ControlNet + IPAdapter |
 | `img2img_controlnet_ipadapter.json` | ControlNet + IPAdapter (img2img) |
 | `img2img_lora_controlnet_ipadapter.json` | LoRA + ControlNet + IPAdapter (img2img) |
-| `txt2img_unet.json` | UNet / text encoder / VAE を別々に読む text-to-image (DiT系) |
+| `txt2img_unet.json` | UNet / text encoder / VAEを別々に読むtext-to-image (DiT系) |
 
 どれを使うかは `task` と `model.loras` の有無、`model.unet` の指定で自動的に決まる。定義は
 [src/agentic_imagegen/workflows/injector.py](../src/agentic_imagegen/workflows/injector.py)
@@ -59,11 +59,11 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 
 | ノードID | class_type | 役割 |
 | --- | --- | --- |
-| 10 | `LoraLoader` | 1本目 (`CheckpointLoaderSimple` から MODEL / CLIP を受ける) |
+| 10 | `LoraLoader` | 1本目 (`CheckpointLoaderSimple` からMODEL / CLIPを受ける) |
 | 11 | `LoraLoader` | 2本目 (10から受ける) |
 | 12 | `LoraLoader` | 3本目 (11から受ける) |
 
-12の MODEL が `KSampler.model` へ、CLIP が `CLIPTextEncode` 2つの `clip` へ繋がる。
+12のMODELが `KSampler.model` へ、CLIPが `CLIPTextEncode` 2つの `clip` へ繋がる。
 `VAEDecode.vae` は `LoraLoader` がVAEを出さないため `CheckpointLoaderSimple` 直結のまま。
 
 指定されたLoRAは先頭のスロットから順に割り当てる。余ったスロットは
@@ -75,7 +75,7 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | ノードID | class_type | 役割 |
 | --- | --- | --- |
 | 10 | `LoadImage` | image (ComfyUIのinput配下の名前) |
-| 11 | `VAEEncode` | pixels は10から、vae は `CheckpointLoaderSimple` から受ける |
+| 11 | `VAEEncode` | pixelsは10から、vaeは `CheckpointLoaderSimple` から受ける |
 
 `KSampler.latent_image` は11から受ける。`denoise` はimg2imgで意味を持つため注入対象に含む。
 
@@ -89,7 +89,7 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 
 | ノードID | class_type | 役割 |
 | --- | --- | --- |
-| 20 | `LoraLoader` | 1本目 (`CheckpointLoaderSimple` から MODEL / CLIP を受ける) |
+| 20 | `LoraLoader` | 1本目 (`CheckpointLoaderSimple` からMODEL / CLIPを受ける) |
 | 21 | `LoraLoader` | 2本目 (20から受ける) |
 | 22 | `LoraLoader` | 3本目 (21から受ける) |
 
@@ -116,7 +116,7 @@ txt2img.json  (手書きベース)
   └─ txt2img_unet       CheckpointLoader -> UNETLoader + CLIPLoader + VAELoader
 ```
 
-`*_ipadapter` はKSamplerのMODEL入力だけを差し替えるため、positive / negative を
+`*_ipadapter` はKSamplerのMODEL入力だけを差し替えるため、positive / negativeを
 差し替える `*_controlnet` と同時にかけられる。
 
 組み合わせが20種になっても手で書かないのは、ノード参照を間違えたときに
@@ -131,23 +131,23 @@ txt2img.json  (手書きベース)
 | 帯 | 用途 |
 | --- | --- |
 | 3-9 | ベース (txt2img標準グラフ) |
-| 10-12 | txt2img系のLoRA / img2imgの LoadImage・VAEEncode |
+| 10-12 | txt2img系のLoRA / img2imgのLoadImage・VAEEncode |
 | 20-22 | img2img系のLoRA |
 | 30-31 | hires fix (LatentUpscaleBy / 2段目KSampler) |
 | 40-43 | ControlNet (LoadImage / Canny / ControlNetLoader / ControlNetApplyAdvanced) |
 | 50-53 | IPAdapter (LoadImage / IPAdapterModelLoader / CLIPVisionLoader / IPAdapterAdvanced) |
 | 60-62 | DiT系のローダー分割 (UNETLoader / CLIPLoader / VAELoader) |
 
-hires fix と ControlNet / IPAdapter の組み合わせは作っていない。両方かけると生成時間が
+hires fixとControlNet / IPAdapterの組み合わせは作っていない。両方かけると生成時間が
 現実的でなく、必要になってから足せばよい (Specの検証で同時指定を拒否している)。
 
 `*_ipadapter` は [ComfyUI_IPAdapter_plus](https://github.com/cubiq/ComfyUI_IPAdapter_plus)
 のノードを使う。未導入のComfyUIでは投入が拒否される。
 
-`txt2img_unet` はDiT系モデル (Anima など) 向けで、`CheckpointLoaderSimple` を3つのローダーへ
+`txt2img_unet` はDiT系モデル (Animaなど) 向けで、`CheckpointLoaderSimple` を3つのローダーへ
 置き換える。UNet単体で配布されるモデルはtext encoderとVAEを同梱しておらず、1ファイルから
-MODEL / CLIP / VAE を取り出す前提が崩れるため。LoRA / img2img / hires fix / ControlNet /
-IPAdapter との組み合わせは作っていない (Specの検証で併用を拒否している)。
+MODEL / CLIP / VAEを取り出す前提が崩れるため。LoRA / img2img / hires fix / ControlNet /
+IPAdapterとの組み合わせは作っていない (Specの検証で併用を拒否している)。
 
 ## GUIから書き出す手順
 
@@ -164,7 +164,7 @@ GUIから書き出すのが原則だが、既存テンプレートに定型の�
 機械的に組み立ててもよい。ただし次を必ず満たすこと。
 
 1. `GET /object_info/<class_type>` で入力キーと出力スロットの並びを確認する
-   (例: `CheckpointLoaderSimple` は 0=MODEL / 1=CLIP / 2=VAE、`LoraLoader` は 0=MODEL / 1=CLIP)
+   (例: `CheckpointLoaderSimple` は0=MODEL / 1=CLIP / 2=VAE、`LoraLoader` は0=MODEL / 1=CLIP)
 2. 既存テンプレートを読み込んで接続だけを差し替える。手書きしない
 3. 生成後にノード参照の整合性を検査する (存在しないノードID・範囲外の出力スロットがないか)
 4. **既存ノードを上書きしていないことを検査する。** 追加するノードIDが既存と衝突すると、
@@ -184,7 +184,7 @@ GUIから書き出すのが原則だが、既存テンプレートに定型の�
 - 注入に必要な `inputs` のキーが存在するか
 - KSamplerの `positive` / `negative` / `latent_image` / `model` の接続先が想定ノードか
 
-positive と negative の接続が入れ替わっているようなケースも、この検証で検出される。
+positiveとnegativeの接続が入れ替わっているようなケースも、この検証で検出される。
 ノードIDを変えた場合は
 [src/agentic_imagegen/adapters/comfyui/workflow.py](../src/agentic_imagegen/adapters/comfyui/workflow.py)
 の `TXT2IMG_BINDING` を合わせて更新する。

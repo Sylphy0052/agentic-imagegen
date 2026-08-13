@@ -1,7 +1,7 @@
 # プロンプトとWorkflowのベストプラクティス
 
 対応モデルごとのプロンプト記法と、ComfyUI workflowテンプレートの扱い方をまとめる。
-Specの書き方そのものは [CLAUDE.md](../CLAUDE.md)、失敗時の切り分けは
+Specの書き方そのものは [spec-reference.md](spec-reference.md)、失敗時の切り分けは
 [.claude/skills/imagegen/references/troubleshooting.md](../.claude/skills/imagegen/references/troubleshooting.md)
 を参照する。
 
@@ -17,7 +17,7 @@ Specの書き方そのものは [CLAUDE.md](../CLAUDE.md)、失敗時の切り�
 - **seedを固定したままpromptとcfgを詰め、最後にseedを振って構図を探す。**
   seedと生成パラメータを同時に動かすと、何が効いたのか判別できない
 
-## SD1.5系 (meinamix_v12Final など)
+## SD1.5系 (meinamix_v12Finalなど)
 
 | 項目 | 目安 |
 | --- | --- |
@@ -34,7 +34,7 @@ Specの書き方そのものは [CLAUDE.md](../CLAUDE.md)、失敗時の切り�
   watermark, signature` のような定型から始める
 - **embeddingはcheckpointの世代に固定される。** SD1.5向けのembeddingはSDXLでは機能しない
 
-## SDXL / Illustrious系 (novaAnimeXL_ilV190 など)
+## SDXL / Illustrious系 (novaAnimeXL_ilV190など)
 
 | 項目 | 目安 |
 | --- | --- |
@@ -51,7 +51,7 @@ Specの書き方そのものは [CLAUDE.md](../CLAUDE.md)、失敗時の切り�
   キャラクタ名もDanbooruの表記順に従う
 - v2.0以降は自然文とタグの併用に対応する
 
-## Anima系 (hassakuAnima_v13 など、DiT + Qwen3-0.6B)
+## Anima系 (hassakuAnima_v13など、DiT + Qwen3-0.6B)
 
 | 項目 | 目安 |
 | --- | --- |
@@ -72,7 +72,7 @@ Specの書き方そのものは [CLAUDE.md](../CLAUDE.md)、失敗時の切り�
 - **重み付けはSDXL系より強い値が要る。** `(chibi:2)` のような指定でようやく効く
 - tag dropoutで学習されているため、関連タグを網羅する必要はない
 
-モデル配布元が推奨する `beta57` scheduler は本CLIのallowlistに無い。`simple` を使う。
+モデル配布元が推奨する `beta57` schedulerは本CLIのallowlistに無い。`simple` を使う。
 Anima向けのstyle presetは [presets/styles/anima-base.yaml](../presets/styles/anima-base.yaml)
 にある。
 
