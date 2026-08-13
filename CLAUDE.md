@@ -70,6 +70,7 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
 | [txt2img_preset_lora.yaml](specs/examples/txt2img_preset_lora.yaml) | preset・LoRAを使う場合 |
 | [img2img.yaml](specs/examples/img2img.yaml) | 既存画像を入力にするimg2img |
 | [txt2img_hires.yaml](specs/examples/txt2img_hires.yaml) | preset・hires fixで解像度を上げる場合 |
+| [txt2img_hires_model.yaml](specs/examples/txt2img_hires_model.yaml) | アップスケールモデル (ESRGAN系) で解像度を上げる場合 |
 | [txt2img_sdxl.yaml](specs/examples/txt2img_sdxl.yaml) | SDXL / Illustrious系のcheckpointを使う場合 |
 | [txt2img_anima.yaml](specs/examples/txt2img_anima.yaml) | DiT系モデル (Anima) を使う場合 |
 | [text_overlay.yaml](specs/examples/text_overlay.yaml) | 生成後に日本語テキストを合成する場合 |

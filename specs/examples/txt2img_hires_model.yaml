@@ -1,0 +1,45 @@
+# GenerationSpec のサンプル (preset + アップスケールモデルを使う hires fix)
+#
+# 検証:  uv run imagegen validate specs/examples/txt2img_hires_model.yaml
+# 生成:  uv run imagegen generate specs/examples/txt2img_hires_model.yaml
+#
+# latent のまま拡大する txt2img_hires.yaml との違いは拡大の経路だけ。
+# 一度 pixel へ戻し、ESRGAN 系のモデルで拡大してから戻す。
+# 拡大の時点で線が補間されるため、denoise を低く保ったまま解像度を上げられる。
+#
+# upscale.model は ~/ComfyUI/models/upscale_models/ のファイル名。
+# 未配置なら生成が失敗する (validate は名前の形だけを見るため通る)。
+#
+# latent 拡大より3割ほど遅い。実測は docs/xpu-setup.md を参照。
+
+version: "1"
+task: txt2img
+
+presets:
+  character: anime-boy-hooded
+  scene: studio-white-fullbody
+  style: anime-detailed
+
+generation:
+  width: 512
+  height: 512
+  seed: -1
+  batch_size: 1
+
+  # steps / cfg / sampler / scheduler は style preset 側で指定済み。
+  # 2段目は1段目と同じ cfg / sampler で走る。
+  upscale:
+    # モデルの固有倍率は 4x。scale 2.0 なので拡大後に 0.5 倍へ縮小する。
+    model: RealESRGAN_x4plus_anime_6B.pth
+    model_scale: 4.0
+    scale: 2.0
+    # latent 拡大 (0.6 前後) より低くてよい。上げると元の絵から離れる。
+    denoise: 0.35
+    steps: 8
+
+model:
+  checkpoint: meinamix_v12Final.safetensors
+
+output:
+  directory: outputs
+  prefix: hires_model_sample

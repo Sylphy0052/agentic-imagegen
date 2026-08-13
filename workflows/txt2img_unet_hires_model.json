@@ -1,0 +1,193 @@
+{
+  "3": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 0,
+      "steps": 30,
+      "cfg": 4.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "60",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "latent_image": [
+        "5",
+        0
+      ]
+    }
+  },
+  "5": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "",
+      "clip": [
+        "70",
+        0
+      ]
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "",
+      "clip": [
+        "70",
+        0
+      ]
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "31",
+        0
+      ],
+      "vae": [
+        "62",
+        0
+      ]
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "imagegen",
+      "images": [
+        "8",
+        0
+      ]
+    }
+  },
+  "31": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 0,
+      "steps": 30,
+      "cfg": 4.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 0.4,
+      "model": [
+        "60",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "latent_image": [
+        "36",
+        0
+      ]
+    }
+  },
+  "32": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "3",
+        0
+      ],
+      "vae": [
+        "62",
+        0
+      ]
+    }
+  },
+  "33": {
+    "class_type": "UpscaleModelLoader",
+    "inputs": {
+      "model_name": "RealESRGAN_x4plus_anime_6B.pth"
+    }
+  },
+  "34": {
+    "class_type": "ImageUpscaleWithModel",
+    "inputs": {
+      "upscale_model": [
+        "33",
+        0
+      ],
+      "image": [
+        "32",
+        0
+      ]
+    }
+  },
+  "35": {
+    "class_type": "ImageScaleBy",
+    "inputs": {
+      "image": [
+        "34",
+        0
+      ],
+      "upscale_method": "nearest-exact",
+      "scale_by": 0.5
+    }
+  },
+  "36": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": [
+        "35",
+        0
+      ],
+      "vae": [
+        "62",
+        0
+      ]
+    }
+  },
+  "60": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "hassakuAnima_v13_int8.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "61": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_3_06b_base.safetensors",
+      "type": "stable_diffusion"
+    }
+  },
+  "62": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    }
+  },
+  "70": {
+    "class_type": "CLIPSetLastLayer",
+    "inputs": {
+      "stop_at_clip_layer": -1,
+      "clip": [
+        "61",
+        0
+      ]
+    }
+  }
+}

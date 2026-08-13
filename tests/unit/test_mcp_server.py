@@ -149,6 +149,16 @@ async def test_list_workflows_returns_allowlist() -> None:
         "txt2img_unet_hires",
         "img2img_unet",
         "img2img_unet_hires",
+        "txt2img_hires_model",
+        "txt2img_lora_hires_model",
+        "img2img_hires_model",
+        "img2img_lora_hires_model",
+        "txt2img_unet_hires_model",
+        "img2img_unet_hires_model",
+        "txt2img_hires_model_controlnet",
+        "txt2img_lora_hires_model_controlnet",
+        "img2img_hires_model_controlnet",
+        "img2img_lora_hires_model_controlnet",
     }
 
 
