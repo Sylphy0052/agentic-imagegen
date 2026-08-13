@@ -47,6 +47,11 @@ IMG2IMG_VAE_ENCODE = "11"
 IMG2IMG_LORA_IDS = ("20", "21", "22")
 HIRES_UPSCALE = "30"
 HIRES_KSAMPLER = "31"
+HIRES_MODEL_DECODE = "32"
+HIRES_MODEL_LOADER = "33"
+HIRES_MODEL_UPSCALE = "34"
+HIRES_MODEL_RESIZE = "35"
+HIRES_MODEL_ENCODE = "36"
 CONTROL_LOAD_IMAGE = "40"
 CONTROL_PREPROCESSOR = "41"
 CONTROL_LOADER = "42"
@@ -65,6 +70,7 @@ DEFAULT_SOURCE_IMAGE = "example.png"
 DEFAULT_CONTROLNET = "control_v11p_sd15_canny_fp16.safetensors"
 DEFAULT_IPADAPTER = "ip-adapter-plus_sd15.safetensors"
 DEFAULT_CLIP_VISION = "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors"
+DEFAULT_UPSCALE_MODEL = "RealESRGAN_x4plus_anime_6B.pth"
 DEFAULT_UNET = "hassakuAnima_v13_int8.safetensors"
 DEFAULT_TEXT_ENCODER = "qwen_3_06b_base.safetensors"
 DEFAULT_VAE = "qwen_image_vae.safetensors"
@@ -91,6 +97,9 @@ OUTPUT_COUNTS = {
     "VAELoader": 1,
     "IPAdapterAdvanced": 1,
     "CLIPSetLastLayer": 1,
+    "UpscaleModelLoader": 1,
+    "ImageUpscaleWithModel": 1,
+    "ImageScaleBy": 1,
 }
 
 Graph = dict[str, dict[str, Any]]
@@ -225,6 +234,84 @@ def with_hires_fix(graph: Graph) -> Graph:
     return graph
 
 
+def with_hires_model_fix(graph: Graph) -> Graph:
+    """KSampler の後にアップスケールモデルでの拡大と2段目の KSampler を挟む。
+
+    latent拡大 (with_hires_fix) との違いは拡大の場所だけで、一度pixelへ戻す。
+
+        KSampler -> VAEDecode -> ImageUpscaleWithModel -> ImageScaleBy
+                 -> VAEEncode -> 2段目のKSampler -> 既存のVAEDecode
+
+    ImageScaleBy を必ず挟むのは、アップスケールモデルの倍率が固定 (4x など) で
+    要求された倍率と一致しないためである。等倍のときは scale_by へ1.0が入る。
+
+    VAEDecode / VAEEncode の VAE は既存の VAEDecode と同じ供給元から取る。
+    DiT系 (VAELoader を分けた構成) でも取り違えないようにするため。
+    """
+    graph = copy.deepcopy(graph)
+    added = (
+        HIRES_MODEL_DECODE,
+        HIRES_MODEL_LOADER,
+        HIRES_MODEL_UPSCALE,
+        HIRES_MODEL_RESIZE,
+        HIRES_MODEL_ENCODE,
+        HIRES_KSAMPLER,
+    )
+    for node_id in added:
+        if node_id in graph:
+            raise ValueError(f"hires (model) 用のノードID {node_id} が既に使われている")
+
+    first = graph[KSAMPLER]["inputs"]
+    vae = graph[VAE_DECODE]["inputs"]["vae"]
+
+    graph[HIRES_MODEL_DECODE] = {
+        "class_type": "VAEDecode",
+        "inputs": {"samples": [KSAMPLER, 0], "vae": vae},
+    }
+    graph[HIRES_MODEL_LOADER] = {
+        "class_type": "UpscaleModelLoader",
+        "inputs": {"model_name": DEFAULT_UPSCALE_MODEL},
+    }
+    graph[HIRES_MODEL_UPSCALE] = {
+        "class_type": "ImageUpscaleWithModel",
+        "inputs": {
+            "upscale_model": [HIRES_MODEL_LOADER, 0],
+            "image": [HIRES_MODEL_DECODE, 0],
+        },
+    }
+    graph[HIRES_MODEL_RESIZE] = {
+        "class_type": "ImageScaleBy",
+        "inputs": {
+            "image": [HIRES_MODEL_UPSCALE, 0],
+            "upscale_method": "nearest-exact",
+            # 4xのモデルで2倍が欲しい場合の既定値。Specから注入される
+            "scale_by": 0.5,
+        },
+    }
+    graph[HIRES_MODEL_ENCODE] = {
+        "class_type": "VAEEncode",
+        "inputs": {"pixels": [HIRES_MODEL_RESIZE, 0], "vae": vae},
+    }
+    graph[HIRES_KSAMPLER] = {
+        "class_type": "KSampler",
+        "inputs": {
+            "seed": first["seed"],
+            "steps": first["steps"],
+            "cfg": first["cfg"],
+            "sampler_name": first["sampler_name"],
+            "scheduler": first["scheduler"],
+            # 拡大の時点で線が補間されるため、latent拡大より低めでよい
+            "denoise": 0.4,
+            "model": first["model"],
+            "positive": first["positive"],
+            "negative": first["negative"],
+            "latent_image": [HIRES_MODEL_ENCODE, 0],
+        },
+    }
+    graph[VAE_DECODE]["inputs"]["samples"] = [HIRES_KSAMPLER, 0]
+    return graph
+
+
 def with_controlnet(graph: Graph) -> Graph:
     """CLIPTextEncode と KSampler の間に ControlNet を挟む。
 
@@ -333,14 +420,23 @@ def build_all(base: Graph) -> dict[str, Graph]:
         # (LoRA / ControlNet / IPAdapter との組み合わせはSpecの検証で拒否している)
         "txt2img_unet": to_separate_loaders(txt2img),
         "txt2img_unet_hires": with_hires_fix(to_separate_loaders(txt2img)),
+        "txt2img_unet_hires_model": with_hires_model_fix(to_separate_loaders(txt2img)),
         "img2img_unet": to_separate_loaders(img2img),
         "img2img_unet_hires": with_hires_fix(to_separate_loaders(img2img)),
+        "img2img_unet_hires_model": with_hires_model_fix(to_separate_loaders(img2img)),
         "txt2img_hires": with_hires_fix(txt2img),
         "txt2img_lora_hires": with_hires_fix(with_lora_chain(txt2img, LORA_IDS)),
+        # アップスケールモデルを使う版。latent拡大の派生と同じ形で並べる
+        "txt2img_hires_model": with_hires_model_fix(txt2img),
+        "txt2img_lora_hires_model": with_hires_model_fix(with_lora_chain(txt2img, LORA_IDS)),
         "img2img": img2img,
         "img2img_lora": with_lora_chain(img2img, IMG2IMG_LORA_IDS),
         "img2img_hires": with_hires_fix(img2img),
         "img2img_lora_hires": with_hires_fix(with_lora_chain(img2img, IMG2IMG_LORA_IDS)),
+        "img2img_hires_model": with_hires_model_fix(img2img),
+        "img2img_lora_hires_model": with_hires_model_fix(
+            with_lora_chain(img2img, IMG2IMG_LORA_IDS)
+        ),
         "txt2img_controlnet": with_controlnet(txt2img),
         "txt2img_lora_controlnet": with_controlnet(with_lora_chain(txt2img, LORA_IDS)),
         "img2img_controlnet": with_controlnet(img2img),
@@ -356,6 +452,14 @@ def build_all(base: Graph) -> dict[str, Graph]:
         "img2img_hires_controlnet": with_controlnet(with_hires_fix(img2img)),
         "img2img_lora_hires_controlnet": with_controlnet(
             with_hires_fix(with_lora_chain(img2img, IMG2IMG_LORA_IDS))
+        ),
+        "txt2img_hires_model_controlnet": with_controlnet(with_hires_model_fix(txt2img)),
+        "txt2img_lora_hires_model_controlnet": with_controlnet(
+            with_hires_model_fix(with_lora_chain(txt2img, LORA_IDS))
+        ),
+        "img2img_hires_model_controlnet": with_controlnet(with_hires_model_fix(img2img)),
+        "img2img_lora_hires_model_controlnet": with_controlnet(
+            with_hires_model_fix(with_lora_chain(img2img, IMG2IMG_LORA_IDS))
         ),
         # IPAdapter と hires fix の併用は未対応 (Issue #38)
         "txt2img_ipadapter": with_ipadapter(txt2img),

@@ -45,6 +45,16 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `txt2img_unet_hires.json` | DiT系 + hires fix |
 | `img2img_unet.json` | DiT系のimage-to-image |
 | `img2img_unet_hires.json` | DiT系 + hires fix (img2img) |
+| `txt2img_hires_model.json` | アップスケールモデルで拡大するhires fix |
+| `txt2img_lora_hires_model.json` | LoRA + モデル拡大のhires fix |
+| `img2img_hires_model.json` | モデル拡大のhires fix (img2img) |
+| `img2img_lora_hires_model.json` | LoRA + モデル拡大のhires fix (img2img) |
+| `txt2img_unet_hires_model.json` | DiT系 + モデル拡大のhires fix |
+| `img2img_unet_hires_model.json` | DiT系 + モデル拡大のhires fix (img2img) |
+| `txt2img_hires_model_controlnet.json` | モデル拡大のhires fix + ControlNet |
+| `txt2img_lora_hires_model_controlnet.json` | LoRA + モデル拡大のhires fix + ControlNet |
+| `img2img_hires_model_controlnet.json` | モデル拡大のhires fix + ControlNet (img2img) |
+| `img2img_lora_hires_model_controlnet.json` | LoRA + モデル拡大のhires fix + ControlNet (img2img) |
 
 どれを使うかは `task` と `model.loras` / `generation.upscale` / `control` / `reference` の有無、
 `model.unet` の指定で自動的に決まる。定義は
@@ -128,6 +138,8 @@ txt2img.json  (手書きベース)
   ├─ img2img            EmptyLatentImage -> LoadImage + VAEEncode
   ├─ *_lora             CheckpointLoader の後に LoraLoader を3段
   ├─ *_hires            KSampler の後に LatentUpscaleBy + 2段目 KSampler
+  ├─ *_hires_model      KSampler の後に VAEDecode + アップスケールモデル + VAEEncode
+  │                     + 2段目 KSampler (pixel空間で拡大する版)
   ├─ *_controlnet       CLIPTextEncode と KSampler の間に ControlNet
   ├─ *_ipadapter        MODEL の経路に IPAdapterAdvanced
   └─ txt2img_unet       CheckpointLoader -> UNETLoader + CLIPLoader + VAELoader
@@ -151,6 +163,7 @@ txt2img.json  (手書きベース)
 | 10-12 | txt2img系のLoRA / img2imgのLoadImage・VAEEncode |
 | 20-22 | img2img系のLoRA |
 | 30-31 | hires fix (LatentUpscaleBy / 2段目KSampler) |
+| 32-36 | モデル拡大のhires fix (VAEDecode / UpscaleModelLoader / ImageUpscaleWithModel / ImageScaleBy / VAEEncode) |
 | 40-43 | ControlNet (LoadImage / Canny / ControlNetLoader / ControlNetApplyAdvanced) |
 | 50-53 | IPAdapter (LoadImage / IPAdapterModelLoader / CLIPVisionLoader / IPAdapterAdvanced) |
 | 60-62 | DiT系のローダー分割 (UNETLoader / CLIPLoader / VAELoader) |
@@ -160,6 +173,13 @@ hires fixとControlNetの組み合わせ (`*_hires_controlnet`) は、hiresを�
 かける順で合成している。この順にすると `ControlNetApplyAdvanced` が差し替えるのは1段目の
 KSamplerだけになり、2段目は素の `CLIPTextEncode` を受けたまま残る。構図は1段目で決まるため、
 2段目は拡大後の解像度で描き足すことに徹する。
+
+`*_hires_model` は latent のまま拡大する代わりに、一度pixelへ戻して
+`ImageUpscaleWithModel` で拡大し、`ImageScaleBy` で要求された倍率へ合わせてから
+`VAEEncode` で戻す。`ImageScaleBy` を必ず挟むのは、アップスケールモデルの倍率が
+固定 (4xなど) で、Specの `generation.upscale.scale` と一致しないためである。
+増やした `VAEDecode` / `VAEEncode` は最終段の `VAEDecode` と同じVAEを見る
+(DiT系では `VAELoader` から受ける)。
 
 hires fixとIPAdapterの組み合わせは作っていない (Specの検証で同時指定を拒否している)。
 [Issue #38](https://github.com/Sylphy0052/agentic-imagegen/issues/38) を参照。

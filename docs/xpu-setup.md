@@ -157,6 +157,8 @@ fp16の相対誤差は4.2e-4だった。
 | 同上 img2img (denoise 0.55) | Intel XPU | 165.7秒 | 600 |
 | 同上 + hires fix (→960x1344 / 2段目6 steps) | Intel XPU | 324.9秒 | 900 |
 | 同上 img2img + hires fix | Intel XPU | 323.6秒 | 900 |
+| SD1.5 / 512x512 -> 1024x1024 (hires fix, 14 + 8 steps) | Intel XPU | 134.5秒 | 300 |
+| 同上 アップスケールモデル (RealESRGAN x4, 4x拡大後0.5倍へ縮小) | Intel XPU | 176.7秒 | 600 |
 | SDXL / 832x1216 / 8 steps | Intel XPU | 299.7秒 (初回) | 600 |
 | SDXL / 832x1216 / 24 steps | Intel XPU | 362.6秒 | 600 |
 
@@ -168,6 +170,11 @@ SDXL系はモデルのロードだけで数分かかるため、初回とロー�
 ControlNet / IPAdapterを使うと1-2割、hires fixを使うと倍以上に伸びる。
 hires fixとControlNetを併用してもControlNetは1段目にしか効かないため、hires fix単独からの
 増分はほぼ無い。
+
+アップスケールモデルを使うhires fix (`generation.upscale.model`) はlatent拡大より3割ほど遅い。
+pixelへ戻す往復 (VAEDecode / VAEEncode) と、モデルの固有倍率までの拡大 (4xモデルなら
+2倍が欲しくても一度4倍まで拡大してから縮小する) が加わるため。
+拡大後の解像度が大きい場合はここがピークメモリになる。
 
 同じSpec (同じseed・同じ解像度) を2回流すとComfyUI側でノード出力がキャッシュされ、
 数秒で返る。計測し直すときはseedを変える。

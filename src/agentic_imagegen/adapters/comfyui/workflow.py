@@ -200,6 +200,79 @@ def _with_hires_fix(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
     return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
 
 
+#: アップスケールモデルを使うhires fixで増えるノードの役割名。
+UPSCALE_MODEL_LOADER_ROLE: Final = "upscale_model_loader"
+UPSCALE_MODEL_DECODE_ROLE: Final = "upscale_model_decode"
+UPSCALE_MODEL_APPLY_ROLE: Final = "upscale_model_apply"
+UPSCALE_MODEL_RESIZE_ROLE: Final = "upscale_model_resize"
+UPSCALE_MODEL_ENCODE_ROLE: Final = "upscale_model_encode"
+
+
+def _with_hires_model_fix(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
+    """既存のbindingに アップスケールモデルでの拡大 + 2段目のKSampler を挟む。
+
+    latent拡大との違いは経路だけで、拡大の前後でpixelへ戻して符号化し直す。
+
+        ksampler -> decode -> apply(model) -> resize -> encode -> hires_ksampler
+
+    途中のどれか1つでも元の繋がりが残っていると、拡大が効かないまま生成が
+    成功してしまう。VAEの供給元まで含めて結線を検証する。
+
+    VAEの出どころはcheckpointに同梱される場合 (checkpoint系) と単体のVAELoader
+    から来る場合 (DiT系) があり、どちらを見るかで拡大前後の符号化が変わる。
+    """
+    nodes = dict(base.nodes)
+    nodes[UPSCALE_MODEL_DECODE_ROLE] = NodeRef("32", "VAEDecode", ())
+    nodes[UPSCALE_MODEL_LOADER_ROLE] = NodeRef("33", "UpscaleModelLoader", ("model_name",))
+    nodes[UPSCALE_MODEL_APPLY_ROLE] = NodeRef("34", "ImageUpscaleWithModel", ())
+    nodes[UPSCALE_MODEL_RESIZE_ROLE] = NodeRef("35", "ImageScaleBy", ("upscale_method", "scale_by"))
+    nodes[UPSCALE_MODEL_ENCODE_ROLE] = NodeRef("36", "VAEEncode", ())
+    nodes[HIRES_KSAMPLER_ROLE] = NodeRef("31", "KSampler", _HIRES_KSAMPLER_INPUTS)
+    nodes["vae_decode"] = NodeRef("8", "VAEDecode", ())
+
+    links = [
+        *base.links,
+        LinkRef(UPSCALE_MODEL_DECODE_ROLE, "samples", "ksampler"),
+        LinkRef(UPSCALE_MODEL_APPLY_ROLE, "image", UPSCALE_MODEL_DECODE_ROLE),
+        LinkRef(UPSCALE_MODEL_APPLY_ROLE, "upscale_model", UPSCALE_MODEL_LOADER_ROLE),
+        LinkRef(UPSCALE_MODEL_RESIZE_ROLE, "image", UPSCALE_MODEL_APPLY_ROLE),
+        LinkRef(UPSCALE_MODEL_ENCODE_ROLE, "pixels", UPSCALE_MODEL_RESIZE_ROLE),
+        LinkRef(HIRES_KSAMPLER_ROLE, "latent_image", UPSCALE_MODEL_ENCODE_ROLE),
+        LinkRef("vae_decode", "samples", HIRES_KSAMPLER_ROLE),
+    ]
+    # 増やしたVAEDecode / VAEEncodeは最終段のVAEDecodeと同じVAEを見る。
+    # DiT系ではVAELoaderが別にあるため、供給元を追随させないと取り違える
+    vae_source = next(
+        (
+            link.expected_role
+            for link in base.links
+            if link.source_node == "vae_decode" and link.input_key == "vae"
+        ),
+        None,
+    )
+    if vae_source is None and "checkpoint" in nodes:
+        # checkpoint系はVAEがcheckpointへ同梱されるため、最終段のVAEDecodeに
+        # 供給元のLinkRefが無い。それでも出どころは一意に決まる
+        vae_source = "checkpoint"
+    if vae_source is not None:
+        links += [
+            LinkRef(UPSCALE_MODEL_DECODE_ROLE, "vae", vae_source),
+            LinkRef(UPSCALE_MODEL_ENCODE_ROLE, "vae", vae_source),
+        ]
+    # 2段目のMODELの供給元は latent拡大版と同じ理由で検証する
+    model_source = next(
+        (
+            link.expected_role
+            for link in base.links
+            if link.source_node == "ksampler" and link.input_key == "model"
+        ),
+        None,
+    )
+    if model_source is not None:
+        links.append(LinkRef(HIRES_KSAMPLER_ROLE, "model", model_source))
+    return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
+
+
 TXT2IMG_LORA_BINDING: Final = _with_lora_chain(
     TXT2IMG_BINDING, name="txt2img_lora", first_node_id=10
 )
@@ -321,6 +394,38 @@ IMG2IMG_HIRES_CONTROLNET_BINDING: Final = _with_controlnet(
 )
 IMG2IMG_LORA_HIRES_CONTROLNET_BINDING: Final = _with_controlnet(
     IMG2IMG_LORA_HIRES_BINDING, name="img2img_lora_hires_controlnet"
+)
+
+#: アップスケールモデルを使うhires fix。latent拡大版と同じ組み合わせを揃える。
+TXT2IMG_HIRES_MODEL_BINDING: Final = _with_hires_model_fix(
+    TXT2IMG_BINDING, name="txt2img_hires_model"
+)
+TXT2IMG_LORA_HIRES_MODEL_BINDING: Final = _with_hires_model_fix(
+    TXT2IMG_LORA_BINDING, name="txt2img_lora_hires_model"
+)
+IMG2IMG_HIRES_MODEL_BINDING: Final = _with_hires_model_fix(
+    IMG2IMG_BINDING, name="img2img_hires_model"
+)
+IMG2IMG_LORA_HIRES_MODEL_BINDING: Final = _with_hires_model_fix(
+    IMG2IMG_LORA_BINDING, name="img2img_lora_hires_model"
+)
+TXT2IMG_UNET_HIRES_MODEL_BINDING: Final = _with_hires_model_fix(
+    TXT2IMG_UNET_BINDING, name="txt2img_unet_hires_model"
+)
+IMG2IMG_UNET_HIRES_MODEL_BINDING: Final = _with_hires_model_fix(
+    IMG2IMG_UNET_BINDING, name="img2img_unet_hires_model"
+)
+TXT2IMG_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_controlnet(
+    TXT2IMG_HIRES_MODEL_BINDING, name="txt2img_hires_model_controlnet"
+)
+TXT2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_controlnet(
+    TXT2IMG_LORA_HIRES_MODEL_BINDING, name="txt2img_lora_hires_model_controlnet"
+)
+IMG2IMG_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_controlnet(
+    IMG2IMG_HIRES_MODEL_BINDING, name="img2img_hires_model_controlnet"
+)
+IMG2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_controlnet(
+    IMG2IMG_LORA_HIRES_MODEL_BINDING, name="img2img_lora_hires_model_controlnet"
 )
 
 #: IPAdapter (reference) 用ノードの役割名。
@@ -642,8 +747,16 @@ def _inject_upscale(
     *,
     seed: int,
 ) -> None:
-    """hires fix 用テンプレートへ拡大倍率と2段目の設定を注入する。"""
-    if UPSCALE_ROLE not in binding.nodes:
+    """hires fix 用テンプレートへ拡大倍率と2段目の設定を注入する。
+
+    latent拡大とアップスケールモデルでは、倍率を書き込む先も意味も違う。
+
+    - latent拡大: LatentUpscaleBy の scale_by へ要求された倍率をそのまま入れる
+    - モデル拡大: 倍率はモデル側で決まるため、ImageScaleBy へ要求された倍率へ
+      戻すための縮小率を入れる
+    """
+    uses_model_template = UPSCALE_MODEL_RESIZE_ROLE in binding.nodes
+    if UPSCALE_ROLE not in binding.nodes and not uses_model_template:
         return
 
     upscale = spec.generation.upscale
@@ -652,10 +765,22 @@ def _inject_upscale(
             f"Workflow ({binding.name}) はhires fix用ですが、"
             "Specに generation.upscale が指定されていません"
         )
+    if uses_model_template != upscale.uses_model:
+        expected = "アップスケールモデル" if uses_model_template else "latent拡大"
+        raise WorkflowValidationError(
+            f"Workflow ({binding.name}) は{expected}用ですが、"
+            "Specの generation.upscale.model の指定が食い違っています"
+        )
 
-    node = inputs_of(UPSCALE_ROLE)
-    node["scale_by"] = upscale.scale
-    node["upscale_method"] = upscale.method
+    if uses_model_template:
+        inputs_of(UPSCALE_MODEL_LOADER_ROLE)["model_name"] = upscale.model
+        resize = inputs_of(UPSCALE_MODEL_RESIZE_ROLE)
+        resize["scale_by"] = upscale.resize_factor()
+        resize["upscale_method"] = upscale.method
+    else:
+        node = inputs_of(UPSCALE_ROLE)
+        node["scale_by"] = upscale.scale
+        node["upscale_method"] = upscale.method
 
     params = spec.generation
     second = inputs_of(HIRES_KSAMPLER_ROLE)
@@ -745,15 +870,20 @@ __all__ = [
     "IMG2IMG_CONTROLNET_IPADAPTER_BINDING",
     "IMG2IMG_HIRES_BINDING",
     "IMG2IMG_HIRES_CONTROLNET_BINDING",
+    "IMG2IMG_HIRES_MODEL_BINDING",
+    "IMG2IMG_HIRES_MODEL_CONTROLNET_BINDING",
     "IMG2IMG_IPADAPTER_BINDING",
     "IMG2IMG_LORA_BINDING",
     "IMG2IMG_LORA_CONTROLNET_BINDING",
     "IMG2IMG_LORA_CONTROLNET_IPADAPTER_BINDING",
     "IMG2IMG_LORA_HIRES_BINDING",
     "IMG2IMG_LORA_HIRES_CONTROLNET_BINDING",
+    "IMG2IMG_LORA_HIRES_MODEL_BINDING",
+    "IMG2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING",
     "IMG2IMG_LORA_IPADAPTER_BINDING",
     "IMG2IMG_UNET_BINDING",
     "IMG2IMG_UNET_HIRES_BINDING",
+    "IMG2IMG_UNET_HIRES_MODEL_BINDING",
     "LORA_SLOT_ROLES",
     "REFERENCE_APPLY_ROLE",
     "REFERENCE_CLIP_VISION_ROLE",
@@ -764,14 +894,24 @@ __all__ = [
     "TXT2IMG_CONTROLNET_IPADAPTER_BINDING",
     "TXT2IMG_HIRES_BINDING",
     "TXT2IMG_HIRES_CONTROLNET_BINDING",
+    "TXT2IMG_HIRES_MODEL_BINDING",
+    "TXT2IMG_HIRES_MODEL_CONTROLNET_BINDING",
     "TXT2IMG_IPADAPTER_BINDING",
     "TXT2IMG_LORA_BINDING",
     "TXT2IMG_LORA_CONTROLNET_BINDING",
     "TXT2IMG_LORA_CONTROLNET_IPADAPTER_BINDING",
     "TXT2IMG_LORA_HIRES_BINDING",
     "TXT2IMG_LORA_HIRES_CONTROLNET_BINDING",
+    "TXT2IMG_LORA_HIRES_MODEL_BINDING",
+    "TXT2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING",
     "TXT2IMG_LORA_IPADAPTER_BINDING",
     "TXT2IMG_UNET_HIRES_BINDING",
+    "TXT2IMG_UNET_HIRES_MODEL_BINDING",
+    "UPSCALE_MODEL_APPLY_ROLE",
+    "UPSCALE_MODEL_DECODE_ROLE",
+    "UPSCALE_MODEL_ENCODE_ROLE",
+    "UPSCALE_MODEL_LOADER_ROLE",
+    "UPSCALE_MODEL_RESIZE_ROLE",
     "UPSCALE_ROLE",
     "LinkRef",
     "NodeRef",

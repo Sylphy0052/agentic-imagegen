@@ -240,14 +240,27 @@ CPU推論では負荷が所要時間へ直接跳ね返るため、既定は控�
 
 ### generation.upscale (hires fix)
 
-1段目の結果をlatentのまま拡大し、2段目のKSamplerで描き足す。アップスケールモデルは不要。
+1段目の結果を拡大し、2段目のKSamplerで描き足す。拡大の仕方は2通りある。
+
+- `model`未指定: latentのまま拡大する。追加のモデルが要らない
+- `model`指定: 一度pixelへ戻し、アップスケールモデル (ESRGAN系) で拡大してから戻す
 
 | キー | 型 | 既定値 | 値域 |
 | --- | --- | --- | --- |
 | `scale` | float | 1.5 | 1.0より大きく4.0以下 |
 | `denoise` | float | 0.5 | 0.0-1.0。低いほど元の絵を保つ。0.3-0.5が扱いやすい |
 | `steps` | int | 1段目と同じ | 1-100 |
-| `method` | enum | `nearest-exact` | `nearest-exact` / `bilinear` / `area` / `bicubic` / `bislerp` |
+| `method` | enum | `nearest-exact` | 下の対応表を参照 |
+| `model` | string | `null` | `~/ComfyUI/models/upscale_models/`のファイル名。拡張子は`.pth` / `.safetensors` |
+| `model_scale` | float | 4.0 | 1.0-8.0。`model`と一緒にのみ指定できる |
+
+`method`は拡大の経路で選べる値が違う。ComfyUI側のノードに無い値は投入前に拒否する。
+
+| 値 | latent拡大 (`model`未指定) | モデル拡大 (`model`指定) |
+| --- | --- | --- |
+| `nearest-exact` / `bilinear` / `area` / `bicubic` | 使える | 使える |
+| `bislerp` | 使える | 使えない |
+| `lanczos` | 使えない | 使える |
 
 ```yaml
 generation:
@@ -260,13 +273,38 @@ generation:
     steps: 8
 ```
 
-- 指定するとテンプレートが`*_hires`へ自動的に切り替わる
+```yaml
+generation:
+  width: 512
+  height: 512
+  steps: 14
+  upscale:
+    model: RealESRGAN_x4plus_anime_6B.pth
+    scale: 2.0
+    denoise: 0.35
+    steps: 8
+```
+
+- 指定するとテンプレートが`*_hires` (モデル拡大なら`*_hires_model`) へ自動的に切り替わる
 - **生成時間は倍以上になる。** 2段目は拡大後の解像度で走るため、1stepあたりの時間も伸びる
 - 2段目のseedは1段目と同じ値を使う (変えると元の絵から離れるため)
 - 最初から大きい解像度で生成するより、hires fixの方が構図が破綻しにくい
-- 滑らかさを求める場合は`method: bislerp`を試す
-- `control`と併用できる (`*_hires_controlnet`)。ControlNetが効くのは1段目だけ。
-  `reference`とは併用できない ([組み合わせの可否](#組み合わせの可否))
+- 滑らかさを求める場合は`method: bislerp`を試す (latent拡大のみ)
+- `control`と併用できる (`*_hires_controlnet` / `*_hires_model_controlnet`)。
+  ControlNetが効くのは1段目だけ。`reference`とは併用できない
+  ([組み合わせの可否](#組み合わせの可否))
+
+#### アップスケールモデルを使う場合
+
+- **`model_scale`にはモデルの固有倍率を書く。** 出力サイズはモデル側で決まるため、
+  `scale`へ合わせるにはこの値が要る。`RealESRGAN_x4plus_anime_6B.pth`なら4.0。
+  拡大後に`scale / model_scale`倍へ縮小する
+- `scale`が`model_scale`を超える指定は拒否する (モデルの出力より大きくは引き伸ばさない)
+- **拡大の時点で線が補間されるため、`denoise`はlatent拡大より低めで足りる。** 0.3-0.4が目安。
+  latent拡大を同じ`denoise`で使うと、拡大の粗さを2段目が補いきれず絵が崩れることがある
+- pixelへ戻す往復 (VAEDecode / VAEEncode) が挟まるぶん所要時間が伸びる。
+  実測は [xpu-setup.md](xpu-setup.md#所要時間とタイムアウトの目安) を参照
+- モデルは`~/ComfyUI/models/upscale_models/`へ置く。MCPのモデル一覧ツールには出ない
 
 ## model
 
@@ -640,7 +678,7 @@ Specの内容から自動的に決まる。`uv run imagegen validate`の`Workflo
 | --- | --- | --- |
 | 1 | `model.unet`を指定 | `_unet` |
 | 1 | `model.loras`が空でない (`model.unet`が無い場合) | `_lora` |
-| 2 | `generation.upscale`を指定 | `_hires` |
+| 2 | `generation.upscale`を指定 | `_hires` (`upscale.model`を指定した場合は`_hires_model`) |
 | 3 | `control`を指定 | `_controlnet` |
 | 4 | `reference`を指定 | `_ipadapter` |
 
@@ -648,6 +686,7 @@ Specの内容から自動的に決まる。`uv run imagegen validate`の`Workflo
 
 例: `task: txt2img`にLoRAとControlNetを指定すると`txt2img_lora_controlnet`。
 `task: img2img`にDiT系モデルとhires fixを指定すると`img2img_unet_hires`。
+hires fixで`upscale.model`まで指定すると`img2img_unet_hires_model`。
 
 テンプレートの一覧と各構成のノード内訳、作り直しの手順は
 [workflows/README.md](../workflows/README.md) を参照。

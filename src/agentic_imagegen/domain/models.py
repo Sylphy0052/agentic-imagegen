@@ -101,10 +101,30 @@ MAX_CLIP_SKIP: Final = 12
 #: strengthの実用上の範囲。ComfyUI自体は±100を許すが、事故を防ぐため絞る。
 LORA_STRENGTH_LIMIT: Final = 10.0
 
-UpscaleMethod = Literal["nearest-exact", "bilinear", "area", "bicubic", "bislerp"]
+#: 拡大方法。latent拡大 (LatentUpscaleBy) とpixel拡大 (ImageScaleBy) で
+#: 選べる値が違う。bislerp はlatentだけ、lanczos はpixelだけにある。
+#: どちらに属するかは UpscaleSpec 側で突き合わせる。
+UpscaleMethod = Literal["nearest-exact", "bilinear", "area", "bicubic", "bislerp", "lanczos"]
+
+#: LatentUpscaleBy にしか無い拡大方法。
+LATENT_ONLY_UPSCALE_METHODS: Final = frozenset({"bislerp"})
+
+#: ImageScaleBy にしか無い拡大方法。
+IMAGE_ONLY_UPSCALE_METHODS: Final = frozenset({"lanczos"})
 
 #: hires fix の拡大倍率の上限。これ以上は生成時間が現実的でない。
 MAX_UPSCALE_SCALE: Final = 4.0
+
+#: アップスケールモデルとして受け付ける拡張子。ESRGAN系は .pth 配布が主流。
+ALLOWED_UPSCALE_MODEL_SUFFIXES: Final = frozenset({".pth", ".safetensors"})
+
+#: アップスケールモデルの固有倍率として受け付ける範囲。
+#: 出回っているのは2x / 4x / 8x で、ImageScaleBy の scale_by 上限も8。
+MIN_UPSCALE_MODEL_SCALE: Final = 1.0
+MAX_UPSCALE_MODEL_SCALE: Final = 8.0
+
+#: アップスケールモデルの固有倍率の既定値。ESRGAN系で最も多い。
+DEFAULT_UPSCALE_MODEL_SCALE: Final = 4.0
 
 #: ControlNetモデルとして受け付ける拡張子。.pth 配布があるためcheckpointより広い。
 ALLOWED_CONTROLNET_SUFFIXES: Final = frozenset({".safetensors", ".pth", ".ckpt"})
@@ -251,8 +271,15 @@ class PromptSpec(_StrictModel):
 class UpscaleSpec(_StrictModel):
     """hires fix の設定。
 
-    1段目の生成結果をlatentのまま拡大し、2段目のKSamplerで描き足す。
-    アップスケールモデルは使わない。
+    拡大の仕方は2通りある。
+
+    - `model` 未指定: 1段目の生成結果をlatentのまま拡大する (LatentUpscaleBy)。
+      追加のモデルが要らない代わりに、拡大時のディテールは2段目のdenoiseだけで補う
+    - `model` 指定: 一度pixelへ戻してアップスケールモデルで拡大する
+      (VAEDecode -> ImageUpscaleWithModel -> ImageScaleBy -> VAEEncode)。
+      拡大の時点で線が補間されるため、denoiseを低く保ったまま解像度を上げられる
+
+    どちらも拡大後に2段目のKSamplerで描き足す点は同じ。
     """
 
     #: 拡大倍率。1.0以下は拡大にならないため許可しない。
@@ -262,10 +289,72 @@ class UpscaleSpec(_StrictModel):
     #: 2段目のsteps。未指定なら1段目と同じ値を使う。
     steps: Annotated[int, Field(ge=1, le=100)] | None = None
     method: UpscaleMethod = "nearest-exact"
+    #: 使うアップスケールモデルのファイル名。未指定ならlatent拡大のまま。
+    model: str | None = None
+    #: モデルの固有倍率。配布元の表記 (4x なら 4.0) をそのまま書く。
+    #: モデルの出力サイズはモデル側で決まるため、`scale` へ合わせるにはこの値が要る。
+    #: 未指定は None のまま保つ (既定値を埋めるとlatent拡大のSpecをdumpしたときにも
+    #: 値が乗り、metadata.json を読み直せなくなる)。実効値は effective_model_scale。
+    model_scale: (
+        Annotated[float, Field(ge=MIN_UPSCALE_MODEL_SCALE, le=MAX_UPSCALE_MODEL_SCALE)] | None
+    ) = None
+
+    @field_validator("model")
+    @classmethod
+    def _reject_unsafe_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _validate_model_filename(value, allowed_suffixes=ALLOWED_UPSCALE_MODEL_SUFFIXES)
+
+    @model_validator(mode="after")
+    def _check_model_combination(self) -> UpscaleSpec:
+        if self.model is None:
+            if self.model_scale is not None:
+                raise ValueError(
+                    "model_scale はアップスケールモデルの固有倍率です。"
+                    "latent拡大では意味を持たないため、model と一緒に指定してください"
+                )
+            if self.method in IMAGE_ONLY_UPSCALE_METHODS:
+                raise ValueError(
+                    f"method {self.method!r} はアップスケールモデルを使う場合のみ指定できます"
+                )
+            return self
+
+        if self.method in LATENT_ONLY_UPSCALE_METHODS:
+            raise ValueError(
+                f"method {self.method!r} はlatent拡大でのみ指定できます "
+                "(アップスケールモデルを使う場合はpixel側の拡大方法を選んでください)"
+            )
+        if self.scale > self.effective_model_scale:
+            raise ValueError(
+                f"scale ({self.scale}) が model_scale ({self.effective_model_scale}) を"
+                "超えています。モデルの出力より大きくは引き伸ばしません"
+            )
+        return self
+
+    @property
+    def uses_model(self) -> bool:
+        """アップスケールモデルを使う指定かどうか。"""
+        return self.model is not None
+
+    @property
+    def effective_model_scale(self) -> float:
+        """実際に使うモデルの固有倍率。未指定ならESRGAN系で最も多い4.0とみなす。"""
+        return self.model_scale if self.model_scale is not None else DEFAULT_UPSCALE_MODEL_SCALE
 
     def effective_steps(self, base_steps: int) -> int:
         """2段目で実際に使うsteps。"""
         return self.steps if self.steps is not None else base_steps
+
+    def resize_factor(self) -> float:
+        """モデルの出力を `scale` へ合わせるための縮小率。
+
+        アップスケールモデルの倍率は固定 (4x など) のため、要求された倍率が
+        それより小さければ拡大後に縮小して合わせる。
+        """
+        if self.model is None:
+            raise ValueError("resize_factor は model を指定した場合にのみ意味を持ちます")
+        return self.scale / self.effective_model_scale
 
 
 class GenerationParams(_StrictModel):

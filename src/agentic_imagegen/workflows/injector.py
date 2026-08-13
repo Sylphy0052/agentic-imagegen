@@ -18,29 +18,39 @@ from agentic_imagegen.adapters.comfyui.workflow import (
     IMG2IMG_CONTROLNET_IPADAPTER_BINDING,
     IMG2IMG_HIRES_BINDING,
     IMG2IMG_HIRES_CONTROLNET_BINDING,
+    IMG2IMG_HIRES_MODEL_BINDING,
+    IMG2IMG_HIRES_MODEL_CONTROLNET_BINDING,
     IMG2IMG_IPADAPTER_BINDING,
     IMG2IMG_LORA_BINDING,
     IMG2IMG_LORA_CONTROLNET_BINDING,
     IMG2IMG_LORA_CONTROLNET_IPADAPTER_BINDING,
     IMG2IMG_LORA_HIRES_BINDING,
     IMG2IMG_LORA_HIRES_CONTROLNET_BINDING,
+    IMG2IMG_LORA_HIRES_MODEL_BINDING,
+    IMG2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING,
     IMG2IMG_LORA_IPADAPTER_BINDING,
     IMG2IMG_UNET_BINDING,
     IMG2IMG_UNET_HIRES_BINDING,
+    IMG2IMG_UNET_HIRES_MODEL_BINDING,
     TXT2IMG_BINDING,
     TXT2IMG_CONTROLNET_BINDING,
     TXT2IMG_CONTROLNET_IPADAPTER_BINDING,
     TXT2IMG_HIRES_BINDING,
     TXT2IMG_HIRES_CONTROLNET_BINDING,
+    TXT2IMG_HIRES_MODEL_BINDING,
+    TXT2IMG_HIRES_MODEL_CONTROLNET_BINDING,
     TXT2IMG_IPADAPTER_BINDING,
     TXT2IMG_LORA_BINDING,
     TXT2IMG_LORA_CONTROLNET_BINDING,
     TXT2IMG_LORA_CONTROLNET_IPADAPTER_BINDING,
     TXT2IMG_LORA_HIRES_BINDING,
     TXT2IMG_LORA_HIRES_CONTROLNET_BINDING,
+    TXT2IMG_LORA_HIRES_MODEL_BINDING,
+    TXT2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING,
     TXT2IMG_LORA_IPADAPTER_BINDING,
     TXT2IMG_UNET_BINDING,
     TXT2IMG_UNET_HIRES_BINDING,
+    TXT2IMG_UNET_HIRES_MODEL_BINDING,
     WorkflowBinding,
     build_workflow,
     resolve_seed,
@@ -82,6 +92,16 @@ ALLOWED_WORKFLOWS: Final[dict[str, WorkflowBinding]] = {
     "txt2img_unet_hires": TXT2IMG_UNET_HIRES_BINDING,
     "img2img_unet": IMG2IMG_UNET_BINDING,
     "img2img_unet_hires": IMG2IMG_UNET_HIRES_BINDING,
+    "txt2img_hires_model": TXT2IMG_HIRES_MODEL_BINDING,
+    "txt2img_lora_hires_model": TXT2IMG_LORA_HIRES_MODEL_BINDING,
+    "img2img_hires_model": IMG2IMG_HIRES_MODEL_BINDING,
+    "img2img_lora_hires_model": IMG2IMG_LORA_HIRES_MODEL_BINDING,
+    "txt2img_unet_hires_model": TXT2IMG_UNET_HIRES_MODEL_BINDING,
+    "img2img_unet_hires_model": IMG2IMG_UNET_HIRES_MODEL_BINDING,
+    "txt2img_hires_model_controlnet": TXT2IMG_HIRES_MODEL_CONTROLNET_BINDING,
+    "txt2img_lora_hires_model_controlnet": TXT2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING,
+    "img2img_hires_model_controlnet": IMG2IMG_HIRES_MODEL_CONTROLNET_BINDING,
+    "img2img_lora_hires_model_controlnet": IMG2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING,
 }
 
 
@@ -100,7 +120,8 @@ def resolve_workflow_name(spec: GenerationSpec) -> str:
     elif spec.model.loras:
         suffix += "_lora"
     if spec.generation.upscale is not None:
-        suffix += "_hires"
+        # 拡大の経路がlatentとpixelで別テンプレートになる
+        suffix += "_hires_model" if spec.generation.upscale.uses_model else "_hires"
     if spec.control is not None:
         suffix += "_controlnet"
     if spec.reference is not None:
