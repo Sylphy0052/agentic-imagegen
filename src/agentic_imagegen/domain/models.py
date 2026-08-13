@@ -33,6 +33,7 @@ SamplerName = Literal[
     "ddim",
     "uni_pc",
     "uni_pc_bh2",
+    "er_sde",
 ]
 
 SchedulerName = Literal[
@@ -268,16 +269,67 @@ class LoraSpec(_StrictModel):
 
 
 class ModelSpec(_StrictModel):
-    """使用するモデル。"""
+    """使用するモデル。
 
-    checkpoint: str = Field(min_length=1)
+    指定の仕方は2通りあり、どちらか一方だけを使う。
+
+    - `checkpoint`: UNet / CLIP / VAE を1ファイルに含む従来形式 (SD1.5 / SDXL 系)
+    - `unet` + `clip` + `vae`: 3つを別々に読む形式 (Anima などのDiT系)
+
+    DiT系のモデルはUNet単体で配布され、text encoderとVAEを同梱しないため、
+    ローダーを分ける必要がある。両方を同時に書けると「どちらが効くのか」が
+    読み取れなくなるため、排他にしている。
+    """
+
+    checkpoint: str | None = None
+    #: DiT系モデルのUNet本体。~/ComfyUI/models/diffusion_models/ に置く。
+    unet: str | None = None
+    #: DiT系モデルのtext encoder。~/ComfyUI/models/text_encoders/ に置く。
+    clip: str | None = None
+    #: DiT系モデルのVAE。~/ComfyUI/models/vae/ に置く。
+    vae: str | None = None
     #: 適用順に並べる。Workflowテンプレートの LoraLoader の段へ先頭から割り当てる。
     loras: tuple[LoraSpec, ...] = ()
 
-    @field_validator("checkpoint")
+    @property
+    def uses_separate_loaders(self) -> bool:
+        """UNet / CLIP / VAE を別々に読む形式かどうか。"""
+        return self.unet is not None
+
+    @field_validator("checkpoint", "unet", "clip", "vae")
     @classmethod
-    def _reject_unsafe_path(cls, value: str) -> str:
+    def _reject_unsafe_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         return _validate_model_filename(value, allowed_suffixes=ALLOWED_CHECKPOINT_SUFFIXES)
+
+    @model_validator(mode="after")
+    def _validate_loader_combination(self) -> ModelSpec:
+        separate = {"unet": self.unet, "clip": self.clip, "vae": self.vae}
+        specified = [key for key, value in separate.items() if value is not None]
+
+        if self.checkpoint is not None:
+            if specified:
+                raise ValueError(
+                    "checkpoint と {} は同時に指定できません".format(" / ".join(sorted(specified)))
+                )
+            return self
+
+        if not specified:
+            raise ValueError("checkpoint、または unet / clip / vae の3つを指定してください")
+
+        missing = sorted(key for key, value in separate.items() if value is None)
+        if missing:
+            raise ValueError(
+                "unet / clip / vae は3つセットで指定してください (不足: {})".format(
+                    " / ".join(missing)
+                )
+            )
+
+        if self.loras:
+            raise ValueError("unet / clip / vae の指定とLoRAの併用は未対応です")
+
+        return self
 
     @field_validator("loras")
     @classmethod
@@ -582,11 +634,29 @@ class GenerationSpec(_StrictModel):
             raise ValueError("upscale と control の同時指定は未対応です")
         if self.generation.upscale is not None and self.reference is not None:
             raise ValueError("upscale と reference の同時指定は未対応です")
+        if self.model.uses_separate_loaders:
+            self._validate_separate_loaders()
         if self.task == "img2img":
             self._validate_img2img()
         elif self.source is not None:
             raise ValueError("source は task が img2img のときにのみ指定できます")
         return self
+
+    def _validate_separate_loaders(self) -> None:
+        """unet / clip / vae を使う場合に、テンプレートが無い組み合わせを拒否する。
+
+        ControlNet / IPAdapter のモデルはSD1.5 / SDXL 系向けのものであり、
+        DiT系のUNetへはそのまま適用できない。hires fix と img2img は
+        テンプレート自体を用意していない。
+        """
+        if self.task != "txt2img":
+            raise ValueError("unet / clip / vae の指定は現在 txt2img でのみ対応しています")
+        if self.generation.upscale is not None:
+            raise ValueError("unet / clip / vae の指定と upscale の併用は未対応です")
+        if self.control is not None:
+            raise ValueError("unet / clip / vae の指定と control の併用は未対応です")
+        if self.reference is not None:
+            raise ValueError("unet / clip / vae の指定と reference の併用は未対応です")
 
     def _validate_img2img(self) -> None:
         if self.source is None:

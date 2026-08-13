@@ -110,7 +110,12 @@ def validate(spec_path: SpecArgument, verbose: VerboseOption = False) -> None:
             typer.echo(f"Source: {spec.source.image} (denoise {spec.source.denoise})")
         else:
             typer.echo(f"Resolution: {params.width}x{params.height} (batch {params.batch_size})")
-        typer.echo(f"Checkpoint: {spec.model.checkpoint}")
+        if spec.model.uses_separate_loaders:
+            typer.echo(f"UNet: {spec.model.unet}")
+            typer.echo(f"CLIP: {spec.model.clip}")
+            typer.echo(f"VAE: {spec.model.vae}")
+        else:
+            typer.echo(f"Checkpoint: {spec.model.checkpoint}")
         if spec.control is not None:
             typer.echo(
                 f"ControlNet: {spec.control.image} "

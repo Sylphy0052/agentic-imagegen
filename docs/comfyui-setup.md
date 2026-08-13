@@ -100,10 +100,37 @@ curl -L --fail -C - -H "Authorization: Bearer ${TOKEN}" \
 | --- | --- | --- | --- |
 | [MeinaMix V12](https://civitai.com/models/7240) | SD 1.5 | `meinamix_v12Final.safetensors` (2.0GB) | Integration Test / E2Eの標準 |
 | [Nova Anime XL IL v19.0](https://civitai.com/models/376130) | Illustrious (SDXL系) | `novaAnimeXL_ilV190.safetensors` (6.5GB) | 仕上がり確認用 |
-| [Hassaku (Anima) v1.3](https://civitai.com/models/2641326) | Anima (DiT) | `hassakuAnima_v13_int8.safetensors` (2.1GB) | 未対応。[Issue #6](https://github.com/Sylphy0052/agentic-imagegen/issues/6) で調査中 |
+| [Hassaku (Anima) v1.3](https://civitai.com/models/2641326) | Anima (DiT) | `hassakuAnima_v13_int8.safetensors` (2.1GB) | `models/diffusion_models/` へ置く。下記参照 |
 
-Hassaku (Anima) はSDXL系ではなくDiT系のアーキテクチャであり、
-同梱の `workflows/txt2img.json` (CheckpointLoaderSimple + KSampler構成) では動かない可能性が高い。
+Hassaku (Anima) はSDXL系ではなくDiT系のアーキテクチャで、同梱の `workflows/txt2img.json`
+(CheckpointLoaderSimple + KSampler構成) では動かない。専用の `txt2img_unet` を使う。
+
+### DiT系モデル (Anima) を置く場合
+
+Anima系のモデルはUNet単体で配布され、text encoderとVAEを同梱していない。
+`models/checkpoints/` へ置いて `CheckpointLoaderSimple` で読ませると、CLIPとVAEが
+`None` のままになり `clip input is invalid: None` で失敗する。3つを別々に置く。
+
+| ファイル | 置き場 | サイズ | 入手元 |
+| --- | --- | --- | --- |
+| `hassakuAnima_v13_int8.safetensors` | `models/diffusion_models/` | 2.10GB | [civitai](https://civitai.com/models/2641326) (APIキー要) |
+| `qwen_3_06b_base.safetensors` | `models/text_encoders/` | 1.19GB | [circlestone-labs/Anima](https://huggingface.co/circlestone-labs/Anima) |
+| `qwen_image_vae.safetensors` | `models/vae/` | 254MB | 同上 |
+
+```bash
+cd ~/ComfyUI/models/text_encoders
+curl -L -o qwen_3_06b_base.safetensors \
+  https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/text_encoders/qwen_3_06b_base.safetensors
+
+cd ~/ComfyUI/models/vae
+curl -L -o qwen_image_vae.safetensors \
+  https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/vae/qwen_image_vae.safetensors
+```
+
+int8量子化版はComfyUI独自の量子化形式 (`comfy_quant`) を使っており、
+`UNETLoader` の `weight_dtype=default` でそのまま読める。bf16版 (3.90GB) は不要。
+
+Spec側の書き方は [CLAUDE.md](../CLAUDE.md) の「DiT系モデルを使う」を参照。
 
 ## 4. 起動
 

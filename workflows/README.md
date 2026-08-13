@@ -37,8 +37,9 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `txt2img_lora_controlnet_ipadapter.json` | LoRA + ControlNet + IPAdapter |
 | `img2img_controlnet_ipadapter.json` | ControlNet + IPAdapter (img2img) |
 | `img2img_lora_controlnet_ipadapter.json` | LoRA + ControlNet + IPAdapter (img2img) |
+| `txt2img_unet.json` | UNet / text encoder / VAE を別々に読む text-to-image (DiT系) |
 
-どれを使うかは `task` と `model.loras` の有無で自動的に決まる。定義は
+どれを使うかは `task` と `model.loras` の有無、`model.unet` の指定で自動的に決まる。定義は
 [src/agentic_imagegen/workflows/injector.py](../src/agentic_imagegen/workflows/injector.py)
 の `resolve_workflow_name` を参照。
 
@@ -111,7 +112,8 @@ txt2img.json  (手書きベース)
   ├─ *_lora             CheckpointLoader の後に LoraLoader を3段
   ├─ *_hires            KSampler の後に LatentUpscaleBy + 2段目 KSampler
   ├─ *_controlnet       CLIPTextEncode と KSampler の間に ControlNet
-  └─ *_ipadapter        MODEL の経路に IPAdapterAdvanced
+  ├─ *_ipadapter        MODEL の経路に IPAdapterAdvanced
+  └─ txt2img_unet       CheckpointLoader -> UNETLoader + CLIPLoader + VAELoader
 ```
 
 `*_ipadapter` はKSamplerのMODEL入力だけを差し替えるため、positive / negative を
@@ -134,12 +136,18 @@ txt2img.json  (手書きベース)
 | 30-31 | hires fix (LatentUpscaleBy / 2段目KSampler) |
 | 40-43 | ControlNet (LoadImage / Canny / ControlNetLoader / ControlNetApplyAdvanced) |
 | 50-53 | IPAdapter (LoadImage / IPAdapterModelLoader / CLIPVisionLoader / IPAdapterAdvanced) |
+| 60-62 | DiT系のローダー分割 (UNETLoader / CLIPLoader / VAELoader) |
 
 hires fix と ControlNet / IPAdapter の組み合わせは作っていない。両方かけると生成時間が
 現実的でなく、必要になってから足せばよい (Specの検証で同時指定を拒否している)。
 
 `*_ipadapter` は [ComfyUI_IPAdapter_plus](https://github.com/cubiq/ComfyUI_IPAdapter_plus)
 のノードを使う。未導入のComfyUIでは投入が拒否される。
+
+`txt2img_unet` はDiT系モデル (Anima など) 向けで、`CheckpointLoaderSimple` を3つのローダーへ
+置き換える。UNet単体で配布されるモデルはtext encoderとVAEを同梱しておらず、1ファイルから
+MODEL / CLIP / VAE を取り出す前提が崩れるため。LoRA / img2img / hires fix / ControlNet /
+IPAdapter との組み合わせは作っていない (Specの検証で併用を拒否している)。
 
 ## GUIから書き出す手順
 

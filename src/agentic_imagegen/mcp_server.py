@@ -104,6 +104,27 @@ async def list_clip_visions() -> list[str]:
 
 
 @server.tool()
+async def list_diffusion_models() -> list[str]:
+    """ComfyUIが持っているUNet単体のモデル名の一覧を返す。
+
+    DiT系モデル (Anima など) を使うときに model.unet へ指定する。
+    """
+    return await mcp_tools.list_diffusion_models(Settings.from_env())
+
+
+@server.tool()
+async def list_text_encoders() -> list[str]:
+    """ComfyUIが持っているtext encoder名の一覧を返す。model.clip へ指定する。"""
+    return await mcp_tools.list_text_encoders(Settings.from_env())
+
+
+@server.tool()
+async def list_vaes() -> list[str]:
+    """ComfyUIが持っているVAE名の一覧を返す。model.vae へ指定する。"""
+    return await mcp_tools.list_vaes(Settings.from_env())
+
+
+@server.tool()
 async def generate_image(spec: dict[str, Any]) -> dict[str, Any]:
     """GenerationSpecに従って画像生成を開始する。
 

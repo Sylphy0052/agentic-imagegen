@@ -259,3 +259,65 @@ async def test_available_clip_visions() -> None:
         assert await client.available_clip_visions() == (
             "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
         )
+
+
+DIFFUSION_MODEL_OBJECT_INFO = {
+    "UNETLoader": {
+        "input": {
+            "required": {
+                "unet_name": [["hassakuAnima_v13_int8.safetensors"], {}],
+                "weight_dtype": [["default", "fp8_e4m3fn"], {}],
+            }
+        }
+    }
+}
+
+TEXT_ENCODER_OBJECT_INFO = {
+    "CLIPLoader": {
+        "input": {
+            "required": {
+                "clip_name": [["qwen_3_06b_base.safetensors"], {}],
+                "type": [["stable_diffusion", "flux2"], {}],
+            }
+        }
+    }
+}
+
+VAE_OBJECT_INFO = {
+    "VAELoader": {"input": {"required": {"vae_name": [["qwen_image_vae.safetensors"], {}]}}}
+}
+
+
+async def test_available_diffusion_models() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/object_info/UNETLoader"
+        return httpx.Response(200, json=DIFFUSION_MODEL_OBJECT_INFO)
+
+    async with _client(handler) as client:
+        assert await client.available_diffusion_models() == ("hassakuAnima_v13_int8.safetensors",)
+
+
+async def test_available_text_encoders() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/object_info/CLIPLoader"
+        return httpx.Response(200, json=TEXT_ENCODER_OBJECT_INFO)
+
+    async with _client(handler) as client:
+        assert await client.available_text_encoders() == ("qwen_3_06b_base.safetensors",)
+
+
+async def test_available_vaes() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/object_info/VAELoader"
+        return httpx.Response(200, json=VAE_OBJECT_INFO)
+
+    async with _client(handler) as client:
+        assert await client.available_vaes() == ("qwen_image_vae.safetensors",)
+
+
+async def test_available_diffusion_models_empty_when_none_placed() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={})
+
+    async with _client(handler) as client:
+        assert await client.available_diffusion_models() == ()

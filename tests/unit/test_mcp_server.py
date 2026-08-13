@@ -26,6 +26,9 @@ EXPECTED_TOOLS = {
     "list_controlnets",
     "list_ipadapters",
     "list_clip_visions",
+    "list_diffusion_models",
+    "list_text_encoders",
+    "list_vaes",
     "list_workflows",
 }
 
@@ -137,6 +140,7 @@ async def test_list_workflows_returns_allowlist() -> None:
         "txt2img_lora_controlnet_ipadapter",
         "img2img_controlnet_ipadapter",
         "img2img_lora_controlnet_ipadapter",
+        "txt2img_unet",
     }
 
 

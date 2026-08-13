@@ -1,0 +1,38 @@
+# UNet / text encoder / VAE を別々に読む形式 (Anima などのDiT系モデル)。
+#
+# checkpoint 1ファイルで完結するSD1.5 / SDXL系と違い、DiT系のモデルはUNet単体で
+# 配布される。text encoderとVAEは別に入手して models/text_encoders/ と models/vae/
+# へ置く (入手先は docs/comfyui-setup.md を参照)。
+version: "1"
+task: txt2img
+
+prompt:
+  positive: >
+    1girl, silver hair, red eyes, school uniform, standing in a sunlit corridor,
+    anime illustration, detailed background
+
+  negative: >
+    worst quality, low quality, blurry, jpeg artifacts
+
+generation:
+  # Animaは1024x1024前後を前提に学習されている。832x1216が最も扱いやすい
+  width: 832
+  height: 1216
+  steps: 28
+  # SD1.5系より低め。5を超えると崩れやすい
+  cfg: 4.0
+  seed: -1
+  batch_size: 1
+  sampler: er_sde
+  scheduler: simple
+
+model:
+  # ~/ComfyUI/models/diffusion_models/
+  unet: hassakuAnima_v13_int8.safetensors
+  # ~/ComfyUI/models/text_encoders/
+  clip: qwen_3_06b_base.safetensors
+  # ~/ComfyUI/models/vae/
+  vae: qwen_image_vae.safetensors
+
+output:
+  prefix: anima

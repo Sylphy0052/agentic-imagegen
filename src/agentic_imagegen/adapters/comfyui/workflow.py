@@ -74,6 +74,42 @@ TXT2IMG_BINDING: Final = WorkflowBinding(
 )
 
 
+#: UNet / CLIP / VAE を別々に読むテンプレートの役割名。
+UNET_LOADER_ROLE: Final = "unet_loader"
+CLIP_LOADER_ROLE: Final = "clip_loader"
+VAE_LOADER_ROLE: Final = "vae_loader"
+
+TXT2IMG_UNET_BINDING: Final = WorkflowBinding(
+    name="txt2img_unet",
+    nodes={
+        UNET_LOADER_ROLE: NodeRef("60", "UNETLoader", ("unet_name", "weight_dtype")),
+        CLIP_LOADER_ROLE: NodeRef("61", "CLIPLoader", ("clip_name", "type")),
+        VAE_LOADER_ROLE: NodeRef("62", "VAELoader", ("vae_name",)),
+        "positive_prompt": NodeRef("6", "CLIPTextEncode", ("text",)),
+        "negative_prompt": NodeRef("7", "CLIPTextEncode", ("text",)),
+        "latent": NodeRef("5", "EmptyLatentImage", ("width", "height", "batch_size")),
+        "ksampler": NodeRef(
+            "3",
+            "KSampler",
+            ("seed", "steps", "cfg", "sampler_name", "scheduler"),
+        ),
+        "vae_decode": NodeRef("8", "VAEDecode", ()),
+        "save_image": NodeRef("9", "SaveImage", ("filename_prefix",)),
+    },
+    links=(
+        LinkRef("ksampler", "positive", "positive_prompt"),
+        LinkRef("ksampler", "negative", "negative_prompt"),
+        LinkRef("ksampler", "latent_image", "latent"),
+        LinkRef("ksampler", "model", UNET_LOADER_ROLE),
+        # 3つのローダーはそれぞれ別の系統を担うため、取り違えると
+        # 「動くが指定したモデルが効かない」状態になる。結線まで検証する。
+        LinkRef("positive_prompt", "clip", CLIP_LOADER_ROLE),
+        LinkRef("negative_prompt", "clip", CLIP_LOADER_ROLE),
+        LinkRef("vae_decode", "vae", VAE_LOADER_ROLE),
+    ),
+)
+
+
 #: LoRAスロットの役割名。テンプレートのLoraLoaderの段数と一致させる。
 LORA_SLOT_ROLES: Final = ("lora_1", "lora_2", "lora_3")
 
@@ -403,7 +439,7 @@ def build_workflow(
         node_inputs: dict[str, Any] = node["inputs"]
         return node_inputs
 
-    inputs_of("checkpoint")["ckpt_name"] = spec.model.checkpoint
+    _inject_model(spec, binding, inputs_of)
     inputs_of("positive_prompt")["text"] = spec.prompt.positive
     inputs_of("negative_prompt")["text"] = spec.prompt.negative
 
@@ -430,6 +466,37 @@ def build_workflow(
     _inject_reference(spec, binding, inputs_of, reference_image_name)
 
     return workflow
+
+
+def _inject_model(
+    spec: GenerationSpec,
+    binding: WorkflowBinding,
+    inputs_of: Callable[[str], dict[str, Any]],
+) -> None:
+    """テンプレートの形式に合わせてモデルのファイル名を注入する。
+
+    checkpoint 1ファイルのテンプレートと、UNet / CLIP / VAE を別々に読む
+    テンプレートで、Spec側の指定の仕方も変わる。食い違ったまま投入すると
+    ComfyUI側で分かりにくい失敗になるため、ここで拒否する。
+    """
+    if UNET_LOADER_ROLE in binding.nodes:
+        model = spec.model
+        if not model.uses_separate_loaders:
+            raise WorkflowValidationError(
+                f"Workflow ({binding.name}) は unet / clip / vae の指定を要求しますが、"
+                "Specでは checkpoint が指定されています"
+            )
+        inputs_of(UNET_LOADER_ROLE)["unet_name"] = model.unet
+        inputs_of(CLIP_LOADER_ROLE)["clip_name"] = model.clip
+        inputs_of(VAE_LOADER_ROLE)["vae_name"] = model.vae
+        return
+
+    if spec.model.checkpoint is None:
+        raise WorkflowValidationError(
+            f"Workflow ({binding.name}) は checkpoint の指定を要求しますが、"
+            "Specでは unet / clip / vae が指定されています"
+        )
+    inputs_of("checkpoint")["ckpt_name"] = spec.model.checkpoint
 
 
 def _inject_reference(

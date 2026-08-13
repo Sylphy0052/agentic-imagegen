@@ -6,7 +6,8 @@ img2img / LoRA / hires fix の組み合わせを生成する。
     txt2img.json  (ベース: 人間がComfyUI GUIで作成しAPI形式で書き出したもの)
       ├─ img2img            EmptyLatentImage -> LoadImage + VAEEncode
       ├─ *_lora             CheckpointLoader の後に LoraLoader を3段
-      └─ *_hires            KSampler の後に LatentUpscaleBy + 2段目 KSampler
+      ├─ *_hires            KSampler の後に LatentUpscaleBy + 2段目 KSampler
+      └─ txt2img_unet       CheckpointLoader -> UNETLoader + CLIPLoader + VAELoader
 
 組み合わせが増えても手で書かないのは、ノード参照を間違えても
 「形は正しいまま意味だけ壊れる」ためである (実際に一度踏んでいる)。
@@ -54,12 +55,18 @@ REFERENCE_LOAD_IMAGE = "50"
 REFERENCE_LOADER = "51"
 REFERENCE_CLIP_VISION = "52"
 REFERENCE_APPLY = "53"
+UNET_LOADER = "60"
+UNET_CLIP_LOADER = "61"
+UNET_VAE_LOADER = "62"
 
 DEFAULT_LORA = "add_detail.safetensors"
 DEFAULT_SOURCE_IMAGE = "example.png"
 DEFAULT_CONTROLNET = "control_v11p_sd15_canny_fp16.safetensors"
 DEFAULT_IPADAPTER = "ip-adapter-plus_sd15.safetensors"
 DEFAULT_CLIP_VISION = "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors"
+DEFAULT_UNET = "hassakuAnima_v13_int8.safetensors"
+DEFAULT_TEXT_ENCODER = "qwen_3_06b_base.safetensors"
+DEFAULT_VAE = "qwen_image_vae.safetensors"
 
 #: 出力スロット数。範囲外の参照を検出するために使う
 OUTPUT_COUNTS = {
@@ -78,6 +85,9 @@ OUTPUT_COUNTS = {
     "ControlNetApplyAdvanced": 2,
     "IPAdapterModelLoader": 1,
     "CLIPVisionLoader": 1,
+    "UNETLoader": 1,
+    "CLIPLoader": 1,
+    "VAELoader": 1,
     "IPAdapterAdvanced": 1,
 }
 
@@ -100,6 +110,45 @@ def to_img2img(graph: Graph) -> Graph:
     graph[KSAMPLER]["inputs"]["latent_image"] = [IMG2IMG_VAE_ENCODE, 0]
     # denoise は img2img で意味を持つ。Specから注入されるが既定は控えめにしておく
     graph[KSAMPLER]["inputs"]["denoise"] = 0.6
+    return graph
+
+
+def to_separate_loaders(graph: Graph) -> Graph:
+    """CheckpointLoaderSimple を UNETLoader + CLIPLoader + VAELoader へ置き換える。
+
+    DiT系のモデル (Anima など) はUNet単体で配布され、text encoderとVAEを同梱しない。
+    1ファイルから MODEL / CLIP / VAE の3つを取り出す前提が崩れるため、
+    ローダーそのものを分ける。
+    """
+    graph = copy.deepcopy(graph)
+    del graph[CHECKPOINT]
+
+    graph[UNET_LOADER] = {
+        "class_type": "UNETLoader",
+        "inputs": {"unet_name": DEFAULT_UNET, "weight_dtype": "default"},
+    }
+    graph[UNET_CLIP_LOADER] = {
+        "class_type": "CLIPLoader",
+        # typeはstate dictからComfyUIが判別するため、既定値のままでAnimaも読める
+        "inputs": {"clip_name": DEFAULT_TEXT_ENCODER, "type": "stable_diffusion"},
+    }
+    graph[UNET_VAE_LOADER] = {
+        "class_type": "VAELoader",
+        "inputs": {"vae_name": DEFAULT_VAE},
+    }
+
+    graph[KSAMPLER]["inputs"]["model"] = [UNET_LOADER, 0]
+    graph[POSITIVE]["inputs"]["clip"] = [UNET_CLIP_LOADER, 0]
+    graph[NEGATIVE]["inputs"]["clip"] = [UNET_CLIP_LOADER, 0]
+    graph[VAE_DECODE]["inputs"]["vae"] = [UNET_VAE_LOADER, 0]
+
+    # 既定値もDiT系へ寄せる (Specから注入されるが、テンプレート単体で見たときに
+    # SD1.5向けの値が残っていると誤解を招く)
+    graph[KSAMPLER]["inputs"]["steps"] = 30
+    graph[KSAMPLER]["inputs"]["cfg"] = 4.0
+    graph[KSAMPLER]["inputs"]["scheduler"] = "simple"
+    graph[EMPTY_LATENT]["inputs"]["width"] = 1024
+    graph[EMPTY_LATENT]["inputs"]["height"] = 1024
     return graph
 
 
@@ -271,6 +320,9 @@ def build_all(base: Graph) -> dict[str, Graph]:
     # txt2img自身は手書きのベースなので生成対象に含めない
     return {
         "txt2img_lora": with_lora_chain(txt2img, LORA_IDS),
+        # DiT系はLoRA / img2img / hires / ControlNet / IPAdapter と組み合わせない
+        # (Specの検証で併用を拒否している)
+        "txt2img_unet": to_separate_loaders(txt2img),
         "txt2img_hires": with_hires_fix(txt2img),
         "txt2img_lora_hires": with_hires_fix(with_lora_chain(txt2img, LORA_IDS)),
         "img2img": img2img,
@@ -317,6 +369,8 @@ def verify(name: str, base: Graph, graph: Graph) -> None:
     for node_id, node in base.items():
         if node_id == EMPTY_LATENT and EMPTY_LATENT not in graph:
             continue  # img2img系では意図的に外している
+        if node_id == CHECKPOINT and CHECKPOINT not in graph:
+            continue  # unet系ではローダーを3つに分けている
         if node_id not in graph:
             raise ValueError(f"{name}: ベースのノード {node_id} が消えている")
         if graph[node_id]["class_type"] != node["class_type"]:

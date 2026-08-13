@@ -258,6 +258,36 @@ uv run imagegen compose inputs/base.png specs/generated/caption.yaml -o outputs/
 [docs/plan/phase5-japanese-text.md](docs/plan/phase5-japanese-text.md) を参照。
 現在の実行環境ではメモリが足りず動かせないため、合成方式を既定とする。
 
+## DiT系モデルを使う (UNet / CLIP / VAE を別に指定する)
+
+Anima などのDiT系モデルは、UNet単体で配布されtext encoderとVAEを同梱しない。
+その場合は `checkpoint` の代わりに3つを別々に指定する。
+
+```yaml
+generation:
+  width: 832        # Animaは1024x1024前後が前提。832x1216が扱いやすい
+  height: 1216
+  steps: 28
+  cfg: 4.0          # SD1.5系より低め。5を超えると崩れやすい
+  sampler: er_sde
+  scheduler: simple
+
+model:
+  unet: hassakuAnima_v13_int8.safetensors   # ~/ComfyUI/models/diffusion_models/
+  clip: qwen_3_06b_base.safetensors         # ~/ComfyUI/models/text_encoders/
+  vae: qwen_image_vae.safetensors           # ~/ComfyUI/models/vae/
+```
+
+- 指定するとテンプレートが `txt2img_unet` へ切り替わる
+- **`checkpoint` とは排他。** 両方書くと拒否される。3つは揃えて指定する
+- **LoRA / img2img / hires fix / ControlNet / IPAdapter とは併用できない。**
+  テンプレートを用意していないため、指定するとその場で拒否される
+- モデル名は `list_diffusion_models` / `list_text_encoders` / `list_vaes` (MCP) で確認する
+- text encoderとVAEはUNetと対応関係がある。Animaなら Qwen3-0.6B と Qwen-Image VAE
+
+入手手順は [docs/comfyui-setup.md](docs/comfyui-setup.md)、サンプルは
+[specs/examples/txt2img_anima.yaml](specs/examples/txt2img_anima.yaml) を参照。
+
 ## 複数枚をまとめて生成する
 
 同じSpecでseedを変えて何枚か出したい場合や、複数のSpecを流したい場合は `batch` を使う。
