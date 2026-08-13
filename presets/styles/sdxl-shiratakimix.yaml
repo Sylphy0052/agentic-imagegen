@@ -6,18 +6,20 @@
 # 配布元の推奨はsteps 20以上 / cfg 3-8 (配布元のサンプルは7.5) /
 # dpmpp_3m_sde または dpmpp_2m_sde + karras。
 #
+# タグの選び方は sdxl-illustrious と同じ (実在するタグだけを使う)。
+#
 # 対象のcheckpointは ~/ComfyUI/models/checkpoints/ へ未配置。使う前に配置する。
 
 description: ShiratakiMix XL系の推奨設定。DPM++ 3M SDE / karrasで線を整える
 
 prompt:
   positive: >
-    masterpiece, best quality, ultra-detailed, high res
+    masterpiece, best quality, absurdres, highres
 
   negative: >
-    super deformed, bad anatomy, bad hands, extra fingers, worst quality,
+    chibi, bad anatomy, bad hands, extra digits, worst quality,
     low quality, normal quality, lowres, blurry, jpeg artifacts, watermark, text,
-    logo, signature, speech bubble, 3d, photorealistic, harsh lighting, lens flare,
+    logo, signature, speech bubble, 3d, photorealistic, lens flare,
     film grain, realistic, monochrome, censored, multiple views
 
 generation:

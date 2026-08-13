@@ -9,9 +9,12 @@ Specの書き方そのものは [spec-reference.md](spec-reference.md)、失敗�
 
 - **前方のトークンほど強く効く。** 主題 -> 属性 -> 構図 -> 品質タグ の順に並べる
 - **重み付けは `(tag:1.3)`。** SD1.5 / SDXL系は0.7-1.5が実用域。それを超えると色が焼き付き、
-  構図が破綻する
+  構図が破綻する。効きはSD1.5系が最も強く、SDXL以降は逓減する。
+  同じ破綻が出続けるときは0.2-0.3刻みで上げる
 - **品質タグは3-4個で打ち止め。** 積み増しても品質は上がらず、主題のトークンが希釈されるだけ
 - **プロンプトは削る方が改善する。** 半分に削って壊れた箇所が、実際に効いていたトークン
+- **negativeは最小から始め、症状を見てから足す。** SD1.5時代の長大なnegativeを貼ると
+  色が抜けて眠い絵になる。washed-out / paleはnegativeが過剰なサインで、半分に削ると戻る
 - **negativeにpositiveの要素を書かない。** positiveに `forest`、negativeに `trees` を入れると
   互いに打ち消し合う
 - **seedを固定したままpromptとcfgを詰め、最後にseedを振って構図を探す。**
@@ -30,8 +33,9 @@ Specの書き方そのものは [spec-reference.md](spec-reference.md)、失敗�
 - **「知っていること」ではなく「見えるもの」をタグにする。** 足が写らない構図で靴のタグを書かない
 - text encoderが単純なため、プロンプト追従をcfgに依存する。指示が効かないときは
   語順の見直しを先に行い、cfgを上げるのは最後にする
-- negativeは15-30語程度が通例。`worst quality, low quality, blurry, bad anatomy, text,
-  watermark, signature` のような定型から始める
+- negativeは `worst quality, low quality, lowres, blurry, bad anatomy, text, watermark,
+  signature` のような10語前後の定型から始め、出た症状に応じて足す。
+  15語を大きく超えると色が抜け始める
 - **embeddingはcheckpointの世代に固定される。** SD1.5向けのembeddingはSDXLでは機能しない
 
 ### 配置済みのSD1.5系モデル
@@ -73,6 +77,34 @@ Specの書き方そのものは [spec-reference.md](spec-reference.md)、失敗�
 - **hires fixのアップスケーラは `R-ESRGAN 4x+Anime6B` が定番**
   ([Issue #58](https://github.com/Sylphy0052/agentic-imagegen/issues/58))
 
+### タグの実在を確認する
+
+存在しないタグは学習語彙に対応する概念を持たない。SD1.5は75トークンしか使えないため、
+効かないタグを並べるとそれだけ主題のトークンが希釈される。
+思いついたタグは書く前にDanbooruで実在を確認する。
+
+```bash
+curl -s 'https://danbooru.donmai.us/tags.json?search%5Bname%5D=oversized_clothes&limit=1' \
+  | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d[0]["post_count"] if d else "NOT_FOUND")'
+```
+
+- **確認はアンダースコア表記で行う。** Danbooruのタグ名は `hair_over_one_eye` の形で登録されている。
+  プロンプトへ書くときはスペース区切りでよい (CLIPはどちらも同じに解釈する)
+- **`post_count` が0または数十なら効かないと判断する。** 数千以上あれば学習に寄与している
+- **置換先が見つからない語は消す。** `mysterious` や `melancholic` のような形容は
+  対応するタグが無く、雰囲気を足す働きもしない
+
+`post_count` で判定してはいけない例外が2つある。
+
+- **品質ラベルはDanbooruタグではない。** `masterpiece` / `best quality` / `worst quality` /
+  `low quality` はいずれも `post_count` 0だが、anime系checkpointが学習時に
+  aesthetic scoreから付与したラベルであり、効く
+- **学習時点との差がある。** `bangs` は現在のDanbooruでは整理されて0だが、
+  SD1.5系checkpointの学習データ (2022-2023時点) には存在した。世代の古いモデルでは残す
+
+negativeはpositiveほど学習タグ語彙に縛られない。CLIPの一般語彙としても効くため、
+`photorealistic` のように件数が少ない語を使ってよい。厳密に確認するのはpositive側。
+
 ### タグをブロックで組む
 
 タグを役割ごとにまとめて並べると、書き換える箇所と使い回せる箇所が分かれる。
@@ -80,13 +112,19 @@ presetの軸もこの区切りに合わせて切る。
 
 | ブロック | 例 | 置き場所 |
 | --- | --- | --- |
-| 品質 | `masterpiece, best quality, high quality, detailed` | style |
-| 大枠 | `1boy, solo, 20years` | character |
+| 品質 | `masterpiece, best quality, absurdres, highres` | style |
+| 大枠 | `1boy, solo, male focus, mature male` | character |
 | 外見 | `black hair, short hair, hair over one eye, bangs` | character |
-| 服装 | `black hoodie, hood up, oversized, long sleeves` | character |
-| 表情 | `pale skin, slight smile, mysterious, melancholic` | character |
+| 服装 | `black hoodie, hood up, oversized clothes, long sleeves` | character |
+| 表情 | `pale skin, shaded face, light smile` | character |
 | 構図 | `full body, standing, looking at viewer` | scene |
 | 背景 | `simple background, white background` | scene |
+
+複合表現はタグとして成立しない。`city street at night` は `street` と `night` へ、
+`rain reflection` は `rain` / `puddle` / `reflection` へ分解する。
+
+相反するタグと重複するタグも洗う。`covered eyes` (両目) と `hair over one eye` (片目) は
+競合し、`black hoodie` があれば `hoodie` は要らない。
 
 A1111 / Forgeでは品質タグを先頭へ置く書き方が通例だが、presetは
 `character` -> `scene` -> `style` の順に連結するため、品質タグは末尾へ回る。
@@ -126,6 +164,7 @@ A1111 / Forgeでは品質タグを先頭へ置く書き方が通例だが、pres
   `masterpiece, best quality` 系の品質タグを使う
 - **タグはDanbooruに実在する表記を使う。** 学習データが少ないタグはLoRAなしでは効かない。
   キャラクタ名もDanbooruの表記順に従う
+  (確認手順は [タグの実在を確認する](#タグの実在を確認する))
 - v2.0以降は自然文とタグの併用に対応する
 - **配布元はclip skip 2を推奨するが指定できない**
   ([Issue #60](https://github.com/Sylphy0052/agentic-imagegen/issues/60))。
@@ -138,13 +177,15 @@ style presetを系統ごとに分けているのはこのため。
 
 | モデル | sampler / scheduler | cfg | steps | 品質タグの語彙 | style preset |
 | --- | --- | --- | --- | --- | --- |
-| Illustrious系 (novaAnimeXL / hassakuXL / waiNSFWIllustrious) | `euler_ancestral` / `normal` | 7 | 30 | `masterpiece, best quality, ultra-detailed, high res` | `sdxl-illustrious` |
+| Illustrious系 (novaAnimeXL / hassakuXL / waiNSFWIllustrious) | `euler_ancestral` / `normal` | 7 | 30 | `masterpiece, best quality, absurdres, highres` | `sdxl-illustrious` |
 | Animagine XL 4.0 | `euler_ancestral` / `normal` | 5-6 | 25 | `masterpiece, high score, great score, absurdres` | `sdxl-animagine` |
 | AnythingXL | `euler_ancestral` / `normal` | 5-7 | 25-30 | Illustrious系と同じ | `sdxl-illustrious` |
 | ShiratakiMix XL | `dpmpp_3m_sde` / `karras` | 7.5 (3-8) | 20以上 | Illustrious系と同じ | `sdxl-shiratakimix` |
 
 - **Animagine XLの品質タグは他系統へ流用しない。** `high score` / `great score` は
-  Animagineの学習語彙で、Illustrious系では効かない。逆も同じ
+  Animagineの学習語彙で、Illustrious系では効かない。逆も同じ。
+  どちらもDanbooruタグではなく学習時に付与された品質ラベルのため、
+  `post_count` では判定しない
 - **ShiratakiMix XLだけサンプラーの系統が違う。** `euler_ancestral`でも生成できるが、
   配布元のサンプルはDPM++系 + karrasで作られている
 - ComfyUIへ実在するSDXL checkpointは`novaAnimeXL_ilV190.safetensors`と

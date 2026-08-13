@@ -1,20 +1,24 @@
 # SD1.5系向けの画風preset。
-# 品質タグを厚めに積み、ネガティブプロンプトで破綻と混入物を抑える構成。
+# 品質タグとネガティブプロンプトで破綻と混入物を抑える構成。
 # 解像度・seed・hires fixは再現性に直結するため、styleでは指定せずSpec側に任せる。
+#
+# 品質タグは4個までに絞る。積み増すと主題のトークンが希釈されるだけで品質は上がらない。
+# ultra-detailed / detailed / illustration はDanbooruタグでもNAI系の品質ラベルでもなく、
+# 効果が見込めないため外した (判定基準は docs/prompting-guide.md)。
 #
 # easynegative のようなTextual Inversion embeddingはまだ扱えないため、
 # ここでは素のタグだけで組んでいる (Issue #59)。
 
-description: 品質タグを厚めに積んだアニメ調イラスト。SD1.5想定
+description: 品質タグを積んだアニメ調イラストの仕上げ向け。SD1.5想定
 
 prompt:
   positive: >
-    masterpiece, best quality, high quality, detailed, ultra-detailed, illustration
+    masterpiece, best quality, absurdres, highres, anime coloring
 
   negative: >
-    multiple views, text, deformed, bad hand, deformed anatomy, deformed fingers,
-    logo, blurry, low quality, monochrome, signature, watermark, nsfw, 3d,
-    fantasy costume, sketches, worst quality
+    worst quality, low quality, lowres, bad anatomy, bad hands, extra digits,
+    blurry, jpeg artifacts, text, watermark, signature, monochrome, sketch, 3d,
+    multiple views
 
 generation:
   sampler: dpmpp_2m

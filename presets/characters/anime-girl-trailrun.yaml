@@ -1,13 +1,17 @@
 # トレイルランニング装備の女性キャラクタpreset。
 # 人物の外見・服装・表情だけを書く。構図や画風は scene / style 側の責務とする。
+#
+# タグはDanbooruに実在するものだけを使う (確認手順は docs/prompting-guide.md)。
+# athletic / running shorts / trail leggings / trail running shoes / small backpack /
+# cheerful は実在しないため、実在するタグへ置き換えている。
 
 description: 茶髪ハイポニーテールの活発なアニメ調女性キャラクタ。トレイルラン装備
 
 prompt:
   positive: >
-    1girl, solo, brown hair, high ponytail, brown eyes, athletic,
-    tank top, running shorts, trail leggings, trail running shoes, small backpack,
-    wristwatch, sweat, smile, cheerful
+    1girl, solo, brown hair, high ponytail, brown eyes, toned,
+    tank top, short shorts, leggings, sneakers, backpack, wristwatch,
+    sweat, smile
 
   negative: >
-    bad anatomy, bad hands, extra fingers
+    bad anatomy, bad hands, extra digits
