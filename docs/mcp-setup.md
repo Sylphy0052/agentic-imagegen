@@ -1,13 +1,13 @@
 # MCP Serverの接続手順
 
-`agentic-imagegen` をMCP Serverとして起動し、Claude Code / Codex の双方から
+`agentic-imagegen` をMCP Serverとして起動し、Claude Code / Codexの双方から
 同じ生成基盤を使うための手順。
 
 CLIは引き続き残る。MCP経由で不具合が出たときに、CLIで層を切り分けられる状態を保つため。
 
 ## 前提
 
-- `uv sync` 済み (開発環境では `mcp` が dev 依存に入っている)
+- `uv sync` 済み (開発環境では `mcp` がdev依存に入っている)
 - ComfyUIが起動していること ([xpu-setup.md](xpu-setup.md) / [comfyui-setup.md](comfyui-setup.md))
 
 MCP依存だけを入れる場合はextrasを使う。
@@ -104,7 +104,8 @@ get_generation_status(job_id)
 
 失敗した場合は `status: failed` とともに理由と `exit_code` を返す。
 exit codeはCLIと同じ体系 (2: Specが不正 / 3: ComfyUIへ到達できない / 6: タイムアウト /
-7: ComfyUI側で失敗 など)。一覧は [CLAUDE.md](../CLAUDE.md) を参照。
+7: ComfyUI側で失敗 など)。一覧は
+[CLAUDE.mdの「exit code」](../CLAUDE.md#exit-code) を参照。
 
 パスは作業ルートからの相対で返す。絶対パスは実行環境の構成を露出するため返さない。
 
@@ -136,7 +137,7 @@ get_batch_status(job_id)
 - Specがファイルとして存在しないため、`label` には受け取った並びの位置 (`spec[0]`) が入る
 - 実行中は件数がまだ確定した結果として無いため `total` は `null` になる。投入時の戻り値に入っている
 
-## Claude Code から使う
+## Claude Codeから使う
 
 **リポジトリに [.mcp.json](../.mcp.json) を同梱しているため、設定は不要。**
 このリポジトリをClaude Codeで開くと検出される。
@@ -170,7 +171,7 @@ agentic-imagegen: uv run imagegen-mcp - ⏸ Pending approval (run `claude` to ap
 claude mcp add agentic-imagegen -- uv run --directory /path/to/agentic-imagegen imagegen-mcp
 ```
 
-## Codex から使う
+## Codexから使う
 
 ```bash
 codex mcp add agentic-imagegen -- uv run --directory /path/to/agentic-imagegen imagegen-mcp

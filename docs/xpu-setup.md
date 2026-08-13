@@ -36,8 +36,8 @@ sudo apt install -y libze1 libze-intel-gpu1 intel-opencl-icd intel-ocloc clinfo
 ```
 
 **`client` ではなく `unified` を指定するのが要点。** jammyの `client` コンポーネントは
-`libze-intel-gpu1` が 24.39.31294 (2024年10月版) 止まりで、PyTorch 2.13のXPUバックエンドから
-呼ぶとデバイス列挙時にsegfaultする。`unified` には 25.18.33578 があり、これで解消する。
+`libze-intel-gpu1` が24.39.31294 (2024年10月版) 止まりで、PyTorch 2.13のXPUバックエンドから
+呼ぶとデバイス列挙時にsegfaultする。`unified` には25.18.33578があり、これで解消する。
 
 導入後のバージョン (動作確認時):
 
@@ -62,7 +62,7 @@ Platform #0: Intel(R) OpenCL Graphics
 ```
 
 `/usr/lib/wsl/lib` にIntel由来のライブラリは置かれない (`libd3d12.so` などのみ)。
-WSL2では compute runtime をWSL内へaptで入れる方式であり、NVIDIAのようにWindowsドライバから
+WSL2ではcompute runtimeをWSL内へaptで入れる方式であり、NVIDIAのようにWindowsドライバから
 `.so` がマップされるわけではない。
 
 ## 2. PyTorchをXPU版へ差し替える
@@ -131,7 +131,7 @@ Devices: xpu:0 Intel(R) Graphics [0x7d55]
 | 512x768 / steps 20 / batch 1 | 約720秒 (36秒/step) | **135.3秒** | 約5.3倍 |
 | Integration Test 4件 (512x512 / steps 2) | 91.7秒 | **17.0秒** | 約5.4倍 |
 
-サンプリング中のstep単体では 2.7-3.0秒/step であり、CPUの36秒/stepに対して約12倍速い。
+サンプリング中のstep単体では2.7-3.0秒/stepであり、CPUの36秒/stepに対して約12倍速い。
 全体が5倍程度に留まるのは、モデルのロードとVAEデコード、および初回のカーネルコンパイルが
 支配的になるため。1step目だけは17秒前後かかり、以降2.7-3.0秒へ落ち着く。
 
@@ -139,13 +139,27 @@ Devices: xpu:0 Intel(R) Graphics [0x7d55]
 実際に同一Specから生成した画像を比較したところ、構図・配色は同一で、品質上の破綻もなかった。
 
 `torch.xpu` 単体の健全性も確認済み。512x512のmatmulでCPU結果と `allclose` (atol=1e-3) が成立し、
-fp16の相対誤差は 4.2e-4 だった。
+fp16の相対誤差は4.2e-4だった。
+
+### 所要時間とタイムアウトの目安
+
+**実測値はこの節を一次情報とする。** 他の文書は代表値1行とこの節への参照に留める。
+
+| 条件 | 実行基盤 | 実測 | `IMAGEGEN_TIMEOUT` の目安 |
+| --- | --- | --- | --- |
+| SD1.5 / 512x768 / 20 steps | Intel XPU | 約135秒 (初回はモデルロード込み) | 300 |
+| SD1.5 / 512x768 / 20 steps | CPU | 約12分 (36秒/step) | 1200 |
+| SD1.5 / 512x512 -> 768x768 (hires fix) | Intel XPU | 43.7秒 | 300 |
+
+ControlNet / IPAdapterを使うと1-2割、hires fixを使うと倍以上に伸びる。
+SDXL / Illustrious系 (`novaAnimeXL_ilV190.safetensors`) はさらに遅く、常用しない。
+再計測した場合はこの表を直し、参照側の代表値と食い違っていないかだけを確認する。
 
 ## トラブルシューティング
 
 | 症状 | 原因と対処 |
 | --- | --- |
-| `torch.xpu.is_available()` でsegfault (rc=139) | compute runtimeが古い。`unified` コンポーネントから 25.18 以上を入れる |
+| `torch.xpu.is_available()` でsegfault (rc=139) | compute runtimeが古い。`unified` コンポーネントから25.18以上を入れる |
 | `torch.__version__` が `+cpu` のまま | `--reinstall` を付けずに入れ直した。同一バージョン番号だとスキップされる |
 | `clinfo -l` でデバイスが出ない | Windows側のIntelグラフィックスドライバを更新する。`/dev/dxg` の有無も確認する |
 | `Can't initialize Level Zero Sysman` | 無害。Sysman (監視API) が使えないだけで推論には影響しない |

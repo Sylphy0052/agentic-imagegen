@@ -19,16 +19,13 @@ CPU推論を選ぶ理由は次のとおり。
 本ドキュメントのCPU手順は、XPUが使えない環境でのフォールバックとして維持する。
 経緯は [Issue #2](https://github.com/Sylphy0052/agentic-imagegen/issues/2)。
 
-CPU推論の所要時間 (Core Ultra 7 165H / 22スレッド / WSL2での実測):
+CPU推論はSD1.5 / 512x768 / 20 stepsで**約12分**かかる (Core Ultra 7 165H / 22スレッド / WSL2)。
+XPUとの比較を含む実測値の一次情報は
+[xpu-setup.mdの「所要時間とタイムアウトの目安」](xpu-setup.md#所要時間とタイムアウトの目安)。
 
-| モデル | 解像度 | steps | 実測 |
-| --- | --- | --- | --- |
-| MeinaMix V12 (SD1.5) | 512x512 | 2 | Integration Test 4件で計91.7秒 (モデルロード込み) |
-| MeinaMix V12 (SD1.5) | 512x768 | 20 | **約12分** (36秒/step) |
-| SDXL / Illustrious系 | 1024x1024 | 25 | 未実測。上記から数十分規模と見込まれる |
-
-CPU推論は1stepあたり数十秒かかる。反復作業では steps を下げるか解像度を落とす。
-SDXL / Illustrious系は仕上がり確認用と位置づけ、常用しない。
+1stepあたり数十秒かかるため、反復作業ではstepsを下げるか解像度を落とす。
+SDXL / Illustrious系 (1024x1024 / 25 steps) は未実測だが数十分規模と見込まれる。
+仕上がり確認用と位置づけ、常用しない。
 
 ## 1. ComfyUIの取得
 
@@ -62,7 +59,7 @@ checkpointは `~/ComfyUI/models/checkpoints/` へ置く。
 拡張子は `.safetensors` / `.ckpt` のみ許可される。
 
 同梱のサンプルSpec (`specs/examples/`) は `meinamix_v12Final.safetensors` を指している。
-サンプルをそのまま動かすなら下の civitai の手順で入れる。別のcheckpointを使う場合は
+サンプルをそのまま動かすなら下のcivitaiの手順で入れる。別のcheckpointを使う場合は
 Spec側の `model.checkpoint` を実際のファイル名へ書き換える。
 
 ### Hugging Faceから取得する場合 (認証不要)
@@ -76,7 +73,7 @@ curl -L -o v1-5-pruned-emaonly.safetensors \
 ### civitaiから取得する場合 (APIキーが必要)
 
 civitaiのモデルダウンロードは未認証だと403になる。
-civitai → Account settings → API Keys でキーを発行し、
+civitai → Account settings → API Keysでキーを発行し、
 **リポジトリの外**に保存する。
 
 ```bash
@@ -130,7 +127,8 @@ curl -L -o qwen_image_vae.safetensors \
 int8量子化版はComfyUI独自の量子化形式 (`comfy_quant`) を使っており、
 `UNETLoader` の `weight_dtype=default` でそのまま読める。bf16版 (3.90GB) は不要。
 
-Spec側の書き方は [CLAUDE.md](../CLAUDE.md) の「DiT系モデルを使う」を参照。
+Spec側の書き方は
+[spec-reference.mdの「DiT系モデル (Anima)」](spec-reference.md#dit系モデル-anima) を参照。
 
 ## 4. 起動
 
@@ -188,9 +186,9 @@ IMAGEGEN_TIMEOUT=300 uv run pytest -m integration
 
 | 症状 | 原因と対処 |
 | --- | --- |
-| `imagegen health` が unreachable | ComfyUIが未起動、またはポートが違う。`COMFYUI_BASE_URL` を確認する |
+| `imagegen health` がunreachable | ComfyUIが未起動、またはポートが違う。`COMFYUI_BASE_URL` を確認する |
 | checkpointが見つからないと言われる | `models/checkpoints/` 配下のファイル名と `model.checkpoint` の指定が一致しているか確認する |
 | civitaiのダウンロードが403 | APIキーが未設定。`Authorization: Bearer <key>` ヘッダを付ける |
 | 生成がタイムアウトする | CPU推論では時間がかかる。`IMAGEGEN_TIMEOUT` を伸ばすか `steps` を下げる。SDXL系は特に遅い |
 | メモリ不足で落ちる | `batch_size` を1に、解像度を512x512に下げる。WSLの割当メモリも確認する |
-| WorkflowValidationError が出る | テンプレートのノード構成が想定と違う。`workflows/README.md` の手順で書き出し直す |
+| WorkflowValidationErrorが出る | テンプレートのノード構成が想定と違う。`workflows/README.md` の手順で書き出し直す |

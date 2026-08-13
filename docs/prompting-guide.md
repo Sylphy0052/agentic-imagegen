@@ -1,7 +1,7 @@
 # プロンプトとWorkflowのベストプラクティス
 
 対応モデルごとのプロンプト記法と、ComfyUI workflowテンプレートの扱い方をまとめる。
-Specの書き方そのものは [CLAUDE.md](../CLAUDE.md)、失敗時の切り分けは
+Specの書き方そのものは [spec-reference.md](spec-reference.md)、失敗時の切り分けは
 [.claude/skills/imagegen/references/troubleshooting.md](../.claude/skills/imagegen/references/troubleshooting.md)
 を参照する。
 
@@ -17,7 +17,7 @@ Specの書き方そのものは [CLAUDE.md](../CLAUDE.md)、失敗時の切り�
 - **seedを固定したままpromptとcfgを詰め、最後にseedを振って構図を探す。**
   seedと生成パラメータを同時に動かすと、何が効いたのか判別できない
 
-## SD1.5系 (meinamix_v12Final など)
+## SD1.5系 (meinamix_v12Finalなど)
 
 | 項目 | 目安 |
 | --- | --- |
@@ -34,7 +34,7 @@ Specの書き方そのものは [CLAUDE.md](../CLAUDE.md)、失敗時の切り�
   watermark, signature` のような定型から始める
 - **embeddingはcheckpointの世代に固定される。** SD1.5向けのembeddingはSDXLでは機能しない
 
-## SDXL / Illustrious系 (novaAnimeXL_ilV190 など)
+## SDXL / Illustrious系 (novaAnimeXL_ilV190など)
 
 | 項目 | 目安 |
 | --- | --- |
@@ -51,7 +51,7 @@ Specの書き方そのものは [CLAUDE.md](../CLAUDE.md)、失敗時の切り�
   キャラクタ名もDanbooruの表記順に従う
 - v2.0以降は自然文とタグの併用に対応する
 
-## Anima系 (hassakuAnima_v13 など、DiT + Qwen3-0.6B)
+## Anima系 (hassakuAnima_v13など、DiT + Qwen3-0.6B)
 
 | 項目 | 目安 |
 | --- | --- |
@@ -72,13 +72,11 @@ Specの書き方そのものは [CLAUDE.md](../CLAUDE.md)、失敗時の切り�
 - **重み付けはSDXL系より強い値が要る。** `(chibi:2)` のような指定でようやく効く
 - tag dropoutで学習されているため、関連タグを網羅する必要はない
 
-**モデル配布元が推奨する `beta57` は KSampler の scheduler ではない。**
-KSamplerが受け付けるschedulerは `simple` / `sgm_uniform` / `karras` / `exponential` /
-`ddim_uniform` / `beta` / `normal` / `linear_quadratic` / `kl_optimal` の9種 (Specでも
-この9種を指定できる) で、`beta57` はこの中に無い。
-`beta` scheduler の alpha=0.5 / beta=0.7 を指す通称であり、指定するには `BetaSamplingScheduler`
+**モデル配布元が推奨する `beta57` はKSamplerのschedulerではない。**
+`beta` schedulerのalpha=0.5 / beta=0.7を指す通称であり、指定するには `BetaSamplingScheduler`
 ノードを持つWorkflowが要る。本リポジトリのテンプレートはKSamplerベースのため使えない。
-`simple` を使う。
+`simple` を使う。指定できるschedulerの一覧は
+[docs/spec-reference.md](spec-reference.md#generation) を参照。
 
 Anima向けのstyle presetは [presets/styles/anima-base.yaml](../presets/styles/anima-base.yaml)
 にある。
@@ -91,7 +89,7 @@ Anima向けのstyle presetは [presets/styles/anima-base.yaml](../presets/styles
 - **API形式で保存する。** GUIの通常のSaveではなく「Save (API Format)」を使う。
   座標・色・グループ・ノードサイズといったUI用のmetadataを落とした形式でないと投入できない
 - **`control_after_generate` を残さない。** `randomize` が残っていると実行ごとにseedが変わり、
-  再現できなくなる。本リポジトリの22テンプレートには含まれていない
+  再現できなくなる。本リポジトリの同梱テンプレートには含まれていない
 - **workflow JSONをバージョン管理下に置き、実行時は入力値だけ差し替える。**
   実行時にグラフを組み立てない (本リポジトリの設計方針と同じ)
 - **workflowと実行環境をセットで固定する。** ComfyUI本体のcommit、custom nodeのリリース、

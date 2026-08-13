@@ -1,6 +1,6 @@
 # agentic-imagegen
 
-AIコーディングエージェント (Claude Code など) から、ComfyUIを介してStable Diffusion系モデルによる画像生成を実行するための基盤。
+AIコーディングエージェント (Claude Codeなど) から、ComfyUIを介してStable Diffusion系モデルによる画像生成を実行するための基盤。
 
 ```text
 Claude Code -> GenerationSpec -> Python CLI (imagegen) -> ComfyUI API -> 画像生成
@@ -13,14 +13,14 @@ Claude Code -> GenerationSpec -> Python CLI (imagegen) -> ComfyUI API -> 画像�
 
 ## ステータス
 
-txt2img から始め、preset / LoRA / img2img、MCP Server、ControlNet / IPAdapter / hires fix /
+txt2imgから始め、preset / LoRA / img2img、MCP Server、ControlNet / IPAdapter / hires fix /
 batch、日本語テキスト合成、DiT系モデル (Anima) 対応まで一通り実装済み。
 
 | 機能 | 内容 |
 | --- | --- |
 | txt2img / img2img | CLI、ComfyUI連携、preset (character / scene / style) |
-| LoRA | 同時3件まで指定可能 |
-| MCP Server | Claude Code / Codex 双方対応 |
+| LoRA | 複数のLoRAを重ねて適用 |
+| MCP Server | Claude Code / Codex双方対応 |
 | ControlNet / IPAdapter | 構図・特徴の引き継ぎ、Character consistency |
 | hires fix / batch | latentアップスケール、複数枚一括生成 |
 | 日本語テキスト合成 | 生成後にPillowで合成 (`text` / `compose`) |
@@ -31,6 +31,17 @@ batch、日本語テキスト合成、DiT系モデル (Anima) 対応まで一通
 参照。未着手の拡張はopenなIssueで個別に管理している。
 最初の設計は [docs/plan/phase1.md](docs/plan/phase1.md) を参照。
 
+## ドキュメントの構成
+
+| 文書 | 何が書いてあるか |
+| --- | --- |
+| README.md (この文書) | プロジェクトの紹介、セットアップ、CLIの使い方 |
+| [docs/spec-reference.md](docs/spec-reference.md) | GenerationSpecの全フィールド仕様。値域・既定値・組み合わせ規則・metadata.json |
+| [CLAUDE.md](CLAUDE.md) | Claude Codeがこのリポジトリを操作するときのルール。環境変数・exit code |
+| [.claude/skills/imagegen/SKILL.md](.claude/skills/imagegen/SKILL.md) | 画像生成要求を受けてから結果を返すまでの手順 |
+| [docs/](docs/) | 環境構築 ([xpu](docs/xpu-setup.md) / [cpu](docs/comfyui-setup.md) / [mcp](docs/mcp-setup.md) / [fonts](docs/fonts-setup.md)) とモデル別の [プロンプト指針](docs/prompting-guide.md) |
+| [workflows/README.md](workflows/README.md) | Workflowテンプレートの一覧と作り方 |
+
 ## 必要環境
 
 - Python 3.12以上
@@ -38,12 +49,9 @@ batch、日本語テキスト合成、DiT系モデル (Anima) 対応まで一通
 - ComfyUI (別途セットアップ)
 
 GPUはIntel Arc内蔵GPU (XPU) での動作を確認している。NVIDIA GPUがなくてもCPU推論で動くが、
-XPUのほうがおよそ5倍速い。
-
-| 実行基盤 | SD1.5 / 512x768 / 20 steps |
-| --- | --- |
-| Intel XPU | 約135秒 |
-| CPU | 約12分 |
+XPUのほうがおよそ5倍速い (SD1.5 / 512x768 / 20 stepsで約135秒 対 約12分)。
+条件別の実測値は
+[docs/xpu-setup.mdの「所要時間とタイムアウトの目安」](docs/xpu-setup.md#所要時間とタイムアウトの目安)。
 
 ## セットアップ
 
@@ -70,19 +78,10 @@ cd ~/ComfyUI
 
 ## Workflowの準備
 
-同梱テンプレートは `workflows/` に21種類あり、通常は差し替え不要。実際に使うテンプレートは
-Specの内容から自動的に決まる。
+同梱テンプレートは `workflows/` にあり、通常は差し替え不要。実際に使うテンプレートは
+Specの内容から自動的に決まる (決まり方は
+[Workflowテンプレートの決まり方](docs/spec-reference.md#workflowテンプレートの決まり方))。
 
-| 分岐要素 | 変わる内容 |
-| --- | --- |
-| `task` | `txt2img` / `img2img` |
-| `model.loras` | 指定すると `_lora` が付く |
-| `generation.upscale` | 指定すると `_hires` が付く (hires fix) |
-| `control` | 指定すると `_controlnet` が付く |
-| `reference` | 指定すると `_ipadapter` が付く |
-| `model.uses_separate_loaders` (`unet`/`clip`/`vae`指定) | `<task>_unet` へ切り替わる (他の分岐とは併用不可) |
-
-例えば `task: txt2img` に LoRA と ControlNet を指定すると `txt2img_lora_controlnet` が選ばれる。
 テンプレート一覧と各構成のノード内訳は [workflows/README.md](workflows/README.md) を参照。
 自環境に合わせて作り直す場合も同ファイルの手順 (API形式での書き出し) に従う。
 
@@ -122,7 +121,8 @@ Resolution: 512x768 (batch 1)
 Checkpoint: meinamix_v12Final.safetensors
 ```
 
-presetやLoRAを指定している場合は、適用内容と実際に使われるテンプレート名も表示される。
+preset・LoRA・ControlNet・IPAdapter・テキスト合成を指定している場合は、
+適用内容と実際に使われるテンプレート名も表示される。
 
 ```text
 Workflow: txt2img_lora
@@ -151,7 +151,8 @@ metadata: /path/to/outputs/2026-08-12/blue_hair/metadata.json
 uv run imagegen generate specs/examples/txt2img.yaml --timeout 600
 ```
 
-失敗時は原因ごとに異なるexit codeを返す (一覧は [CLAUDE.md](CLAUDE.md) を参照)。
+失敗時は原因ごとに異なるexit codeを返す
+(一覧は [CLAUDE.mdの「exit code」](CLAUDE.md#exit-code))。
 
 ### 一括生成
 
@@ -175,15 +176,22 @@ uv run imagegen batch specs/generated/a.yaml --seeds 111,222,333
 
 Specの検証は実行前に全件まとめて行う。不正なSpecが混ざっていた場合は1件も生成しない。
 
+### テキストの後合成
+
+生成済みの画像へ日本語を合成する。入力画像は変更しない。
+
+```bash
+uv run imagegen compose inputs/base.png specs/generated/caption.yaml
+uv run imagegen compose inputs/base.png specs/generated/caption.yaml -o outputs/caption.png
+```
+
 ## GenerationSpec
+
+エージェントとの境界となるYAML。最小構成は次のとおり。
 
 ```yaml
 version: "1"
 task: txt2img
-
-presets:              # 省略可。character / scene / style を名前で参照する
-  character: anime-girl-blue
-  style: anime-soft
 
 prompt:
   positive: 1girl, blue hair, blue eyes, anime illustration, full body
@@ -195,256 +203,32 @@ generation:
   steps: 20
   cfg: 5.5
   seed: -1          # -1 は実行時にランダムへ解決し、実際の値をmetadataへ記録する
-  batch_size: 1
-  sampler: euler
-  scheduler: normal
 
 model:
   checkpoint: meinamix_v12Final.safetensors
-  loras:            # 省略可。同時3件まで
-    - name: add_detail.safetensors
-      strength_model: 0.8
-      strength_clip: 0.8
 
 output:
-  directory: outputs  # 省略時は IMAGEGEN_OUTPUT_ROOT
   prefix: blue_hair
 ```
 
-検証内容:
+追加のブロックを書くと機能が有効になり、使うWorkflowテンプレートも自動的に切り替わる。
 
-- 解像度は64-8192かつ8の倍数、steps 1-100、cfg 0-30、batch_size 1-4
-- 環境変数による上限 (`IMAGEGEN_MAX_*`) を超える指定は拒否する
-- checkpoint名・LoRA名はPath Traversal・絶対パス・想定外の拡張子を拒否する
-- `checkpoint` と `unet` / `clip` / `vae` は排他。後者は3つセットで指定する
-- LoRAは同時3件まで、同じLoRAの重複指定は拒否、strengthは±10.0まで
-- preset名は英数字始まりの `[A-Za-z0-9._-]` のみ
-- 出力先が作業ルートの外を指す場合は拒否する
-
-## Preset
-
-繰り返し使う指定を3つの軸にまとめ、Specから名前で参照する。
-
-| 軸 | 置き場 | 書く内容 |
+| ブロック | 何ができるか | 仕様 |
 | --- | --- | --- |
-| `character` | `presets/characters/<name>.yaml` | 人物の外見的特徴 |
-| `scene` | `presets/scenes/<name>.yaml` | 場所・時間帯・構図 |
-| `style` | `presets/styles/<name>.yaml` | 画風・品質タグ・サンプラー設定 |
+| `presets` | character / scene / styleを名前で参照して再利用する | [presets](docs/spec-reference.md#presets) |
+| `model.loras` | LoRAを重ねて適用する | [model.loras](docs/spec-reference.md#modelloras) |
+| `model.unet` / `clip` / `vae` | DiT系モデル (Anima) を3ローダ構成で使う | [DiT系モデル](docs/spec-reference.md#dit系モデル-anima) |
+| `source` | 既存画像を入力にして描き直す (img2img) | [source](docs/spec-reference.md#source-img2img) |
+| `control` | 参考画像から線画 (Canny) を取り構図を保つ | [control](docs/spec-reference.md#control-controlnet) |
+| `reference` | 参照画像の顔立ち・服装・画風を引き継ぐ (IPAdapter) | [reference](docs/spec-reference.md#reference-ipadapter) |
+| `generation.upscale` | latentのまま拡大し2段目で描き足す (hires fix) | [generation.upscale](docs/spec-reference.md#generationupscale-hires-fix) |
+| `text` | 生成後に日本語テキストを合成する | [text](docs/spec-reference.md#text-テキスト合成) |
 
-```yaml
-# presets/styles/anime-soft.yaml
-description: 柔らかい光のアニメ調。SD1.5想定
-
-prompt:
-  positive: anime illustration, soft lighting, masterpiece, best quality
-  negative: low quality, worst quality, blurry
-
-generation:
-  sampler: dpmpp_2m
-  scheduler: karras
-```
-
-解決規則:
-
-- **prompt** は `character` -> `scene` -> `style` -> Spec本体 の順にカンマ連結し、
-  重複トークンは最初の1つを残して除去する (大文字小文字と連続空白は無視)。negativeも同じ
-- **generation** はpresetの指定を取り込んだうえで、Spec本体の指定を優先する
-  (spec > style > scene > character)
-- 適用したpreset名は解決後のSpecに残り、`metadata.json` にも記録される
-
-## ControlNet (構図を指定する)
-
-参考画像から線画 (Canny) を取り、その構図を保ったまま生成する。
-
-```yaml
-control:
-  image: inputs/pose.png
-  model: control_v11p_sd15_canny_fp16.safetensors
-  strength: 0.9
-  low_threshold: 0.3
-  high_threshold: 0.7
-```
-
-```text
-$ uv run imagegen validate specs/generated/controlnet-check.yaml
-Workflow: txt2img_controlnet
-ControlNet: inputs/pose.png (model=control_v11p_sd15_canny_fp16.safetensors, strength=0.9)
-```
-
-- txt2img / img2img のどちらでも使える。LoRAとも併用できる
-- control画像は生成前にComfyUIへ自動でアップロードされる
-- ControlNetモデルは `~/ComfyUI/models/controlnet/` へ置く
-- **前処理は Canny のみ。** pose / depth はpreprocessorのカスタムノードが要るため未対応
-- `upscale` との同時指定は未対応
-
-線が強く出すぎる場合は `low_threshold` を上げるか `strength` を下げる。
-
-## IPAdapter (参照画像から特徴を引き継ぐ)
-
-参照画像をCLIP Visionで読み、その特徴を効かせたまま生成する。プロンプトだけでは揺れる
-人物の顔立ちや服装を固定できる。
-
-```yaml
-reference:
-  image: inputs/character.png
-  model: ip-adapter-plus_sd15.safetensors
-  clip_vision: CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors
-  weight: 0.8
-  weight_type: linear
-```
-
-```text
-$ uv run imagegen validate specs/generated/ipadapter-check.yaml
-Workflow: txt2img_ipadapter
-IPAdapter: inputs/character.png (model=ip-adapter-plus_sd15.safetensors, weight=0.8)
-```
-
-- txt2img / img2img のどちらでも使える。LoRA・ControlNetとも併用できる
-- 参照画像は生成前にComfyUIへ自動でアップロードされる
-- [ComfyUI_IPAdapter_plus](https://github.com/cubiq/ComfyUI_IPAdapter_plus) の導入が要る。
-  モデルは `~/ComfyUI/models/ipadapter/`、CLIP Visionは `~/ComfyUI/models/clip_vision/` へ置く
-- `weight_type` は `linear` / `style transfer` / `composition` など15種。
-  背景まで参照画像に引きずられる場合は `style transfer` を使う
-- `upscale` との同時指定は未対応
-
-ControlNetと併用すると、構図をControlNet、特徴をIPAdapterが担う。同一キャラクタを
-異なる構図で出したい場合はこの組み合わせを使う。
-
-同じキャラクタを別の場面で出す手順は
-[.claude/skills/imagegen/references/character-consistency.md](.claude/skills/imagegen/references/character-consistency.md)
-にまとめてある。基準画像を1枚作り、それを `reference` に指定したまま scene preset だけ
-差し替える。preset だけでは顔立ちまでは固定できない。
-
-## hires fix (解像度を上げる)
-
-1段目の結果をlatentのまま拡大し、2段目のKSamplerで描き足す。アップスケールモデルは不要。
-
-```yaml
-generation:
-  width: 512
-  height: 512
-  steps: 8
-  upscale:
-    scale: 1.5        # 1.0より大きく4.0以下
-    denoise: 0.45     # 低いほど元の絵を保つ
-    steps: 6          # 省略時は1段目と同じ
-    method: nearest-exact  # latentの拡大方式。既定nearest-exact
-```
-
-指定するとテンプレートが `*_hires` へ自動的に切り替わる。
-2段目のseedは1段目と同じ値を使う (変えると元の絵から離れるため)。
-`method` は `nearest-exact` / `bilinear` / `area` / `bicubic` / `bislerp` から選べる
-(既定 `nearest-exact`)。滑らかさを求める場合は `bislerp` を試す。
-
-実測 (Intel XPU / SD1.5 / 512x512 -> 768x768): 43.7秒。
-**生成時間は倍以上になる。** 2段目は拡大後の解像度で走る。
-
-## 日本語テキストの合成
-
-SD1.5 / SDXL 系のモデルは日本語をほぼ描けない。読める文字が必要な場合は生成に任せず、
-生成後に合成する。フォント・位置・大きさを完全に制御できる。
-
-```yaml
-text:
-  layers:
-    - content: 夜の街
-      font: NotoSansJP-Bold.ttf   # fonts/ 配下のファイル名
-      font_index: 0               # .ttc (コレクション) 内の書体を選ぶ。既定0
-      size: 72
-      color: "#ffffff"
-      anchor: top-center          # 9分割の基準位置
-      offset: [0, 48]
-      max_width: 0.8              # 折り返し幅。1.0以下は画像幅に対する比率
-      align: center
-      rotation: -5.0
-      direction: horizontal       # vertical で縦書き
-      stroke:
-        width: 4
-        color: "#101020"
-      shadow:
-        offset: [0, 6]
-        blur: 8
-        opacity: 0.6
-      box:
-        color: "#000000"
-        opacity: 0.55
-        padding: [24, 16]
-        radius: 12
-```
-
-レイヤは指定順に描画し、後のものが上へ重なる (最大10件)。生成そのままの画像は残り、
-合成結果は `image_0001_text.png` として別に出力される。
-
-フォントは `fonts/` へ置く (git管理外)。置き方は [docs/fonts-setup.md](docs/fonts-setup.md)。
-`.ttc` はコレクション内の書体を `font_index` で選べる (既定0)。
-見つからないフォントは別の書体へ代替せず exit code 10 で失敗する。
-
-生成済みの画像へ後から合成する場合は `compose` を使う。入力画像は変更しない。
-
-```bash
-uv run imagegen compose inputs/base.png specs/generated/caption.yaml
-uv run imagegen compose inputs/base.png specs/generated/caption.yaml -o outputs/caption.png
-```
-
-日本語を直接描けるモデル (Qwen-Image) の評価と導入条件は
-[docs/plan/phase5-japanese-text.md](docs/plan/phase5-japanese-text.md) を参照。
-現在の実行環境ではメモリが足りず動かせないため、合成方式を既定とする。
-
-## DiT系モデル (Anima) を使う
-
-Anima などのDiT系モデルは、UNet単体で配布されtext encoderとVAEを同梱しない。
-その場合は `checkpoint` の代わりに `model.unet` / `model.clip` / `model.vae` を
-別々に指定する。
-
-```yaml
-generation:
-  width: 832        # Animaは1024x1024前後が前提。832x1216が扱いやすい
-  height: 1216
-  steps: 28
-  cfg: 4.0          # SD1.5系より低め。5を超えると崩れやすい
-  sampler: er_sde
-  scheduler: simple
-
-model:
-  unet: hassakuAnima_v13_int8.safetensors   # ~/ComfyUI/models/diffusion_models/
-  clip: qwen_3_06b_base.safetensors         # ~/ComfyUI/models/text_encoders/
-  vae: qwen_image_vae.safetensors           # ~/ComfyUI/models/vae/
-```
-
-- 指定するとテンプレートが `txt2img_unet` へ切り替わる
-- **`checkpoint` とは排他。** 両方書くと拒否される。`unet` / `clip` / `vae` は3つ揃えて指定する
-- **`task` は現在 `txt2img` のみ対応。** `img2img` は拒否される
-- **LoRA / hires fix (`generation.upscale`) / ControlNet (`control`) / IPAdapter (`reference`)
-  とは併用できない。** テンプレートを用意していないため、指定するとその場で拒否される
-- モデル名は `list_diffusion_models` / `list_text_encoders` / `list_vaes` (MCP) で確認する
-- text encoderとVAEはUNetと対応関係がある。Animaなら Qwen3-0.6B と Qwen-Image VAE
-
-入手手順は [docs/comfyui-setup.md](docs/comfyui-setup.md)、サンプルは
-[specs/examples/txt2img_anima.yaml](specs/examples/txt2img_anima.yaml) を参照。
-
-## img2img
-
-既存の画像を入力にして描き直す。
-
-```yaml
-version: "1"
-task: img2img
-
-source:
-  image: inputs/reference.png   # リポジトリ配下に置く (git管理外)
-  denoise: 0.55                 # 0に近いほど入力を保ち、1に近いほど描き直す
-
-prompt:
-  positive: 1girl, blue hair, rooftop, night, city lights
-
-model:
-  checkpoint: meinamix_v12Final.safetensors
-```
-
-- 入力画像は生成前にComfyUIへ自動でアップロードされる (`~/ComfyUI/input/` へ手で置く必要はない)
-- **解像度は入力画像のサイズをそのまま使う。** `width` / `height` を書くと拒否される
-- `batch_size` は1のみ。LoRAは併用できる (`img2img_lora` テンプレートへ切り替わる)
-- 拡張子は `.png` / `.jpg` / `.jpeg` / `.webp`、上限は `IMAGEGEN_MAX_SOURCE_BYTES` (既定32MiB)
+**全フィールドの値域・既定値・組み合わせ規則は
+[docs/spec-reference.md](docs/spec-reference.md) を参照。**
+指定しても効かない項目は黙って無視せず、Specの検証時に拒否する。
+IPAdapterには [ComfyUI_IPAdapter_plus](https://github.com/cubiq/ComfyUI_IPAdapter_plus) の
+導入が要る。それ以外はComfyUI本体のノードだけで動く。
 
 ## 出力
 
@@ -457,43 +241,14 @@ outputs/
         └── metadata.json
 ```
 
-`metadata.json` の内容:
-
-| キー | 内容 |
-| --- | --- |
-| `prompt_id` | ComfyUI側の実行ID |
-| `workflow` | 実際に使ったテンプレート名 |
-| `workflow_hash` | テンプレートのダイジェスト (`sha256:...`) |
-| `created_at` | 生成時刻 (タイムゾーン付き) |
-| `resolved_seed` | 実際に使われたseed |
-| `backend` | 実行基盤 (`comfyui_version` / `devices`) |
-| `spec` | preset展開後のSpec全体 |
-| `outputs` | 出力ファイル名 |
-| `text` | テキスト合成の結果 (解決したフォントの実パスと合成後のファイル名)。合成しなかった場合は `null` |
-
-`batch_size` > 1 でテキスト合成の一部だけが失敗した場合、`text` には成功した分の記録に
-加えて失敗理由を示す `error` が入る。1件も成功しなかった場合のみ `text` は `null`。
-
 同じ日に同じprefixで再実行した場合は連番ディレクトリを作り、既存の結果を上書きしない。
-
-同じSpecなのに結果が変わった場合は `workflow_hash` と `backend` を前回と比べると、
-テンプレートが変わったのか実行基盤が変わったのかを切り分けられる。
+`metadata.json` には再現に必要な情報 (`resolved_seed` / `workflow_hash` / preset展開後のSpecなど) を
+集約する。キーの一覧は [metadata.json](docs/spec-reference.md#metadatajson) を参照。
 
 ## 設定
 
-| 変数 | 既定値 | 用途 |
-| --- | --- | --- |
-| `COMFYUI_BASE_URL` | `http://127.0.0.1:8188` | ComfyUI接続先 |
-| `IMAGEGEN_MAX_WIDTH` | 2048 | 幅の上限 |
-| `IMAGEGEN_MAX_HEIGHT` | 2048 | 高さの上限 |
-| `IMAGEGEN_MAX_PIXELS` | 4194304 | 総pixel数の上限 (batch込み) |
-| `IMAGEGEN_MAX_BATCH` | 4 | batch_sizeの上限 (4が上限。超える値を設定すると起動時にエラーになる) |
-| `IMAGEGEN_TIMEOUT` | 300 | 生成のタイムアウト秒 |
-| `IMAGEGEN_OUTPUT_ROOT` | `outputs` | 出力ルート |
-| `IMAGEGEN_PRESETS_ROOT` | `presets` | presetの探索ルート |
-| `IMAGEGEN_MAX_SOURCE_BYTES` | 33554432 | img2imgの入力画像の上限バイト数 |
-| `IMAGEGEN_FONTS_ROOT` | `fonts` | テキスト合成に使うフォントの探索ルート |
-
+接続先と上限値は環境変数で変えられる。一覧は
+[CLAUDE.mdの「環境変数」](CLAUDE.md#環境変数) を参照。
 秘密情報は扱わないため、環境変数ファイルは必須ではない。
 
 ## テスト
@@ -534,9 +289,11 @@ Spec作成から生成まで自動で実行される。
 5. `uv run imagegen generate` で生成
 6. 出力パスとseedを返す
 
-「同じキャラで別の構図」のような依頼では、character presetを再利用して
-scene だけを差し替える。失敗時の切り分けは
-[.claude/skills/imagegen/references/troubleshooting.md](.claude/skills/imagegen/references/troubleshooting.md)
+「同じキャラで別の構図」のような依頼では、基準画像を1枚作って `reference` に指定したまま
+scene presetだけを差し替える (手順:
+[character-consistency.md](.claude/skills/imagegen/references/character-consistency.md))。
+失敗時の切り分けは
+[troubleshooting.md](.claude/skills/imagegen/references/troubleshooting.md)
 にexit codeごとの手順がある。
 
 Claude Codeが守るルール (Workflowを勝手に書き換えない、validationを迂回しないなど) は
@@ -544,22 +301,21 @@ Claude Codeが守るルール (Workflowを勝手に書き換えない、validati
 
 ## MCP Server
 
-Claude Code / Codex の双方から同じ基盤を使える。手順は
-[docs/mcp-setup.md](docs/mcp-setup.md) を参照。
+Claude Code / Codexの双方から同じ基盤を使える。手順とtoolの一覧は
+[docs/mcp-setup.md](docs/mcp-setup.md) を参照 (一次情報はそちら)。
 
 ```bash
 uv run imagegen-mcp   # stdioで待ち受ける (通常はクライアントが子プロセスとして起動する)
 ```
 
-利用できるtoolの一覧は [docs/mcp-setup.md](docs/mcp-setup.md) を参照 (一次情報はそちら)。
 生成系・確認系・一覧系あわせて14個あり、生成は数十秒から数分かかるため、`generate_image` は
 完了を待たずに `job_id` を返し、`get_generation_status` で結果を受け取る。
-失敗時はCLIと同じ exit code を返す。
+失敗時はCLIと同じexit codeを返す。
 
 ControlNet・IPAdapter・hires fix・LoRA・img2imgはいずれもSpecの内容で決まるため、MCP側に専用の
 パラメータは無い。CLIで書けるSpecはそのままMCPでも使える。
 
-MCP層は薄いアダプタで、検証も生成もCLIと同じ Service / Domain を通る。
+MCP層は薄いアダプタで、検証も生成もCLIと同じService / Domainを通る。
 MCP経由で検証を迂回できる経路は作っていない。
 
 ## アーキテクチャ

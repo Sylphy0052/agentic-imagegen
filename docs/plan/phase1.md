@@ -1,10 +1,15 @@
-# agentic-imagegen Phase 1 実装計画
+# agentic-imagegen Phase 1実装計画
+
+**この文書は最初の設計の記録であり、現在の実装の仕様書ではない。**
+現在の仕様は [docs/spec-reference.md](../spec-reference.md) を、進捗は
+[Issue #1](https://github.com/Sylphy0052/agentic-imagegen/issues/1) (Roadmap) を参照。
+`docs/plan/` の方針は [README.md](README.md) にある。
 
 - 対象: Phase 1 (Claude Code -> GenerationSpec -> Python CLI -> ComfyUI API -> 画像生成)
 - 作成日: 2026-08-12
-- ステータス: Step 1-9 完了。Step 7 のIntegration Testは実機ComfyUIに対して全件PASS済み
+- ステータス: Phase 1完了 (Step 1-9)。Step 7のIntegration Testは実機ComfyUIに対して全件PASS済み
 - 関連Issue: [#1 Roadmap](https://github.com/Sylphy0052/agentic-imagegen/issues/1) /
-  [#2 推論高速化検証](https://github.com/Sylphy0052/agentic-imagegen/issues/2) /
+  [#2推論高速化検証](https://github.com/Sylphy0052/agentic-imagegen/issues/2) /
   [#6 Hassaku (Anima) 対応調査](https://github.com/Sylphy0052/agentic-imagegen/issues/6)
 
 ---
@@ -36,13 +41,13 @@ Phase 1の完了条件は「一気通貫で実行できること」であり、�
 | --- | --- |
 | OS | Ubuntu 22.04.5 LTS (WSL2, kernel 6.18.33.2-microsoft-standard-WSL2) |
 | CPU | Intel Core Ultra 7 165H (22スレッド) |
-| RAM | WSL割当 15GB (空き約8GB) |
+| RAM | WSL割当15GB (空き約8GB) |
 | GPU | Intel Arc Graphics (Core Ultra 7 165H内蔵iGPU / Xe-LPG)。NVIDIA GPUなし |
 | WSL GPU | `/dev/dxg` あり、`libd3d12.so` / `libdxcore.so` あり。Intel Level Zeroランタイムは未インストール |
-| ディスク | WSL側 928GB空き / C: 211GB空き |
-| Python | システム 3.10.12。uv管理の 3.12.13 / 3.13.14 が利用可能 |
+| ディスク | WSL側928GB空き / C: 211GB空き |
+| Python | システム3.10.12。uv管理の3.12.13 / 3.13.14が利用可能 |
 | uv | 0.12.2 |
-| ComfyUI | 未インストール (WSL側・Windows側いずれにも存在せず)。127.0.0.1:8188 および WSLホストIP:8188 へ到達不可 |
+| ComfyUI | 未インストール (WSL側・Windows側いずれにも存在せず)。127.0.0.1:8188およびWSLホストIP:8188へ到達不可 |
 | リポジトリ | `LICENSE` のみ。実装コードなし |
 | リモート | `github.com:Sylphy0052/agentic-imagegen` (gh CLI認証済み) |
 
@@ -71,7 +76,7 @@ Phase 1の完了条件は「一気通貫で実行できること」であり、�
 | Integration Test | 4件PASS / 91.67秒 (モデルロード込み、512x512 / steps 2) |
 | E2E (512x768 / steps 20 / SD1.5) | 約12分 (36秒/step) |
 
-当初は「SD1.5 / 512x768 / 20 steps で1-2.5分」と見積もっていたが、実測は約12分だった。
+当初は「SD1.5 / 512x768 / 20 stepsで1-2.5分」と見積もっていたが、実測は約12分だった。
 CPU推論では1stepあたり数十秒かかるため、反復作業ではstepsまたは解像度を下げる。
 
 配置したcheckpoint:
@@ -98,7 +103,7 @@ Hassaku (Anima) はSDXL系ではなくDiT系のため、同梱の `workflows/txt
 - ただし `--listen` とファイアウォール設定が必要で、Phase 1の「127.0.0.1限定」設計原則と衝突する。
 - Intel XPUが不調だった場合の退避先として、上記の高速化Issue内に代替案として記載する。
 
-Adapter層でComfyUI依存を隔離しているため、後からバックエンドの実行基盤を差し替えても Core / CLI 層は変更不要である。
+Adapter層でComfyUI依存を隔離しているため、後からバックエンドの実行基盤を差し替えてもCore / CLI層は変更不要である。
 
 ---
 
@@ -246,7 +251,7 @@ output:
 
 すべて `extra="forbid"` とし、未知キーは実行前に弾く。
 
-### 6.2 バリデーション仕様
+### 6.2バリデーション仕様
 
 2段構えとする。
 
@@ -255,13 +260,13 @@ output:
    - steps: 1以上100以下
    - cfg: 0以上30以下
    - batch_size: 1以上4以下
-   - seed: -1 (ランダム) または 0以上 2^63-1 以下
+   - seed: -1 (ランダム) または0以上2^63-1以下
    - sampler / scheduler: 既知値のリテラル集合
 2. 設定由来のポリシー制約 (`config.Settings` から注入)
-   - `IMAGEGEN_MAX_WIDTH` (既定 2048)
-   - `IMAGEGEN_MAX_HEIGHT` (既定 2048)
-   - `IMAGEGEN_MAX_PIXELS` (既定 4194304)
-   - `IMAGEGEN_MAX_BATCH` (既定 4)
+   - `IMAGEGEN_MAX_WIDTH` (既定2048)
+   - `IMAGEGEN_MAX_HEIGHT` (既定2048)
+   - `IMAGEGEN_MAX_PIXELS` (既定4194304)
+   - `IMAGEGEN_MAX_BATCH` (既定4)
    - 違反時は `InvalidGenerationSpec` を送出する
 
 セキュリティ関連の検証:
@@ -287,14 +292,14 @@ TXT2IMG_BINDING: Final = WorkflowBinding(
 )
 ```
 
-`workflows/injector.py` は「どのworkflowを実行してよいか」という allowlist
+`workflows/injector.py` は「どのworkflowを実行してよいか」というallowlist
 (`ALLOWED_WORKFLOWS`) とテンプレート読み込みだけを持ち、構造検証と注入はAdapter層へ委譲する。
 
 - Node IDはComfyUI標準txt2imgテンプレート (API形式) の既定IDに合わせる。
 - 注入前に、各NodeRefについて「対象node_idが存在するか」「class_typeが一致するか」「必要な入力キーが存在するか」を検証する。1つでも不一致なら `WorkflowValidationError` でfail-fastし、誤ったノードへの注入を防ぐ。
-- 注入対象は positive_prompt / negative_prompt / checkpoint / seed / steps / cfg / sampler / scheduler / width / height / batch_size / filename_prefix に限定する。
+- 注入対象はpositive_prompt / negative_prompt / checkpoint / seed / steps / cfg / sampler / scheduler / width / height / batch_size / filename_prefixに限定する。
 - 注入は元テンプレートを破壊しない (deep copyしてから書き換える)。
-- seedが -1 の場合は実行時に乱数へ解決し、解決後の値をmetadataへ記録する。
+- seedが -1の場合は実行時に乱数へ解決し、解決後の値をmetadataへ記録する。
 
 ### 6.4 ComfyUI Client
 
@@ -317,7 +322,7 @@ health check (GET /system_stats)
 - タイムアウトは `IMAGEGEN_TIMEOUT` (既定300秒) で設定可能。Integration Testでは短縮する。
 - ComfyUI固有のエラーレスポンスは、後述の例外型へ変換してから上位へ返す。
 
-### 6.5 出力とmetadata
+### 6.5出力とmetadata
 
 ```text
 outputs/
@@ -342,7 +347,7 @@ ComfyUIのoutputディレクトリだけに依存せず、プロジェクト側�
 
 Phase 1では過剰実装を避け、上記項目のみ記録する。
 
-### 6.6 エラー型とexit code
+### 6.6エラー型とexit code
 
 ```text
 ImageGenError (基底)
@@ -439,7 +444,7 @@ Specの状態は `metadata.json` に全量を残すため、prompt全文など�
 | 2 | GenerationSpec + バリデーション | 正常系・異常系のUnit Testが通過 (width/height/steps/cfg/batch_size/checkpoint traversal) |
 | 3 | Workflow loader / injector | 注入テストと構造不一致時のfail-fastテストが通過 |
 | 4 | ComfyUI Client (health checkまで) | `imagegen health` が到達可否を正しく判定。未起動時に `ComfyUIUnavailable` |
-| 5 | submission + 実行監視 + 出力取得 | モックサーバに対する submit -> 完了検知 -> 画像取得 が通過。タイムアウト動作を検証 |
+| 5 | submission + 実行監視 + 出力取得 | モックサーバに対するsubmit -> 完了検知 -> 画像取得 が通過。タイムアウト動作を検証 |
 | 6 | CLI (validate / health / generate) | 3コマンドが動作し、失敗時に規定のexit codeを返す |
 | 7 | ComfyUI環境構築 + Integration Test | ComfyUI起動、SD1.5配置、`uv run pytest -m integration` が通過 |
 | 8 | CLAUDE.md | 画像生成要求時の手順と禁止事項を記載 |
@@ -490,7 +495,7 @@ uv run pytest -m integration
 - `uv run pytest --cov` でカバレッジ80%以上
 - 巨大な単一モジュールを作らない。DRYを守りつつ過剰な抽象化はしない。
 
-優先順位: 1. 正しく動く 2. テスト可能 3. 障害を切り分けやすい 4. 型安全 5. 将来MCP化しやすい 6. コード量を増やしすぎない。
+優先順位: 1. 正しく動く2. テスト可能3. 障害を切り分けやすい4. 型安全5. 将来MCP化しやすい6. コード量を増やしすぎない。
 
 ---
 
@@ -506,10 +511,18 @@ uv run pytest -m integration
 
 ---
 
-## 12. 将来拡張 (参考)
+## 12. 将来拡張 (Phase 1作成時点の見通し)
+
+**この節は2026-08-12時点の見通しを記録したもので、進捗を示すものではない。**
+Phase 2以降は実際に着手済みで、完了状況は
+[Issue #1](https://github.com/Sylphy0052/agentic-imagegen/issues/1) (Roadmap) が一次情報。
 
 - Phase 2: Claude Code Skill / Preset system / LoRA / Character preset / Scene preset / Metadata強化 / Reference image / img2img
 - Phase 3: MCP Server (`generate_image` / `validate_generation` / `list_models` / `list_loras` / `list_workflows` / `get_generation_status`)
 - Phase 4: ControlNet / IPAdapter / Character consistency / Batch generation / Upscaling / Backend追加
 
 Phase 1時点では、MCPのためだけの抽象層は作らない。
+この判断はPhase 4完了後も維持しており、Backend抽象は
+[Issue #31](https://github.com/Sylphy0052/agentic-imagegen/issues/31) で継続管理している。
+
+Phase 2以降の設計文書を作っていない理由は [README.md](README.md) を参照。

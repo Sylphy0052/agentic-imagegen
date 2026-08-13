@@ -13,7 +13,7 @@ fonts/
     NotoSerifJP-Regular.otf
 ```
 
-Spec からはファイル名で参照する。サブフォルダに置いた場合は `noto/NotoSerifJP-Regular.otf`
+Specからはファイル名で参照する。サブフォルダに置いた場合は `noto/NotoSerifJP-Regular.otf`
 のように書く。
 
 ```yaml
@@ -29,7 +29,7 @@ text:
 
 ## 入手する
 
-再配布条件が緩く、日本語の字形が揃っているものとして Noto Sans JP を推奨する。
+再配布条件が緩く、日本語の字形が揃っているものとしてNoto Sans JPを推奨する。
 
 ```bash
 mkdir -p fonts
@@ -53,7 +53,7 @@ fc-list :lang=ja file family
 cp /usr/share/fonts/opentype/ipafont-gothic/ipag.ttf fonts/
 ```
 
-WSL から Windows 側のフォントを使う場合は `/mnt/c/Windows/Fonts/` にある。
+WSLからWindows側のフォントを使う場合は `/mnt/c/Windows/Fonts/` にある。
 
 ```bash
 # 例: BIZ UDゴシック
@@ -61,7 +61,7 @@ cp /mnt/c/Windows/Fonts/BIZ-UDGothicR.ttc fonts/
 ```
 
 `.ttc` は複数の書体をまとめた形式なので、どの書体を使うかを `font_index` で指定する
-(既定は 0)。
+(値域は [docs/spec-reference.md](spec-reference.md#text-テキスト合成) を参照)。
 
 ```yaml
 text:
@@ -77,7 +77,7 @@ text:
 
 ## 確認する
 
-指定したフォントが見つからない場合、`imagegen` は別の書体へ代替せず exit code 10 で
+指定したフォントが見つからない場合、`imagegen` は別の書体へ代替せずexit code 10で
 失敗し、`fonts/` 配下にある候補を表示する。意図しない書体で出力されるより、
 その場で止める方が扱いやすいため。
 

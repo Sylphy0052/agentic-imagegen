@@ -2,21 +2,8 @@
 
 exit codeごとの原因と対処。生成コマンドが失敗したときはここを見る。
 
-## exit code 一覧
-
-| code | 例外 | 意味 |
-| --- | --- | --- |
-| 0 | - | 成功 |
-| 1 | - | 想定外の内部エラー |
-| 2 | `InvalidGenerationSpec` | Specが不正 |
-| 3 | `ComfyUIUnavailable` | ComfyUIへ到達できない |
-| 4 | `WorkflowValidationError` | Workflowテンプレートが不正 |
-| 5 | `WorkflowSubmissionError` | Workflowの投入が拒否された |
-| 6 | `GenerationTimeout` | 生成がタイムアウトした |
-| 7 | `GenerationFailed` | ComfyUI側で実行が失敗した |
-| 8 | `OutputNotFound` | 出力画像が見つからない |
-| 9 | `InvalidConfiguration` | 環境変数の設定値が不正 |
-| 10 | `TextCompositionError` | テキスト合成に失敗した |
+codeと例外クラスの対応は [CLAUDE.mdの「exit code」](../../../../CLAUDE.md#exit-code) を参照。
+ここには対処だけを書く。
 
 ## code 2: Specが不正
 
@@ -124,13 +111,14 @@ ComfyUIの起動ログを見る。よくある原因:
 - 出力先が作業ルートの外を指している場合も失敗する (`--output/-o` は作業ルート配下のみ)
 - 画像が大きすぎる場合は `IMAGEGEN_MAX_PIXELS` の上限に収まるよう縮小するか、
   上限自体を緩める
-- `batch_size` > 1 の生成では、失敗した時点で後続は処理しない。
+- `batch_size` > 1の生成では、失敗した時点で後続は処理しない。
   それまでに成功した分は `metadata.json` の `text.outputs` に残る
-  (スキーマの詳細は [CLAUDE.md](../../../../CLAUDE.md) の metadata.json節を参照)
+  (スキーマの詳細は
+  [docs/spec-reference.md](../../../../docs/spec-reference.md#metadatajson) を参照)
 
 ## 画像は出たが意図と違う
 
-- prompt が長すぎる可能性がある。presetを重ねすぎていないか確認する
+- promptが長すぎる可能性がある。presetを重ねすぎていないか確認する
   (重複トークンは自動で除去されるが、総量は減らない)
 - `metadata.json` の `spec.prompt.positive` に展開後のpromptが記録されている。
   実際にComfyUIへ渡った内容はここで確認する
@@ -139,7 +127,7 @@ ComfyUIの起動ログを見る。よくある原因:
   前回の結果と比べる。値が違えばWorkflowテンプレート自体が変わっている
 - `metadata.json` の `backend` で実行基盤 (ComfyUI版とデバイス) を確認できる。
   XPUとCPUではfp16とfp32の違いがあり、同じseedでも完全には一致しない
-- 構図だけ変えたい場合は scene preset を差し替える。character presetは変えない
+- 構図だけ変えたい場合はscene presetを差し替える。character presetは変えない
 - 同一キャラクタのはずが別人になる場合は
   [character-consistency.md](character-consistency.md) の手順を使う。
   presetだけでは顔立ちまでは固定できない
