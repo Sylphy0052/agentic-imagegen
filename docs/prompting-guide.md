@@ -73,8 +73,9 @@ Specの書き方そのものは [CLAUDE.md](../CLAUDE.md)、失敗時の切り�
 - tag dropoutで学習されているため、関連タグを網羅する必要はない
 
 **モデル配布元が推奨する `beta57` は KSampler の scheduler ではない。**
-ComfyUIのschedulerは `simple` / `sgm_uniform` / `karras` / `exponential` / `ddim_uniform` /
-`beta` / `normal` / `linear_quadratic` / `kl_optimal` の9種で、`beta57` はこの中に無い。
+KSamplerが受け付けるschedulerは `simple` / `sgm_uniform` / `karras` / `exponential` /
+`ddim_uniform` / `beta` / `normal` / `linear_quadratic` / `kl_optimal` の9種 (Specでも
+この9種を指定できる) で、`beta57` はこの中に無い。
 `beta` scheduler の alpha=0.5 / beta=0.7 を指す通称であり、指定するには `BetaSamplingScheduler`
 ノードを持つWorkflowが要る。本リポジトリのテンプレートはKSamplerベースのため使えない。
 `simple` を使う。

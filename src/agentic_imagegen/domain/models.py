@@ -36,6 +36,8 @@ SamplerName = Literal[
     "er_sde",
 ]
 
+#: ComfyUIの comfy/samplers.py SCHEDULER_HANDLERS と同じ集合。
+#: KSamplerが受け付けないもの (BetaSamplingSchedulerノード側の設定を指す beta57 など) は含めない。
 SchedulerName = Literal[
     "normal",
     "karras",
@@ -44,6 +46,8 @@ SchedulerName = Literal[
     "simple",
     "ddim_uniform",
     "beta",
+    "linear_quadratic",
+    "kl_optimal",
 ]
 
 #: 解像度のハード上限。環境変数による実運用上の上限は Settings 側で別途課す。
