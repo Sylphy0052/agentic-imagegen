@@ -591,14 +591,15 @@ outputs/
 
 ## 組み合わせの可否
 
-| | LoRA | img2img | hires fix | ControlNet | IPAdapter | text |
-| --- | --- | --- | --- | --- | --- | --- |
-| **LoRA** | - | 可 | 可 | 可 | 可 | 可 |
-| **img2img** | 可 | - | 可 | 可 | 可 | 可 |
-| **hires fix** | 可 | 可 | - | 可 | **不可** | 可 |
-| **ControlNet** | 可 | 可 | 可 | - | 可 | 可 |
-| **IPAdapter** | 可 | 可 | **不可** | 可 | - | 可 |
-| **DiT系 (unet/clip/vae)** | **不可** | 可 | 可 | **不可** | **不可** | 可 |
+| | LoRA | img2img | hires fix | ControlNet | IPAdapter | text | clip_skip |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **LoRA** | - | 可 | 可 | 可 | 可 | 可 | 可 |
+| **img2img** | 可 | - | 可 | 可 | 可 | 可 | 可 |
+| **hires fix** | 可 | 可 | - | 可 | **不可** | 可 | 可 |
+| **ControlNet** | 可 | 可 | 可 | - | 可 | 可 | 可 |
+| **IPAdapter** | 可 | 可 | **不可** | 可 | - | 可 | 可 |
+| **DiT系 (unet/clip/vae)** | **不可** | 可 | 可 | **不可** | **不可** | 可 | **不可** |
+| **clip_skip** | 可 | 可 | 可 | 可 | 可 | 可 | - |
 
 `text`は生成後の後処理のため、どの構成とも併用できる。
 
