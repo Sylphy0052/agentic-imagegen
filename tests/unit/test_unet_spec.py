@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from agentic_imagegen.domain.models import GenerationSpec
+from agentic_imagegen.workflows.injector import ALLOWED_WORKFLOWS, resolve_workflow_name
 
 SEPARATE_MODEL: dict[str, Any] = {
     "unet": "hassakuAnima_v13_int8.safetensors",
@@ -75,18 +76,33 @@ def test_rejects_loras_with_separate_loaders() -> None:
         GenerationSpec.model_validate(_spec(model=payload))
 
 
-def test_rejects_img2img_with_separate_loaders() -> None:
-    payload = _spec(task="img2img", source={"image": "inputs/base.png"})
+def test_accepts_img2img_with_separate_loaders() -> None:
+    """VAEEncodeを挟むだけで通る。latentのch数は入力画像から決まる。"""
+    spec = GenerationSpec.model_validate(_spec(task="img2img", source={"image": "inputs/base.png"}))
 
-    with pytest.raises(ValidationError, match="txt2img でのみ"):
-        GenerationSpec.model_validate(payload)
+    assert resolve_workflow_name(spec) == "img2img_unet"
+    assert "img2img_unet" in ALLOWED_WORKFLOWS
 
 
-def test_rejects_upscale_with_separate_loaders() -> None:
-    payload = _spec(generation={"upscale": {"scale": 1.5}})
+def test_accepts_upscale_with_separate_loaders() -> None:
+    """latentのch数は拡大しても変わらないため、SD1.5系と同じ構成で組める。"""
+    spec = GenerationSpec.model_validate(_spec(generation={"upscale": {"scale": 1.5}}))
 
-    with pytest.raises(ValidationError, match="upscale"):
-        GenerationSpec.model_validate(payload)
+    assert resolve_workflow_name(spec) == "txt2img_unet_hires"
+    assert "txt2img_unet_hires" in ALLOWED_WORKFLOWS
+
+
+def test_accepts_img2img_and_upscale_together() -> None:
+    spec = GenerationSpec.model_validate(
+        _spec(
+            task="img2img",
+            source={"image": "inputs/base.png"},
+            generation={"upscale": {"scale": 1.5}},
+        )
+    )
+
+    assert resolve_workflow_name(spec) == "img2img_unet_hires"
+    assert "img2img_unet_hires" in ALLOWED_WORKFLOWS
 
 
 def test_rejects_control_with_separate_loaders() -> None:

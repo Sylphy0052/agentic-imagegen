@@ -674,13 +674,10 @@ class GenerationSpec(_StrictModel):
         """unet / clip / vae を使う場合に、テンプレートが無い組み合わせを拒否する。
 
         ControlNet / IPAdapter のモデルはSD1.5 / SDXL 系向けのものであり、
-        DiT系のUNetへはそのまま適用できない。hires fix と img2img は
-        テンプレート自体を用意していない。
+        DiT系のUNetへはそのまま適用できない。DiT系向けのモデルが出回るまでは
+        テンプレートを用意しても使えるモデルが無い。
+        img2img と hires fix は組み合わせられる。
         """
-        if self.task != "txt2img":
-            raise ValueError("unet / clip / vae の指定は現在 txt2img でのみ対応しています")
-        if self.generation.upscale is not None:
-            raise ValueError("unet / clip / vae の指定と upscale の併用は未対応です")
         if self.control is not None:
             raise ValueError("unet / clip / vae の指定と control の併用は未対応です")
         if self.reference is not None:

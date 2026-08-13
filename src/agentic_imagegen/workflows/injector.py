@@ -25,6 +25,8 @@ from agentic_imagegen.adapters.comfyui.workflow import (
     IMG2IMG_LORA_HIRES_BINDING,
     IMG2IMG_LORA_HIRES_CONTROLNET_BINDING,
     IMG2IMG_LORA_IPADAPTER_BINDING,
+    IMG2IMG_UNET_BINDING,
+    IMG2IMG_UNET_HIRES_BINDING,
     TXT2IMG_BINDING,
     TXT2IMG_CONTROLNET_BINDING,
     TXT2IMG_CONTROLNET_IPADAPTER_BINDING,
@@ -38,6 +40,7 @@ from agentic_imagegen.adapters.comfyui.workflow import (
     TXT2IMG_LORA_HIRES_CONTROLNET_BINDING,
     TXT2IMG_LORA_IPADAPTER_BINDING,
     TXT2IMG_UNET_BINDING,
+    TXT2IMG_UNET_HIRES_BINDING,
     WorkflowBinding,
     build_workflow,
     resolve_seed,
@@ -76,6 +79,9 @@ ALLOWED_WORKFLOWS: Final[dict[str, WorkflowBinding]] = {
     "img2img_controlnet_ipadapter": IMG2IMG_CONTROLNET_IPADAPTER_BINDING,
     "img2img_lora_controlnet_ipadapter": IMG2IMG_LORA_CONTROLNET_IPADAPTER_BINDING,
     "txt2img_unet": TXT2IMG_UNET_BINDING,
+    "txt2img_unet_hires": TXT2IMG_UNET_HIRES_BINDING,
+    "img2img_unet": IMG2IMG_UNET_BINDING,
+    "img2img_unet_hires": IMG2IMG_UNET_HIRES_BINDING,
 }
 
 
@@ -85,13 +91,13 @@ def resolve_workflow_name(spec: GenerationSpec) -> str:
     `task` は論理的なタスク名であり、テンプレートはそれとLoRA指定の有無で決まる。
     LoRA未指定でLoRA用テンプレートを使う意味はないため、素のテンプレートを選ぶ。
     """
-    if spec.model.uses_separate_loaders:
-        # UNet / CLIP / VAE を別々に読む形式は、LoRAやControlNetとの組み合わせを
-        # 持たない (Specのバリデーションで併用を拒否している)
-        return f"{spec.task}_unet"
-
     suffix = ""
-    if spec.model.loras:
+    if spec.model.uses_separate_loaders:
+        # UNet / CLIP / VAE を別々に読む形式。ローダーの分割はLoRAより手前の軸なので
+        # 接尾辞も先頭へ置く。LoRA / ControlNet / IPAdapter との組み合わせは
+        # Specのバリデーションで拒否している
+        suffix += "_unet"
+    elif spec.model.loras:
         suffix += "_lora"
     if spec.generation.upscale is not None:
         suffix += "_hires"

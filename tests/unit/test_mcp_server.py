@@ -145,6 +145,9 @@ async def test_list_workflows_returns_allowlist() -> None:
         "img2img_controlnet_ipadapter",
         "img2img_lora_controlnet_ipadapter",
         "txt2img_unet",
+        "txt2img_unet_hires",
+        "img2img_unet",
+        "img2img_unet_hires",
     }
 
 

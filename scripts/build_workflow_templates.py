@@ -141,14 +141,19 @@ def to_separate_loaders(graph: Graph) -> Graph:
     graph[POSITIVE]["inputs"]["clip"] = [UNET_CLIP_LOADER, 0]
     graph[NEGATIVE]["inputs"]["clip"] = [UNET_CLIP_LOADER, 0]
     graph[VAE_DECODE]["inputs"]["vae"] = [UNET_VAE_LOADER, 0]
+    if IMG2IMG_VAE_ENCODE in graph:
+        # img2imgでは入力画像をVAEEncodeする側もCheckpointLoaderのVAEを見ている
+        graph[IMG2IMG_VAE_ENCODE]["inputs"]["vae"] = [UNET_VAE_LOADER, 0]
 
     # 既定値もDiT系へ寄せる (Specから注入されるが、テンプレート単体で見たときに
     # SD1.5向けの値が残っていると誤解を招く)
     graph[KSAMPLER]["inputs"]["steps"] = 30
     graph[KSAMPLER]["inputs"]["cfg"] = 4.0
     graph[KSAMPLER]["inputs"]["scheduler"] = "simple"
-    graph[EMPTY_LATENT]["inputs"]["width"] = 1024
-    graph[EMPTY_LATENT]["inputs"]["height"] = 1024
+    if EMPTY_LATENT in graph:
+        # img2imgは入力画像の解像度をそのまま使うためEmptyLatentImage自体が無い
+        graph[EMPTY_LATENT]["inputs"]["width"] = 1024
+        graph[EMPTY_LATENT]["inputs"]["height"] = 1024
     return graph
 
 
@@ -320,9 +325,13 @@ def build_all(base: Graph) -> dict[str, Graph]:
     # txt2img自身は手書きのベースなので生成対象に含めない
     return {
         "txt2img_lora": with_lora_chain(txt2img, LORA_IDS),
-        # DiT系はLoRA / img2img / hires / ControlNet / IPAdapter と組み合わせない
-        # (Specの検証で併用を拒否している)
+        # DiT系はローダーを分けてから他の派生をかける。逆順にすると、後から足した
+        # 2段目のKSamplerがCheckpointLoaderを見たまま残る
+        # (LoRA / ControlNet / IPAdapter との組み合わせはSpecの検証で拒否している)
         "txt2img_unet": to_separate_loaders(txt2img),
+        "txt2img_unet_hires": with_hires_fix(to_separate_loaders(txt2img)),
+        "img2img_unet": to_separate_loaders(img2img),
+        "img2img_unet_hires": with_hires_fix(to_separate_loaders(img2img)),
         "txt2img_hires": with_hires_fix(txt2img),
         "txt2img_lora_hires": with_hires_fix(with_lora_chain(txt2img, LORA_IDS)),
         "img2img": img2img,

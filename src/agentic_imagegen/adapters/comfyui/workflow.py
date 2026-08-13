@@ -79,35 +79,30 @@ UNET_LOADER_ROLE: Final = "unet_loader"
 CLIP_LOADER_ROLE: Final = "clip_loader"
 VAE_LOADER_ROLE: Final = "vae_loader"
 
-TXT2IMG_UNET_BINDING: Final = WorkflowBinding(
-    name="txt2img_unet",
-    nodes={
-        UNET_LOADER_ROLE: NodeRef("60", "UNETLoader", ("unet_name", "weight_dtype")),
-        CLIP_LOADER_ROLE: NodeRef("61", "CLIPLoader", ("clip_name", "type")),
-        VAE_LOADER_ROLE: NodeRef("62", "VAELoader", ("vae_name",)),
-        "positive_prompt": NodeRef("6", "CLIPTextEncode", ("text",)),
-        "negative_prompt": NodeRef("7", "CLIPTextEncode", ("text",)),
-        "latent": NodeRef("5", "EmptyLatentImage", ("width", "height", "batch_size")),
-        "ksampler": NodeRef(
-            "3",
-            "KSampler",
-            ("seed", "steps", "cfg", "sampler_name", "scheduler"),
-        ),
-        "vae_decode": NodeRef("8", "VAEDecode", ()),
-        "save_image": NodeRef("9", "SaveImage", ("filename_prefix",)),
-    },
-    links=(
-        LinkRef("ksampler", "positive", "positive_prompt"),
-        LinkRef("ksampler", "negative", "negative_prompt"),
-        LinkRef("ksampler", "latent_image", "latent"),
+
+def _to_separate_loaders(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
+    """CheckpointLoaderSimple を UNet / CLIP / VAE の3ローダーへ分けたbindingを組み立てる。
+
+    3つのローダーはそれぞれ別の系統を担うため、取り違えると
+    「動くが指定したモデルが効かない」状態になる。結線まで検証する。
+    """
+    nodes = {role: node for role, node in base.nodes.items() if role != "checkpoint"}
+    nodes[UNET_LOADER_ROLE] = NodeRef("60", "UNETLoader", ("unet_name", "weight_dtype"))
+    nodes[CLIP_LOADER_ROLE] = NodeRef("61", "CLIPLoader", ("clip_name", "type"))
+    nodes[VAE_LOADER_ROLE] = NodeRef("62", "VAELoader", ("vae_name",))
+    nodes["vae_decode"] = NodeRef("8", "VAEDecode", ())
+
+    links = [link for link in base.links if link.expected_role != "checkpoint"]
+    links += [
         LinkRef("ksampler", "model", UNET_LOADER_ROLE),
-        # 3つのローダーはそれぞれ別の系統を担うため、取り違えると
-        # 「動くが指定したモデルが効かない」状態になる。結線まで検証する。
         LinkRef("positive_prompt", "clip", CLIP_LOADER_ROLE),
         LinkRef("negative_prompt", "clip", CLIP_LOADER_ROLE),
         LinkRef("vae_decode", "vae", VAE_LOADER_ROLE),
-    ),
-)
+    ]
+    if "vae_encode" in nodes:
+        # img2imgでは入力画像をVAEEncodeする側も同じVAEを見る
+        links.append(LinkRef("vae_encode", "vae", VAE_LOADER_ROLE))
+    return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
 
 
 #: LoRAスロットの役割名。テンプレートのLoraLoaderの段数と一致させる。
@@ -176,6 +171,19 @@ def _with_hires_fix(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
         LinkRef(HIRES_KSAMPLER_ROLE, "latent_image", UPSCALE_ROLE),
         LinkRef("vae_decode", "samples", HIRES_KSAMPLER_ROLE),
     ]
+    # 2段目のMODELは1段目と同じ供給元から来る。ここを検証しないと、ローダーを
+    # 差し替えた構成 (LoRAチェーン / DiT系の3ローダー) で2段目だけが元の
+    # CheckpointLoaderを見たまま残っていても気づけない
+    model_source = next(
+        (
+            link.expected_role
+            for link in base.links
+            if link.source_node == "ksampler" and link.input_key == "model"
+        ),
+        None,
+    )
+    if model_source is not None:
+        links.append(LinkRef(HIRES_KSAMPLER_ROLE, "model", model_source))
     return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
 
 
@@ -273,6 +281,13 @@ TXT2IMG_HIRES_BINDING: Final = _with_hires_fix(TXT2IMG_BINDING, name="txt2img_hi
 TXT2IMG_LORA_HIRES_BINDING: Final = _with_hires_fix(TXT2IMG_LORA_BINDING, name="txt2img_lora_hires")
 IMG2IMG_HIRES_BINDING: Final = _with_hires_fix(IMG2IMG_BINDING, name="img2img_hires")
 IMG2IMG_LORA_HIRES_BINDING: Final = _with_hires_fix(IMG2IMG_LORA_BINDING, name="img2img_lora_hires")
+
+#: DiT系 (UNet / CLIP / VAE を別々に読む形式)。ローダーを分けてから他の派生をかける。
+#: 逆順にすると、後から足した2段目のKSamplerがCheckpointLoaderを見たまま残る。
+TXT2IMG_UNET_BINDING: Final = _to_separate_loaders(TXT2IMG_BINDING, name="txt2img_unet")
+TXT2IMG_UNET_HIRES_BINDING: Final = _with_hires_fix(TXT2IMG_UNET_BINDING, name="txt2img_unet_hires")
+IMG2IMG_UNET_BINDING: Final = _to_separate_loaders(IMG2IMG_BINDING, name="img2img_unet")
+IMG2IMG_UNET_HIRES_BINDING: Final = _with_hires_fix(IMG2IMG_UNET_BINDING, name="img2img_unet_hires")
 
 #: hires fix と ControlNet の併用。hires を先に重ねてから ControlNet をかけることで、
 #: ControlNetApplyAdvanced が差し替えるのは1段目のKSamplerだけになる。2段目は素の
@@ -696,6 +711,8 @@ __all__ = [
     "IMG2IMG_LORA_HIRES_BINDING",
     "IMG2IMG_LORA_HIRES_CONTROLNET_BINDING",
     "IMG2IMG_LORA_IPADAPTER_BINDING",
+    "IMG2IMG_UNET_BINDING",
+    "IMG2IMG_UNET_HIRES_BINDING",
     "LORA_SLOT_ROLES",
     "REFERENCE_APPLY_ROLE",
     "REFERENCE_CLIP_VISION_ROLE",
@@ -713,6 +730,7 @@ __all__ = [
     "TXT2IMG_LORA_HIRES_BINDING",
     "TXT2IMG_LORA_HIRES_CONTROLNET_BINDING",
     "TXT2IMG_LORA_IPADAPTER_BINDING",
+    "TXT2IMG_UNET_HIRES_BINDING",
     "UPSCALE_ROLE",
     "LinkRef",
     "NodeRef",

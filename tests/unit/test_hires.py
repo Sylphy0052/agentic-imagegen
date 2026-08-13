@@ -161,6 +161,25 @@ class TestStructureValidation:
         with pytest.raises(WorkflowValidationError):
             build_workflow(broken, _spec(upscale=UPSCALE), seed=1, binding=TXT2IMG_HIRES_BINDING)
 
+    def test_detects_second_pass_bypassing_lora_chain(self) -> None:
+        """2段目だけがCheckpointLoaderを見ていると、LoRAが1段目にしか効かない。
+
+        絵は出るため生成そのものは成功してしまい、結果を見ても気づきにくい。
+        """
+        binding = ALLOWED_WORKFLOWS["txt2img_lora_hires"]
+        broken = json.loads(json.dumps(load_workflow_template("txt2img_lora_hires")))
+        second = binding.nodes[HIRES_KSAMPLER_ROLE].node_id
+        checkpoint = binding.nodes["checkpoint"].node_id
+        broken[second]["inputs"]["model"] = [checkpoint, 0]
+
+        with pytest.raises(WorkflowValidationError):
+            build_workflow(
+                broken,
+                _spec(loras=[LORA], upscale=UPSCALE),
+                seed=1,
+                binding=binding,
+            )
+
     def test_prepare_workflow_selects_and_injects(self) -> None:
         prepared = prepare_workflow(_spec(loras=[LORA], upscale=UPSCALE))
 
