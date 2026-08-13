@@ -9,7 +9,12 @@ import pytest
 from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.domain.results import HealthStatus, ImageRef
-from agentic_imagegen.errors import GenerationTimeout, InvalidGenerationSpec, OutputNotFound
+from agentic_imagegen.errors import (
+    ComfyUIUnavailable,
+    GenerationTimeout,
+    InvalidGenerationSpec,
+    OutputNotFound,
+)
 from agentic_imagegen.services.generation import generate
 
 PROMPT_ID = "b3f0a1c2-0000-4000-8000-000000000001"
@@ -27,12 +32,14 @@ class FakeBackend:
         outputs_error: Exception | None = None,
         health_error: Exception | None = None,
         embeddings: tuple[str, ...] = (),
+        embeddings_error: Exception | None = None,
     ) -> None:
         self.images = images
         self.wait_error = wait_error
         self.outputs_error = outputs_error
         self.health_error = health_error
         self.embeddings = embeddings
+        self.embeddings_error = embeddings_error
         self.submitted: dict[str, Any] | None = None
         self.wait_timeout: float | None = None
         self.embeddings_queried = False
@@ -65,6 +72,8 @@ class FakeBackend:
 
     async def available_embeddings(self) -> tuple[str, ...]:
         self.embeddings_queried = True
+        if self.embeddings_error is not None:
+            raise self.embeddings_error
         return self.embeddings
 
 
@@ -318,6 +327,63 @@ async def test_generate_reports_multiple_missing_embeddings(tmp_path: Path) -> N
             backend=backend,
             project_root=tmp_path,
         )
+
+
+async def test_generate_allows_embedding_with_extension(tmp_path: Path) -> None:
+    """拡張子付きで書いてもComfyUIは解決するため、こちらで拒んではいけない。
+
+    `GET /embeddings` は拡張子を落とした名前を返す (server.py の splitext) が、
+    load_embed は `easynegative.safetensors` をそのまま見つける。
+    """
+    backend = FakeBackend(images=_images(1), embeddings=("easynegative",))
+
+    result = await generate(
+        _spec(prompt={"negative": "embedding:easynegative.safetensors, worst quality"}),
+        _settings(tmp_path),
+        backend=backend,
+        project_root=tmp_path,
+    )
+
+    assert result.prompt_id == PROMPT_ID
+
+
+async def test_generate_rejects_unresolvable_embedding_reference(tmp_path: Path) -> None:
+    """ComfyUIが解決しない書き方は、配置済みかどうかに関わらず止める。
+
+    `1girl,embedding:easynegative` は空白が無いためComfyUIにとって1つの語であり、
+    embeddingとしては扱われない。警告すら出ないので、ここで気づけるようにする。
+    """
+    backend = FakeBackend(images=_images(1), embeddings=("easynegative",))
+
+    with pytest.raises(InvalidGenerationSpec, match="空白"):
+        await generate(
+            _spec(prompt={"negative": "1girl,embedding:easynegative"}),
+            _settings(tmp_path),
+            backend=backend,
+            project_root=tmp_path,
+        )
+
+    assert backend.submitted is None
+
+
+async def test_generate_propagates_backend_error_during_embedding_lookup(
+    tmp_path: Path,
+) -> None:
+    """embeddingの問い合わせでComfyUIへ到達できなければ、握り潰さず伝える。"""
+    backend = FakeBackend(
+        images=_images(1),
+        embeddings_error=ComfyUIUnavailable("ComfyUIへ到達できません"),
+    )
+
+    with pytest.raises(ComfyUIUnavailable):
+        await generate(
+            _spec(prompt={"negative": "embedding:easynegative"}),
+            _settings(tmp_path),
+            backend=backend,
+            project_root=tmp_path,
+        )
+
+    assert backend.submitted is None
 
 
 async def test_generate_skips_embedding_lookup_when_not_referenced(tmp_path: Path) -> None:

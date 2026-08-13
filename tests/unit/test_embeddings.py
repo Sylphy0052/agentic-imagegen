@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from agentic_imagegen.domain.embeddings import extract_embedding_names
+import pytest
+
+from agentic_imagegen.domain.embeddings import (
+    extract_embedding_names,
+    extract_unresolvable_embedding_refs,
+    strip_embedding_extension,
+)
 
 
 def test_extracts_single_embedding() -> None:
@@ -59,3 +65,47 @@ def test_no_texts_returns_empty() -> None:
 
 def test_empty_strings_return_empty() -> None:
     assert extract_embedding_names("", "") == ()
+
+
+def test_comma_without_space_is_not_resolved() -> None:
+    """ComfyUIは空白の直後の `embedding:` しか分割しない。
+
+    `1girl,embedding:easynegative` はComfyUIにとって1つの語であり、
+    `embedding:` で始まらないためembeddingとして解決されない
+    (comfy/sd1_clip.py は空白の直後の `embedding:` でしか分割しない)。
+    """
+    assert extract_embedding_names("1girl,embedding:easynegative") == ()
+
+
+def test_comma_without_space_is_reported_as_unresolvable() -> None:
+    """解決されない書き方は、警告すら出ないので別に拾って知らせる。"""
+    names = extract_unresolvable_embedding_refs("1girl,embedding:easynegative")
+
+    assert names == ("easynegative",)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "embedding:easynegative",
+        "1girl, embedding:easynegative",
+        "(embedding:easynegative:1.2)",
+    ],
+)
+def test_resolvable_positions_are_not_reported_as_unresolvable(text: str) -> None:
+    assert extract_unresolvable_embedding_refs(text) == ()
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("easynegative.safetensors", "easynegative"),
+        ("badhandv4.pt", "badhandv4"),
+        ("foo.bin", "foo"),
+        ("easynegative", "easynegative"),
+        ("ng_deepnegative_v1_75t", "ng_deepnegative_v1_75t"),
+    ],
+)
+def test_strip_embedding_extension(name: str, expected: str) -> None:
+    """`GET /embeddings` は拡張子を落とした名前を返すため、比較前に揃える。"""
+    assert strip_embedding_extension(name) == expected

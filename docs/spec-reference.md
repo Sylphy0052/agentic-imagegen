@@ -87,8 +87,12 @@ prompt:
     embedding:easynegative, worst quality, low quality
 ```
 
-- **`embedding:<name>` と書いた場合のみ実在チェックの対象になる。** `<name>` は
-  拡張子を含めない (`list_embeddings` が返す名前と同じ形)
+- **`embedding:` の直前には空白が要る。** ComfyUIは空白の直後にある `embedding:` しか
+  embeddingとして解決しない。`1girl,embedding:easynegative` のように空白が無いと
+  ただの語として扱われ、警告すら出ずに無視される。この書き方は
+  `InvalidGenerationSpec` (exit code 2) で止める
+- **`<name>` の拡張子は付けても付けなくてもよい。** `list_embeddings` は拡張子を
+  落とした名前を返すが、ComfyUIは `easynegative.safetensors` のような指定も解決する
 - **未配置のembeddingを指定すると生成前に `InvalidGenerationSpec` (exit code 2) で止まる。**
   ComfyUI自身は未配置のembeddingを見つけても例外にせず、警告ログを残して黙って
   無視するだけ (生成は成功するがembeddingは効かない)。それでは気づけないため、

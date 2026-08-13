@@ -14,7 +14,11 @@ from pathlib import Path
 from typing import Any, Final, Protocol
 
 from agentic_imagegen.config import Settings
-from agentic_imagegen.domain.embeddings import extract_embedding_names
+from agentic_imagegen.domain.embeddings import (
+    extract_embedding_names,
+    extract_unresolvable_embedding_refs,
+    strip_embedding_extension,
+)
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.domain.policy import resolve_output_directory, resolve_source_image
 from agentic_imagegen.domain.results import GenerationResult, HealthStatus, ImageRef
@@ -281,12 +285,21 @@ async def _validate_embeddings(spec: GenerationSpec, backend: GenerationBackend)
     prompt中に `embedding:` 記法が無ければComfyUIへ問い合わせない
     (無駄な往復を避ける)。
     """
+    unresolvable = extract_unresolvable_embedding_refs(spec.prompt.positive, spec.prompt.negative)
+    if unresolvable:
+        raise InvalidGenerationSpec(
+            "ComfyUIが解決しない書き方のembedding参照があります: "
+            f"{', '.join(unresolvable)} "
+            "(embedding: の直前に空白が要ります。"
+            "`1girl,embedding:name` ではなく `1girl, embedding:name` と書きます)"
+        )
+
     referenced = extract_embedding_names(spec.prompt.positive, spec.prompt.negative)
     if not referenced:
         return
 
     available = set(await backend.available_embeddings())
-    missing = [name for name in referenced if name not in available]
+    missing = [name for name in referenced if strip_embedding_extension(name) not in available]
     if missing:
         raise InvalidGenerationSpec(
             "未配置のembeddingが指定されています: "
