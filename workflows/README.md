@@ -29,6 +29,10 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `txt2img_lora_controlnet.json` | LoRA + ControlNet |
 | `img2img_controlnet.json` | ControlNet付きimage-to-image |
 | `img2img_lora_controlnet.json` | LoRA + ControlNet (img2img) |
+| `txt2img_hires_controlnet.json` | hires fix + ControlNet (ControlNetが効くのは1段目だけ) |
+| `txt2img_lora_hires_controlnet.json` | LoRA + hires fix + ControlNet |
+| `img2img_hires_controlnet.json` | hires fix + ControlNet (img2img) |
+| `img2img_lora_hires_controlnet.json` | LoRA + hires fix + ControlNet (img2img) |
 | `txt2img_ipadapter.json` | IPAdapter付きtext-to-image |
 | `txt2img_lora_ipadapter.json` | LoRA + IPAdapter |
 | `img2img_ipadapter.json` | IPAdapter付きimage-to-image |
@@ -39,7 +43,8 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `img2img_lora_controlnet_ipadapter.json` | LoRA + ControlNet + IPAdapter (img2img) |
 | `txt2img_unet.json` | UNet / text encoder / VAEを別々に読むtext-to-image (DiT系) |
 
-どれを使うかは `task` と `model.loras` の有無、`model.unet` の指定で自動的に決まる。定義は
+どれを使うかは `task` と `model.loras` / `generation.upscale` / `control` / `reference` の有無、
+`model.unet` の指定で自動的に決まる。定義は
 [src/agentic_imagegen/workflows/injector.py](../src/agentic_imagegen/workflows/injector.py)
 の `resolve_workflow_name` を参照。
 
