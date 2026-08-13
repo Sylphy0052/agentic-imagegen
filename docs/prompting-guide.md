@@ -58,7 +58,7 @@ Specの書き方そのものは [spec-reference.md](spec-reference.md)、失敗�
 | 解像度 | 512x512 - 1536x1536 (832x1216が扱いやすい) |
 | cfg | 4-5 |
 | steps | 30-50 |
-| sampler | `er_sde` (フラットでシャープ) / `euler_ancestral` (柔らかい線) / `dpmpp_2m_sde` (多様性) |
+| sampler | `er_sde` (フラットでシャープ) / `euler_ancestral` (柔らかい線) / `dpmpp_2m_sde_gpu` (多様性) |
 | scheduler | `simple` |
 
 - **danbooruタグ・自然文・その混在をすべて受け付ける。** 自然文で書く場合は最低2文書く
@@ -72,7 +72,12 @@ Specの書き方そのものは [spec-reference.md](spec-reference.md)、失敗�
 - **重み付けはSDXL系より強い値が要る。** `(chibi:2)` のような指定でようやく効く
 - tag dropoutで学習されているため、関連タグを網羅する必要はない
 
-モデル配布元が推奨する `beta57` schedulerは本CLIのallowlistに無い。`simple` を使う。
+**モデル配布元が推奨する `beta57` はKSamplerのschedulerではない。**
+`beta` schedulerのalpha=0.5 / beta=0.7を指す通称であり、指定するには `BetaSamplingScheduler`
+ノードを持つWorkflowが要る。本リポジトリのテンプレートはKSamplerベースのため使えない。
+`simple` を使う。指定できるschedulerの一覧は
+[docs/spec-reference.md](spec-reference.md#generation) を参照。
+
 Anima向けのstyle presetは [presets/styles/anima-base.yaml](../presets/styles/anima-base.yaml)
 にある。
 
@@ -84,7 +89,7 @@ Anima向けのstyle presetは [presets/styles/anima-base.yaml](../presets/styles
 - **API形式で保存する。** GUIの通常のSaveではなく「Save (API Format)」を使う。
   座標・色・グループ・ノードサイズといったUI用のmetadataを落とした形式でないと投入できない
 - **`control_after_generate` を残さない。** `randomize` が残っていると実行ごとにseedが変わり、
-  再現できなくなる。本リポジトリの22テンプレートには含まれていない
+  再現できなくなる。本リポジトリの同梱テンプレートには含まれていない
 - **workflow JSONをバージョン管理下に置き、実行時は入力値だけ差し替える。**
   実行時にグラフを組み立てない (本リポジトリの設計方針と同じ)
 - **workflowと実行環境をセットで固定する。** ComfyUI本体のcommit、custom nodeのリリース、

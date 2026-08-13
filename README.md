@@ -78,7 +78,7 @@ cd ~/ComfyUI
 
 ## Workflowの準備
 
-同梱テンプレートは `workflows/` に21種類あり、通常は差し替え不要。実際に使うテンプレートは
+同梱テンプレートは `workflows/` にあり、通常は差し替え不要。実際に使うテンプレートは
 Specの内容から自動的に決まる (決まり方は
 [Workflowテンプレートの決まり方](docs/spec-reference.md#workflowテンプレートの決まり方))。
 

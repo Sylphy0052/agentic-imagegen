@@ -131,23 +131,34 @@ style presetはモデル系統ごとに用意する (`anime-soft`はSD1.5向け�
 | `cfg` | float | 7.0 | 0-30 |
 | `seed` | int | -1 | -1、または0以上`2**63-1`以下。-1は実行時に乱数へ解決する |
 | `batch_size` | int | 1 | 1-4。`IMAGEGEN_MAX_BATCH`も超えられない |
-| `sampler` | enum | `euler` | 下記20種 |
-| `scheduler` | enum | `normal` | 下記7種 |
+| `sampler` | enum | `euler` | 下記44種 |
+| `scheduler` | enum | `normal` | 下記9種 |
 | `upscale` | mapping | `null` | hires fix。指定すると2段階生成になる |
 
 `sampler`に指定できる値:
 
 ```text
-euler  euler_ancestral  heun  heunpp2  dpm_2  dpm_2_ancestral  lms
-dpm_fast  dpm_adaptive  dpmpp_2s_ancestral  dpmpp_sde  dpmpp_2m
-dpmpp_2m_sde  dpmpp_3m_sde  ddpm  lcm  ddim  uni_pc  uni_pc_bh2  er_sde
+euler  euler_cfg_pp  euler_ancestral  euler_ancestral_cfg_pp
+heun  heunpp2  exp_heun_2_x0  exp_heun_2_x0_sde
+dpm_2  dpm_2_ancestral  lms  dpm_fast  dpm_adaptive
+dpmpp_2s_ancestral  dpmpp_2s_ancestral_cfg_pp  dpmpp_sde  dpmpp_sde_gpu
+dpmpp_2m  dpmpp_2m_cfg_pp  dpmpp_2m_sde  dpmpp_2m_sde_gpu
+dpmpp_2m_sde_heun  dpmpp_2m_sde_heun_gpu  dpmpp_3m_sde  dpmpp_3m_sde_gpu
+ddpm  lcm  ipndm  ipndm_v  deis
+res_multistep  res_multistep_cfg_pp  res_multistep_ancestral  res_multistep_ancestral_cfg_pp
+gradient_estimation  gradient_estimation_cfg_pp  er_sde
+seeds_2  seeds_3  sa_solver  sa_solver_pece  ddim  uni_pc  uni_pc_bh2
 ```
 
 `scheduler`に指定できる値:
 
 ```text
 normal  karras  exponential  sgm_uniform  simple  ddim_uniform  beta
+linear_quadratic  kl_optimal
 ```
+
+ComfyUIのKSamplerが受け付けるものに揃えてある。配布元が`beta57`のような通称で
+推奨している場合は [prompting-guide.md](prompting-guide.md) を参照する。
 
 CPU推論では負荷が所要時間へ直接跳ね返るため、既定は控えめにする。
 
@@ -534,7 +545,7 @@ Specの内容から自動的に決まる。`uv run imagegen validate`の`Workflo
 
 例: `task: txt2img`にLoRAとControlNetを指定すると`txt2img_lora_controlnet`。
 
-テンプレートは`workflows/`に21種類ある。一覧と各構成のノード内訳、作り直しの手順は
+テンプレートの一覧と各構成のノード内訳、作り直しの手順は
 [workflows/README.md](../workflows/README.md) を参照。
 読み込み時にノードID・class_type・必要な入力キー・ノード間の接続を検証し、
 1つでも想定と違えば注入せずに失敗する (exit code 4)。

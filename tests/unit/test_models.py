@@ -108,16 +108,91 @@ def test_valid_seed(seed: int) -> None:
     assert spec.generation.seed == seed
 
 
-@pytest.mark.parametrize("sampler", ["", "euler_x", "unknown", "EULER"])
+@pytest.mark.parametrize("sampler", ["", "euler_x", "unknown", "EULER", "dpmpp_2m_gpu"])
 def test_invalid_sampler(sampler: str) -> None:
     with pytest.raises(ValidationError):
         GenerationSpec.model_validate(_spec_dict(generation={"sampler": sampler}))
 
 
-@pytest.mark.parametrize("scheduler", ["", "karas", "unknown"])
+# ComfyUI の comfy/samplers.py SAMPLER_NAMES (KSAMPLER_NAMES + ddim / uni_pc 系) と同じ全種。
+@pytest.mark.parametrize(
+    "sampler",
+    [
+        "euler",
+        "euler_cfg_pp",
+        "euler_ancestral",
+        "euler_ancestral_cfg_pp",
+        "heun",
+        "heunpp2",
+        "exp_heun_2_x0",
+        "exp_heun_2_x0_sde",
+        "dpm_2",
+        "dpm_2_ancestral",
+        "lms",
+        "dpm_fast",
+        "dpm_adaptive",
+        "dpmpp_2s_ancestral",
+        "dpmpp_2s_ancestral_cfg_pp",
+        "dpmpp_sde",
+        "dpmpp_sde_gpu",
+        "dpmpp_2m",
+        "dpmpp_2m_cfg_pp",
+        "dpmpp_2m_sde",
+        "dpmpp_2m_sde_gpu",
+        "dpmpp_2m_sde_heun",
+        "dpmpp_2m_sde_heun_gpu",
+        "dpmpp_3m_sde",
+        "dpmpp_3m_sde_gpu",
+        "ddpm",
+        "lcm",
+        "ipndm",
+        "ipndm_v",
+        "deis",
+        "res_multistep",
+        "res_multistep_cfg_pp",
+        "res_multistep_ancestral",
+        "res_multistep_ancestral_cfg_pp",
+        "gradient_estimation",
+        "gradient_estimation_cfg_pp",
+        "er_sde",
+        "seeds_2",
+        "seeds_3",
+        "sa_solver",
+        "sa_solver_pece",
+        "ddim",
+        "uni_pc",
+        "uni_pc_bh2",
+    ],
+)
+def test_valid_sampler(sampler: str) -> None:
+    spec = GenerationSpec.model_validate(_spec_dict(generation={"sampler": sampler}))
+    assert spec.generation.sampler == sampler
+
+
+@pytest.mark.parametrize("scheduler", ["", "karas", "unknown", "beta57"])
 def test_invalid_scheduler(scheduler: str) -> None:
     with pytest.raises(ValidationError):
         GenerationSpec.model_validate(_spec_dict(generation={"scheduler": scheduler}))
+
+
+# ComfyUI の comfy/samplers.py SCHEDULER_HANDLERS が受け付ける全種。
+@pytest.mark.parametrize(
+    "scheduler",
+    [
+        "normal",
+        "karras",
+        "exponential",
+        "sgm_uniform",
+        "simple",
+        "ddim_uniform",
+        "beta",
+        "linear_quadratic",
+        "kl_optimal",
+    ],
+)
+def test_valid_scheduler(scheduler: str) -> None:
+    spec = GenerationSpec.model_validate(_spec_dict(generation={"scheduler": scheduler}))
+    assert spec.generation.scheduler == scheduler
 
 
 @pytest.mark.parametrize(

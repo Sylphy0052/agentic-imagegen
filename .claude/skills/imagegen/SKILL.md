@@ -114,8 +114,10 @@ output:
 presetで足りない要素だけ `prompt.positive` に足す。preset側と重複するトークンは
 自動で除去されるので、重複を気にして削る必要はない。
 
-モデル系統ごとのプロンプトの書き方 (タグ語彙・語順・重み付け・品質タグの記法) は
-[docs/prompting-guide.md](../../../docs/prompting-guide.md) を参照。
+**プロンプトの書き方はモデル系統ごとに違う。** SD1.5はdanbooruタグ主体で75トークンまで、
+SDXL / Illustrious系は品質タグを先頭に置き `score_9` 系の記法は使わない、Animaはタグと
+自然文のどちらでもよく絵師タグに `@` を前置する、といった差がある。語順・重み付けの効き方・
+品質タグの記法は [docs/prompting-guide.md](../../../docs/prompting-guide.md) を参照する。
 
 要求に応じて足すブロックは次のとおり。**値域と既定値は書かず、参照先で確かめる。**
 
