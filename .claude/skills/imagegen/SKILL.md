@@ -1,7 +1,7 @@
 ---
 name: imagegen
 description: "自然言語の画像生成要求をGenerationSpecへ落とし込み、preset選択・validate・generateまで実行して出力パスとseedを返す。ComfyUI未起動時やエラー時は原因ごとの切り分けまで担う。Use when: 「〇〇な画像を生成して」「画像を作って」「イラストを生成」「同じキャラで別の構図」「presetを追加して」、/imagegen。"
-allowed-tools: Read, Write, Bash, Glob, Grep
+allowed-tools: Read, Write, Bash, Glob, Grep, AskUserQuestion
 argument-hint: "[生成したい画像の説明]"
 ---
 
@@ -99,7 +99,32 @@ sceneだけ差し替える。プロンプトを一から書き直さない。
 顔立ちまで固定したい場合は [references/character-consistency.md](references/character-consistency.md)
 の手順で基準画像を作り `reference` に指定する。
 
-### 4. Specを作る
+### 4. 一言だけの要求なら、Specを作る前に確認する
+
+「猫の画像を作って」のように要求が一言で、モデル・解像度・画風が読み取れない場合は、
+推測で埋めずに **AskUserQuestion** で聞く。解像度やcheckpointは出来上がりと所要時間を
+決めてしまうため、後から直すと生成をやり直すことになる。
+
+- **発動する場面** — 要求が一言レベルで、下の項目が要求文から決まらないとき
+- **発動しない場面** — 要求に画風・被写体・用途が具体的に書かれているとき、
+  または既存のSpecやpresetを名指しで再利用するとき。この場合は聞かずに進める
+- **聞き方** — 一問一答にする。複数の項目をまとめて1回で聞かない。
+  選択肢は推奨案を先頭に置き、代替案を2つ以上並べる
+- **答えが返らない場合** — 推奨案として提示した値で進め、
+  何を既定にしたかを結果の報告に添える
+
+聞く項目は次の3つに絞る。seed / steps / cfg / samplerはstyle presetと既定値で埋まるため聞かない。
+
+| 項目 | 選択肢の作り方 |
+| --- | --- |
+| モデル (checkpoint) | `ls ~/ComfyUI/models/checkpoints/` で実在するものから、要求に近い系統を推奨案にする。傾向は [配置済みのSD1.5系モデル](../../../docs/prompting-guide.md#配置済みのsd15系モデル) を見て書く |
+| 解像度・アスペクト | 縦長 512x768 / 正方形 512x512 / 横長 768x512 のように、CPU・XPUで現実的な範囲から出す。SDXL系を選んだ場合は1024x1024相当で出す |
+| 画風 (style preset) | `ls presets/styles` の実在するものから出す。checkpointが決まっていれば対応する `sd15-*` / `sdxl-*` / `anima-base` を推奨案にする |
+
+要求から明らかな項目は聞かない。3項目のうち2つが要求文で決まっているなら、
+残る1つだけを聞く。
+
+### 5. Specを作る
 
 `specs/generated/<内容が分かる名前>.yaml` へ保存する (git管理外)。
 
@@ -162,7 +187,7 @@ SDXL / Illustrious系は品質タグを先頭に置き `score_9` 系の記法は
 - 入力画像・参照画像・control画像は `inputs/` へ置く。生成前にComfyUIへ自動でアップロードされるため、
   `~/ComfyUI/input/` へ手で置かない
 
-### 5. validateする
+### 6. validateする
 
 ```bash
 uv run imagegen validate specs/generated/<name>.yaml
@@ -172,7 +197,7 @@ uv run imagegen validate specs/generated/<name>.yaml
 確認する。`text` を書いた場合は `Text:` 行にレイヤ数とフォント名が出る。
 検証を緩めて通すことはしない。
 
-### 6. generateする
+### 7. generateする
 
 ```bash
 uv run imagegen generate specs/generated/<name>.yaml
@@ -200,7 +225,7 @@ uv run imagegen batch specs/generated/a.yaml specs/generated/b.yaml
 uv run imagegen compose inputs/base.png specs/generated/caption.yaml
 ```
 
-### 7. 結果を報告する
+### 8. 結果を報告する
 
 exit codeが0であること、出力ファイルが存在することを確認したうえで、
 **生成された画像のパスとseed** を伝える。テキストを合成した場合は、
