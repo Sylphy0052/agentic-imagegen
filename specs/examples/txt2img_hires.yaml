@@ -1,0 +1,38 @@
+# GenerationSpec のサンプル (preset + hires fix)
+#
+# 検証:  uv run imagegen validate specs/examples/txt2img_hires.yaml
+# 生成:  uv run imagegen generate specs/examples/txt2img_hires.yaml
+#
+# 512x768 で構図を作り、hires fix で 1024x1536 まで引き上げる SD1.5 系の定番構成。
+# 最初から大きい解像度で生成するより構図が破綻しにくい。
+#
+# 生成時間は hires fix なしの倍以上になる。CPU 推論で試す場合は
+# steps と upscale.steps を落としてから実行する。
+
+version: "1"
+task: txt2img
+
+presets:
+  character: anime-boy-hooded
+  scene: studio-white-fullbody
+  style: anime-detailed
+
+generation:
+  width: 512
+  height: 768
+  seed: -1
+  batch_size: 1
+
+  # steps / cfg / sampler / scheduler は style preset 側で指定済み。
+  # 2段目は1段目と同じ cfg / sampler で走る。
+  upscale:
+    scale: 2.0
+    denoise: 0.65
+    steps: 10
+
+model:
+  checkpoint: meinamix_v12Final.safetensors
+
+output:
+  directory: outputs
+  prefix: hires_sample

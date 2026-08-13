@@ -34,6 +34,47 @@ Specの書き方そのものは [spec-reference.md](spec-reference.md)、失敗�
   watermark, signature` のような定型から始める
 - **embeddingはcheckpointの世代に固定される。** SD1.5向けのembeddingはSDXLでは機能しない
 
+### タグをブロックで組む
+
+タグを役割ごとにまとめて並べると、書き換える箇所と使い回せる箇所が分かれる。
+presetの軸もこの区切りに合わせて切る。
+
+| ブロック | 例 | 置き場所 |
+| --- | --- | --- |
+| 品質 | `masterpiece, best quality, high quality, detailed` | style |
+| 大枠 | `1boy, solo, 20years` | character |
+| 外見 | `black hair, short hair, hair over one eye, bangs` | character |
+| 服装 | `black hoodie, hood up, oversized, long sleeves` | character |
+| 表情 | `pale skin, slight smile, mysterious, melancholic` | character |
+| 構図 | `full body, standing, looking at viewer` | scene |
+| 背景 | `simple background, white background` | scene |
+
+A1111 / Forgeでは品質タグを先頭へ置く書き方が通例だが、presetは
+`character` -> `scene` -> `style` の順に連結するため、品質タグは末尾へ回る。
+前方のトークンほど強く効く以上、主題が先に来るこの順の方が意図どおりに効く。
+品質タグを前へ出したい場合はstyleではなくSpec本体の`prompt.positive`へ書く
+(連結順は [spec-reference.md](spec-reference.md#presets) を参照)。
+
+実際の構成は [presets/styles/anime-detailed.yaml](../presets/styles/anime-detailed.yaml) と
+[presets/characters/anime-boy-hooded.yaml](../presets/characters/anime-boy-hooded.yaml)、
+組み合わせた例は
+[specs/examples/txt2img_hires.yaml](../specs/examples/txt2img_hires.yaml) にある。
+
+### hires fixの値
+
+512x768で構図を作り、`upscale.scale: 2.0`で1024x1536へ引き上げるのがSD1.5系の定番。
+
+- `denoise`は0.5-0.65あたりが2段目で描き足す量として扱いやすい。
+  上げるほど元の構図から離れ、下げるほど拡大しただけの絵に近づく
+- `upscale.steps`は1段目の1/3程度 (steps 30なら10) から始める
+- 2段目のcfgとsamplerは1段目と同じ値を使う。片方だけ変える手段は用意していない
+- **`R-ESRGAN 4x+Anime6B`のようなアップスケールモデルは使えない**
+  (latent拡大のみ。[Issue #58](https://github.com/Sylphy0052/agentic-imagegen/issues/58))
+- **外部VAEの差し替えとclip skipの指定も未対応**
+  ([Issue #57](https://github.com/Sylphy0052/agentic-imagegen/issues/57) /
+  [Issue #60](https://github.com/Sylphy0052/agentic-imagegen/issues/60))。
+  clip skipは既定が1相当のため、1で運用している分には差が出ない
+
 ## SDXL / Illustrious系 (novaAnimeXL_ilV190など)
 
 | 項目 | 目安 |

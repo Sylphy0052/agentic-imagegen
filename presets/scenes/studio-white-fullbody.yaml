@@ -1,0 +1,9 @@
+# 白背景のスタジオ撮りのようなシーンpreset。
+# 場所・構図を書く。人物の外見は character 側の責務とする。
+# 背景を持たないため、キャラクタの立ち姿を確認する用途に向く。
+
+description: 白背景、全身の立ち構図
+
+prompt:
+  positive: >
+    full body, standing, looking at viewer, simple background, white background
