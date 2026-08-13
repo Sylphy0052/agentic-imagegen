@@ -7,14 +7,16 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from agentic_imagegen.domain.models import TextSpec
+from agentic_imagegen.domain.models import TextLayer, TextSegment, TextSpec
 from agentic_imagegen.errors import TextCompositionError
+from agentic_imagegen.services import compose as compose_module
 from agentic_imagegen.services.compose import (
     anchor_origin,
     compose_text,
     parse_color,
     wrap_lines,
 )
+from synthetic_font import DESCENDER_CHAR
 
 CANVAS: tuple[int, int] = (400, 300)
 
@@ -889,3 +891,219 @@ class TestComposeTextVerticalWrap:
         # 1列あたりの高さは短くなる
         assert wrapped_box[2] > tall_box[2]
         assert wrapped_box[3] < tall_box[3]
+
+
+class TestComposeTextTateChuYoko:
+    """Issue #40 第2段: 縦中横 (`TextSegment.tate_chu_yoko`)。
+
+    1セルの幅は変わらず (`_line_height` = column_width)、セルの中身だけ横に
+    縮めて収める。stroke込みでタイル描画してから縮小するため、縁取りが縮小されず
+    残ってしまう回帰 (#80と同種) が無いことも確認する。
+    """
+
+    SIZE = 64
+
+    def _text_layer(self, **overrides: object) -> TextLayer:
+        base: dict[str, object] = {
+            "content": "AB",
+            "font": "test.ttf",
+            "size": self.SIZE,
+            "color": "#ff0000",
+            "direction": "vertical",
+        }
+        base.update(overrides)
+        return TextLayer.model_validate(base)
+
+    def _pixels_equal(self, left: Path, right: Path) -> bool:
+        with Image.open(left) as image_left, Image.open(right) as image_right:
+            return image_left.convert("RGBA").tobytes() == image_right.convert("RGBA").tobytes()
+
+    def test_segment_content_without_tate_chu_yoko_matches_string_content(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        # インライン記法ではなく、tate_chu_yokoを使わないセグメント列は
+        # 文字列指定と完全に同じ結果になること (後方互換の回帰テスト)。
+        string_output = base_image.parent / "string.png"
+        segment_output = base_image.parent / "segment.png"
+
+        compose_text(
+            image=base_image,
+            spec=_spec(content="秋葉原駅", direction="vertical", size=self.SIZE),
+            fonts_root=fonts_root,
+            output=string_output,
+        )
+        compose_text(
+            image=base_image,
+            spec=_spec(content=[{"text": "秋葉原駅"}], direction="vertical", size=self.SIZE),
+            fonts_root=fonts_root,
+            output=segment_output,
+        )
+
+        assert self._pixels_equal(string_output, segment_output)
+
+    def test_block_size_is_unaffected_by_tate_chu_yoko(self, fonts_root: Path) -> None:
+        # セル数が同じであれば、tate_chu_yokoの有無で列の幅・行の高さ (block_size)
+        # は変わらない。
+        plain = self._text_layer(content="AB")
+        mixed = self._text_layer(content=[{"text": "A"}, {"text": "12", "tate_chu_yoko": True}])
+
+        resolved = compose_module.ResolvedFont(
+            name="test.ttf", path=fonts_root / "test.ttf", index=0
+        )
+        font = compose_module._load_font(resolved, self.SIZE)
+
+        plain_lines = compose_module._wrap_layer(plain, font, CANVAS)
+        mixed_lines = compose_module._wrap_layer(mixed, font, CANVAS)
+
+        assert compose_module._block_size(plain, font, plain_lines) == compose_module._block_size(
+            mixed, font, mixed_lines
+        )
+
+    def test_content_to_cell_paragraphs_splits_newline_inside_segment(self) -> None:
+        # tate_chu_yoko=False のセグメント内に改行があっても、文字列指定と同じく
+        # 段落として分かれること。
+        paragraphs = compose_module._content_to_cell_paragraphs((TextSegment(text="AB\nCD"),))
+
+        assert [[cell.text for cell in line] for line in paragraphs] == [["A", "B"], ["C", "D"]]
+
+    def test_wrap_cell_lines_preserves_empty_lines(self) -> None:
+        # wrap_lines("A\n\nB", ...) が ["A", "", "B"] を返すのと同じく、
+        # 空行 (段落) を捨てずに残すこと。
+        paragraphs = compose_module._content_to_cell_paragraphs("A\n\nB")
+
+        lines = compose_module._wrap_cell_lines(
+            paragraphs, measure=lambda cells: 999.0, max_width=999.0
+        )
+
+        assert [[cell.text for cell in line] for line in lines] == [["A"], [], ["B"]]
+
+    def test_tate_chu_yoko_cell_fits_within_column_width(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        output = base_image.parent / "out.png"
+        column_width = round(self.SIZE * 1.2)  # _line_height と同じ計算 (line_spacing既定1.2)
+
+        compose_text(
+            image=base_image,
+            spec=_spec(
+                content=[{"text": "1234", "tate_chu_yoko": True}],
+                direction="vertical",
+                anchor="top-left",
+                size=self.SIZE,
+            ),
+            fonts_root=fonts_root,
+            output=output,
+        )
+
+        box = _bounding_box(output)
+        assert box is not None
+        assert (box[2] - box[0]) <= column_width
+
+    def test_tate_chu_yoko_cell_is_drawn_without_resize_when_it_already_fits(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        # 1文字だけの縦中横はセル幅に収まるため、縮小せずそのまま描かれる分岐も通す。
+        output = base_image.parent / "out.png"
+
+        compose_text(
+            image=base_image,
+            spec=_spec(
+                content=[{"text": "1", "tate_chu_yoko": True}],
+                direction="vertical",
+                anchor="top-left",
+                size=self.SIZE,
+            ),
+            fonts_root=fonts_root,
+            output=output,
+        )
+
+        box = _bounding_box(output)
+        assert box is not None
+
+    def test_wrap_does_not_split_a_tate_chu_yoko_cell(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        output = base_image.parent / "out.png"
+        column_width = round(self.SIZE * 1.2)
+
+        compose_text(
+            image=base_image,
+            spec=_spec(
+                content=[{"text": "1234", "tate_chu_yoko": True}],
+                direction="vertical",
+                anchor="top-left",
+                size=self.SIZE,
+                # 文字単位で折り返すと複数列に割れるほど小さい幅。セル単位の
+                # 折り返しでは1セルしかないため、列は増えないはず。
+                max_width=column_width,
+            ),
+            fonts_root=fonts_root,
+            output=output,
+        )
+
+        box = _bounding_box(output)
+        assert box is not None
+        # 列が2本以上に割れていれば幅が column_width を大きく超える
+        assert (box[2] - box[0]) <= column_width
+
+    def test_stroke_is_not_deformed_for_tate_chu_yoko(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        plain = base_image.parent / "plain.png"
+        stroked = base_image.parent / "stroked.png"
+
+        compose_text(
+            image=base_image,
+            spec=_spec(
+                content=[{"text": "12", "tate_chu_yoko": True}],
+                direction="vertical",
+                anchor="top-left",
+                size=self.SIZE,
+            ),
+            fonts_root=fonts_root,
+            output=plain,
+        )
+        compose_text(
+            image=base_image,
+            spec=_spec(
+                content=[{"text": "12", "tate_chu_yoko": True}],
+                direction="vertical",
+                anchor="top-left",
+                size=self.SIZE,
+                stroke={"width": 4, "color": "#00ff00"},
+            ),
+            fonts_root=fonts_root,
+            output=stroked,
+        )
+
+        # 縁取りをタイルに描かず縮小後に足す実装だと、縁取りなしのまま
+        # 描かれてしまい面積が変わらない (#80と同種の罠)。
+        assert _opaque_pixels(stroked) > _opaque_pixels(plain)
+
+    def test_tate_chu_yoko_keeps_descender(self, base_image: Path, fonts_root: Path) -> None:
+        """タイルの高さが字送り1つ分だと descender が切れる。
+
+        フォントの ascender + descender は 1em を超えるため、字送り1つ分
+        (= 1em) の高さしかないタイルへ描くと下端が水平に切り落とされる。
+        IPAゴシックの `gjpq` で実際に踏んだ。合成フォントの `DESCENDER_CHAR` は
+        ascender から descender まで使い切る字形のため、同じ切れ方を再現できる。
+        """
+        output = base_image.parent / "out.png"
+
+        compose_text(
+            image=base_image,
+            spec=_spec(
+                content=[{"text": DESCENDER_CHAR, "tate_chu_yoko": True}],
+                direction="vertical",
+                anchor="top-left",
+                size=self.SIZE,
+            ),
+            fonts_root=fonts_root,
+            output=output,
+        )
+
+        box = _bounding_box(output)
+        assert box is not None
+        # 字形は ascender から descender まで 1em ぶんの高さを持つ。切れていれば
+        # タイルに収まる分 (descender の食み出し分) だけ低くなる。
+        assert (box[3] - box[1]) >= self.SIZE

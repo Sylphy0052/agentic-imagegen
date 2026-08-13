@@ -13,7 +13,7 @@ from typing import Final
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, UnidentifiedImageError
 
-from agentic_imagegen.domain.models import TextAnchor, TextLayer, TextSpec
+from agentic_imagegen.domain.models import TextAnchor, TextLayer, TextSegment, TextSpec
 from agentic_imagegen.domain.policy import display_path, resolve_font
 from agentic_imagegen.errors import TextCompositionError
 
@@ -73,6 +73,72 @@ class ComposeResult:
 
     output: Path
     fonts: tuple[ResolvedFont, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TextCell:
+    """縦書き1列・横書き1行を構成する最小単位。
+
+    通常は1文字=1セルだが、縦中横 (`tate_chu_yoko=True`) では複数文字が
+    1セルへまとまる。折り返し・行間/字送りの計算はすべてセル単位で行うことで、
+    縦中横セルを文字の途中で分割しないようにする。
+    """
+
+    text: str
+    tate_chu_yoko: bool = False
+
+
+def _content_to_cell_paragraphs(content: str | tuple[TextSegment, ...]) -> list[list[TextCell]]:
+    """content を段落 (`\\n` 区切り) ごとのセル列へ正規化する。
+
+    文字列指定は1文字=1セルとして展開し、既存の縦書き (1文字1セル) の挙動と
+    完全に一致させる。セグメント列指定は `tate_chu_yoko=True` のセグメントを
+    1セグメント=1セルとし、`False` のセグメントは文字列指定と同じく1文字ずつ
+    1セルへ展開したうえで隣接するセグメントを同じ段落として連結する。
+    """
+    if isinstance(content, str):
+        return [[TextCell(text=char) for char in paragraph] for paragraph in content.split("\n")]
+
+    paragraphs: list[list[TextCell]] = [[]]
+    for segment in content:
+        if segment.tate_chu_yoko:
+            paragraphs[-1].append(TextCell(text=segment.text, tate_chu_yoko=True))
+            continue
+        for index, part in enumerate(segment.text.split("\n")):
+            if index > 0:
+                paragraphs.append([])
+            paragraphs[-1].extend(TextCell(text=char) for char in part)
+    return paragraphs
+
+
+def _wrap_cell_lines(
+    paragraphs: Sequence[list[TextCell]],
+    *,
+    measure: Callable[[list[TextCell]], float],
+    max_width: float,
+) -> list[list[TextCell]]:
+    """`wrap_lines` と同じ考え方をセル列に適用し、幅を超えたセルの手前で折り返す。
+
+    セル境界でのみ折り返すため、縦中横セルが文字の途中で割れることはない。
+    1セルだけで幅を超える場合も、そのセルを捨てずに1行として残す
+    (`wrap_lines` と同じ規則)。
+    """
+    lines: list[list[TextCell]] = []
+    for paragraph in paragraphs:
+        if not paragraph:
+            lines.append([])
+            continue
+
+        current: list[TextCell] = []
+        for cell in paragraph:
+            candidate = [*current, cell]
+            if current and measure(candidate) > max_width:
+                lines.append(current)
+                current = [cell]
+            else:
+                current = candidate
+        lines.append(current)
+    return lines
 
 
 def parse_color(value: str, *, opacity: float = 1.0) -> tuple[int, int, int, int]:
@@ -306,9 +372,17 @@ def _alpha_scaler(opacity: float) -> Callable[[int], int]:
 
 def _wrap_layer(
     layer: TextLayer, font: ImageFont.FreeTypeFont, canvas_size: tuple[int, int]
-) -> list[str]:
+) -> list[list[TextCell]]:
+    """content をセル単位の行 (横書き) / 列 (縦書き) へ折り返す。
+
+    縦中横セルは `_wrap_cell_lines` がセル境界でしか折り返さないため、
+    ここでは常にセル単位のリストを返す。横書きは tate_chu_yoko セルを
+    持てない (domain 側で検証済み) ため、後続の描画は文字列へ戻して
+    既存ロジックをそのまま使える。
+    """
+    paragraphs = _content_to_cell_paragraphs(layer.content)
     if layer.max_width is None:
-        return layer.content.split("\n")
+        return paragraphs
 
     # 縦書きでは行が縦へ伸びるため、折り返しの基準も画像の高さになる
     axis = canvas_size[1] if layer.direction == "vertical" else canvas_size[0]
@@ -316,8 +390,14 @@ def _wrap_layer(
 
     if layer.direction == "vertical":
         advance = _vertical_advance(layer)
-        return wrap_lines(layer.content, measure=lambda s: len(s) * advance, max_width=limit)
-    return wrap_lines(layer.content, measure=font.getlength, max_width=limit)
+        return _wrap_cell_lines(
+            paragraphs, measure=lambda cells: len(cells) * advance, max_width=limit
+        )
+    return _wrap_cell_lines(
+        paragraphs,
+        measure=lambda cells: font.getlength("".join(cell.text for cell in cells)),
+        max_width=limit,
+    )
 
 
 def _line_height(layer: TextLayer) -> int:
@@ -330,14 +410,18 @@ def _vertical_advance(layer: TextLayer) -> int:
 
 
 def _block_size(
-    layer: TextLayer, font: ImageFont.FreeTypeFont, lines: Sequence[str]
+    layer: TextLayer, font: ImageFont.FreeTypeFont, lines: Sequence[list[TextCell]]
 ) -> tuple[int, int]:
     if layer.direction == "vertical":
         column_width = _line_height(layer)
+        # rows はセル数 (縦中横セルも1セルとして数える)。tate_chu_yokoの
+        # 有無にかかわらず、同じセル数なら同じ高さになる。
         rows = max((len(line) for line in lines), default=0)
         return column_width * len(lines), _vertical_advance(layer) * rows
 
-    width = max((font.getlength(line) for line in lines), default=0.0)
+    width = max(
+        (font.getlength("".join(cell.text for cell in line)) for line in lines), default=0.0
+    )
     return round(width), _line_height(layer) * len(lines)
 
 
@@ -368,7 +452,7 @@ def _draw_box(
 def _render_shadow(
     layer: TextLayer,
     font: ImageFont.FreeTypeFont,
-    lines: Sequence[str],
+    lines: Sequence[list[TextCell]],
     origin: tuple[int, int],
     block: tuple[int, int],
     canvas_size: tuple[int, int],
@@ -397,7 +481,7 @@ def _draw_text(
     canvas: Image.Image,
     layer: TextLayer,
     font: ImageFont.FreeTypeFont,
-    lines: Sequence[str],
+    lines: Sequence[list[TextCell]],
     origin: tuple[int, int],
     block: tuple[int, int],
     *,
@@ -420,19 +504,22 @@ def _draw_horizontal(
     draw: ImageDraw.ImageDraw,
     layer: TextLayer,
     font: ImageFont.FreeTypeFont,
-    lines: Sequence[str],
+    lines: Sequence[list[TextCell]],
     origin: tuple[int, int],
     block: tuple[int, int],
     fill: tuple[int, int, int, int],
     stroke_width: int,
     stroke_fill: tuple[int, int, int, int] | None,
 ) -> None:
+    # 横書きは tate_chu_yoko セルを持たない (domain 側で検証済み) ため、
+    # セルを文字列へ戻せば既存のロジックと完全に同じ結果になる。
     line_height = _line_height(layer)
     for index, line in enumerate(lines):
-        offset = _align_offset(layer.align, block[0], font.getlength(line))
+        text = "".join(cell.text for cell in line)
+        offset = _align_offset(layer.align, block[0], font.getlength(text))
         draw.text(
             (origin[0] + offset, origin[1] + index * line_height),
-            line,
+            text,
             font=font,
             fill=fill,
             stroke_width=stroke_width,
@@ -445,28 +532,43 @@ def _draw_vertical(
     draw: ImageDraw.ImageDraw,
     layer: TextLayer,
     font: ImageFont.FreeTypeFont,
-    lines: Sequence[str],
+    lines: Sequence[list[TextCell]],
     origin: tuple[int, int],
     block: tuple[int, int],
     fill: tuple[int, int, int, int],
     stroke_width: int,
     stroke_fill: tuple[int, int, int, int] | None,
 ) -> None:
-    """縦書きを1文字ずつ配置して描く。
+    """縦書きを1セルずつ配置して描く。
 
     Pillow は縦書きを持たないため自前で並べる。列は右から左へ進める。
-    句読点・小書き文字は右上へ寄せ、長音や括弧などの約物は時計回りに90度回転させる
-    (常時適用、GenerationSpec 側にON/OFFの指定はない)。ルビ・縦中横は対象外。
+    句読点・小書き文字は右上へ寄せ、長音や括弧などの約物は時計回りに90度回転させ、
+    縦中横セル (`tate_chu_yoko=True`) は数文字を横に組んで1セルへ収める
+    (常時適用、GenerationSpec 側にON/OFFの指定はない)。ルビは対象外。
     """
     column_width = _line_height(layer)
     advance = _vertical_advance(layer)
     for column, line in enumerate(lines):
         x = origin[0] + block[0] - (column + 1) * column_width
         column_offset = _align_offset(layer.align, block[1], advance * len(line))
-        for index, char in enumerate(line):
+        for index, cell in enumerate(line):
             y = origin[1] + column_offset + index * advance
+            cell_center = (x + column_width / 2, y + advance / 2)
+            if cell.tate_chu_yoko:
+                _draw_tate_chu_yoko_cell(
+                    canvas,
+                    font,
+                    cell.text,
+                    cell_center,
+                    column_width,
+                    advance,
+                    fill,
+                    stroke_width,
+                    stroke_fill,
+                )
+                continue
+            char = cell.text
             if char in _VERTICAL_ROTATED_CHARS:
-                cell_center = (x + column_width / 2, y + advance / 2)
                 _draw_rotated_vertical_char(
                     canvas, layer, font, char, cell_center, advance, fill, stroke_width, stroke_fill
                 )
@@ -534,6 +636,54 @@ def _draw_rotated_vertical_char(
     )
     dest = (round(cell_center[0] - tile_side / 2), round(cell_center[1] - tile_side / 2))
     canvas.alpha_composite(rotated, dest=dest)
+
+
+def _draw_tate_chu_yoko_cell(
+    canvas: Image.Image,
+    font: ImageFont.FreeTypeFont,
+    text: str,
+    cell_center: tuple[float, float],
+    column_width: int,
+    advance: int,
+    fill: tuple[int, int, int, int],
+    stroke_width: int,
+    stroke_fill: tuple[int, int, int, int] | None,
+) -> None:
+    """縦中横 (数文字を横に組んで1セルへ収める組版) の1セルを描く。
+
+    _draw_rotated_vertical_char と同じく、タイルへ (stroke込みで) 描いてから
+    親キャンバスへ合成する。回転ではなくセル幅を超えた場合の縮小が異なる点が
+    違うだけで、stroke_width / stroke_fill をタイル描画の段階で渡さないと
+    縁取りが縮小されず残ってしまう罠は同じ。
+    """
+    tile_width = max(round(font.getlength(text)) + stroke_width * 2, 1)
+    # 字送り1つ分の高さでは `g` / `j` / `p` / `q` の descender がタイル下端で切れる
+    # (フォントの ascender + descender は 1em を超える)。_draw_rotated_vertical_char が
+    # 正方形タイルを2倍取っているのと同じ理由で、ここも余裕を持たせる。
+    # はみ出した分は透明のまま合成されるので、行の高さも列の幅も変わらない。
+    tile_height = advance * 2 + stroke_width * 2
+    tile = Image.new("RGBA", (tile_width, tile_height), (0, 0, 0, 0))
+    tile_draw = ImageDraw.Draw(tile)
+    tile_draw.text(
+        (stroke_width, tile_height / 2 - advance / 2),
+        text,
+        font=font,
+        fill=fill,
+        stroke_width=stroke_width,
+        stroke_fill=stroke_fill,
+    )
+
+    # 行の高さも列の幅も変えない。テキストが1セル幅に収まらない場合だけ、
+    # 横方向へ縮小して1セルへ収める (縦中横は「セルへ収める」組版のため)。
+    if tile.width > column_width:
+        scale = column_width / tile.width
+        tile = tile.resize(
+            (column_width, max(1, round(tile.height * scale))),
+            resample=Image.Resampling.BICUBIC,
+        )
+
+    dest = (round(cell_center[0] - tile.width / 2), round(cell_center[1] - tile.height / 2))
+    canvas.alpha_composite(tile, dest=dest)
 
 
 def _align_offset(align: str, block_size: float, line_size: float) -> float:

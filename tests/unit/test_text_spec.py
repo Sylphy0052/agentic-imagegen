@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from agentic_imagegen.domain.models import (
     MAX_DIMENSION,
     MAX_FONT_SIZE,
+    MAX_TATE_CHU_YOKO_LENGTH,
     MAX_TEXT_CONTENT_LENGTH,
     MAX_TEXT_LAYERS,
     BoxSpec,
@@ -15,6 +16,7 @@ from agentic_imagegen.domain.models import (
     ShadowSpec,
     StrokeSpec,
     TextLayer,
+    TextSegment,
     TextSpec,
 )
 
@@ -231,6 +233,107 @@ class TestDecorations:
     def test_rejects_opacity_out_of_range(self, opacity: float) -> None:
         with pytest.raises(ValidationError):
             TextLayer.model_validate(_layer(opacity=opacity))
+
+
+class TestTextSegment:
+    def test_builds_with_required_fields_only(self) -> None:
+        segment = TextSegment.model_validate({"text": "7"})
+
+        assert segment.text == "7"
+        assert segment.tate_chu_yoko is False
+
+    def test_rejects_empty_text(self) -> None:
+        with pytest.raises(ValidationError):
+            TextSegment.model_validate({"text": ""})
+
+    def test_rejects_control_characters(self) -> None:
+        with pytest.raises(ValidationError, match="制御文字"):
+            TextSegment.model_validate({"text": "改\x00行"})
+
+    def test_allows_newline_when_not_tate_chu_yoko(self) -> None:
+        segment = TextSegment.model_validate({"text": "一行目\n二行目"})
+
+        assert segment.text == "一行目\n二行目"
+
+    def test_rejects_unknown_field(self) -> None:
+        with pytest.raises(ValidationError):
+            TextSegment.model_validate({"text": "7", "unknown": "x"})
+
+
+class TestTextLayerContentSegments:
+    """Issue #40 第2段: 縦中横 (`TextSegment.tate_chu_yoko`) の検証規則。"""
+
+    def test_accepts_plain_string_content_unchanged(self) -> None:
+        # 縦中横対応前と完全に同じ結果になること (後方互換の回帰テスト)。
+        layer = TextLayer.model_validate(_layer(content="夜の街"))
+
+        assert layer.content == "夜の街"
+
+    def test_accepts_segment_sequence(self) -> None:
+        layer = TextLayer.model_validate(
+            _layer(
+                content=[
+                    {"text": "令和"},
+                    {"text": "7", "tate_chu_yoko": True},
+                    {"text": "年五月"},
+                ],
+                direction="vertical",
+            )
+        )
+
+        assert layer.content == (
+            TextSegment(text="令和"),
+            TextSegment(text="7", tate_chu_yoko=True),
+            TextSegment(text="年五月"),
+        )
+
+    def test_rejects_tate_chu_yoko_over_max_length(self) -> None:
+        text = "1" * (MAX_TATE_CHU_YOKO_LENGTH + 1)
+        with pytest.raises(ValidationError, match=str(MAX_TATE_CHU_YOKO_LENGTH)):
+            TextLayer.model_validate(
+                _layer(content=[{"text": text, "tate_chu_yoko": True}], direction="vertical")
+            )
+
+    def test_accepts_tate_chu_yoko_at_max_length(self) -> None:
+        text = "1" * MAX_TATE_CHU_YOKO_LENGTH
+        layer = TextLayer.model_validate(
+            _layer(content=[{"text": text, "tate_chu_yoko": True}], direction="vertical")
+        )
+
+        assert isinstance(layer.content, tuple)
+        assert layer.content[0].text == text
+
+    def test_rejects_newline_inside_tate_chu_yoko_segment(self) -> None:
+        with pytest.raises(ValidationError, match="改行"):
+            TextLayer.model_validate(
+                _layer(content=[{"text": "1\n2", "tate_chu_yoko": True}], direction="vertical")
+            )
+
+    def test_rejects_tate_chu_yoko_with_horizontal_direction(self) -> None:
+        with pytest.raises(ValidationError, match="horizontal"):
+            TextLayer.model_validate(
+                _layer(content=[{"text": "7", "tate_chu_yoko": True}], direction="horizontal")
+            )
+
+    def test_rejects_total_segment_length_over_limit(self) -> None:
+        segments = [{"text": "あ"} for _ in range(MAX_TEXT_CONTENT_LENGTH + 1)]
+        with pytest.raises(ValidationError, match=str(MAX_TEXT_CONTENT_LENGTH)):
+            TextLayer.model_validate(_layer(content=segments, direction="vertical"))
+
+    def test_accepts_total_segment_length_at_limit(self) -> None:
+        segments = [{"text": "あ"} for _ in range(MAX_TEXT_CONTENT_LENGTH)]
+        layer = TextLayer.model_validate(_layer(content=segments, direction="vertical"))
+
+        assert isinstance(layer.content, tuple)
+        assert len(layer.content) == MAX_TEXT_CONTENT_LENGTH
+
+    def test_rejects_control_characters_in_segment_text(self) -> None:
+        with pytest.raises(ValidationError, match="制御文字"):
+            TextLayer.model_validate(_layer(content=[{"text": "改\x00行"}], direction="vertical"))
+
+    def test_rejects_empty_segment_sequence(self) -> None:
+        with pytest.raises(ValidationError):
+            TextLayer.model_validate(_layer(content=[], direction="vertical"))
 
 
 class TestTextSpec:

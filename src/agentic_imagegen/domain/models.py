@@ -182,8 +182,13 @@ ALLOWED_FONT_SUFFIXES: Final = frozenset({".ttf", ".otf", ".ttc"})
 #: 1枚へ重ねられるテキストレイヤの上限。これ以上は指定が読めなくなる。
 MAX_TEXT_LAYERS: Final = 10
 
-#: 1レイヤに書ける文字数の上限。
+#: 1レイヤに書ける文字数の上限。セグメント列で指定する場合は全セグメント合計で見る。
 MAX_TEXT_CONTENT_LENGTH: Final = 500
+
+#: 縦中横 (縦書き中で数文字を横に組んで1セルへ収める組版) の1セルに書ける文字数の上限。
+#: 「令和7年」の「7」のように短い数字・アルファベットを想定した値で、
+#: これを超えると1セル分の幅へ収まらず可読性が落ちる。
+MAX_TATE_CHU_YOKO_LENGTH: Final = 4
 
 #: フォントサイズの上限。解像度の上限に対して十分大きい。
 MAX_FONT_SIZE: Final = 512
@@ -240,6 +245,17 @@ def _validate_model_filename(value: str, *, allowed_suffixes: frozenset[str]) ->
     if PurePosixPath(segments[-1]).suffix.lower() not in allowed_suffixes:
         allowed = " / ".join(sorted(allowed_suffixes))
         raise ValueError(f"拡張子は {allowed} のいずれかにしてください (指定値: {value})")
+    return value
+
+
+def _reject_control_characters(value: str) -> str:
+    """改行以外の制御文字を拒否する。
+
+    TextLayer.content (文字列指定) と TextSegment.text の両方から使う共通ロジック。
+    改行だけは複数行の指定として許す。
+    """
+    if any(ord(ch) < 32 and ch != "\n" for ch in value):
+        raise ValueError("改行以外の制御文字は指定できません")
     return value
 
 
@@ -634,14 +650,53 @@ class BoxSpec(_StrictModel):
         return _validate_color(value)
 
 
+class TextSegment(_StrictModel):
+    """縦中横などセグメント単位で組版を変える場合の1区間。
+
+    `TextLayer.content` へ文字列の代わりにこの列を渡すと、`tate_chu_yoko=True` の
+    区間だけ縦書き中で数文字を横に組んで1セルへ収める (「令和7年」の「7」など)。
+    ルビは対象外 (列幅が可変になり別の設計変更が要るため、今回は入れない)。
+    """
+
+    text: str = Field(min_length=1)
+    tate_chu_yoko: bool = False
+
+    @field_validator("text")
+    @classmethod
+    def _reject_control_characters_in_text(cls, value: str) -> str:
+        return _reject_control_characters(value)
+
+    @model_validator(mode="after")
+    def _validate_tate_chu_yoko(self) -> TextSegment:
+        if not self.tate_chu_yoko:
+            return self
+        if len(self.text) > MAX_TATE_CHU_YOKO_LENGTH:
+            raise ValueError(
+                f"tate_chu_yokoは{MAX_TATE_CHU_YOKO_LENGTH}文字までしか指定できません "
+                f"(指定文字数: {len(self.text)})"
+            )
+        if "\n" in self.text:
+            raise ValueError("tate_chu_yokoのセグメントに改行は含められません")
+        return self
+
+
 class TextLayer(_StrictModel):
     """重ねるテキスト1件。
 
     fontは fonts/ 配下のファイル名で指定する。実体の解決とルート外への脱出検証は
     domain.policy が担う。
+
+    contentは文字列、またはTextSegmentの並びで指定する。文字列指定は従来どおり
+    横書き・縦書きとも1文字1セルとして扱う。セグメント列は縦中横 (`tate_chu_yoko`)
+    を使いたいときだけ使う書き方で、区切り記号を使ったインライン記法
+    (青空文庫式`｜漢字《かんじ》`等) は採らない。`_VERTICAL_ROTATED_CHARS`が
+    区切り記号候補すべてと衝突するため。
     """
 
-    content: str = Field(min_length=1, max_length=MAX_TEXT_CONTENT_LENGTH)
+    content: (
+        Annotated[str, Field(min_length=1, max_length=MAX_TEXT_CONTENT_LENGTH)]
+        | Annotated[tuple[TextSegment, ...], Field(min_length=1)]
+    )
     font: str = Field(min_length=1)
     #: .ttc のようなコレクションの中で使う書体の索引。
     font_index: Annotated[int, Field(ge=0, le=64)] = 0
@@ -668,11 +723,33 @@ class TextLayer(_StrictModel):
 
     @field_validator("content")
     @classmethod
-    def _reject_control_characters(cls, value: str) -> str:
-        # 改行だけは複数行の指定として許す。
-        if any(ord(ch) < 32 and ch != "\n" for ch in value):
-            raise ValueError("改行以外の制御文字は指定できません")
+    def _reject_control_characters_in_content(
+        cls, value: str | tuple[TextSegment, ...]
+    ) -> str | tuple[TextSegment, ...]:
+        # セグメント列側の制御文字チェックは TextSegment._reject_control_characters_in_text
+        # で完結しているため、ここでは文字列指定のときだけ検査する。
+        if isinstance(value, str):
+            return _reject_control_characters(value)
         return value
+
+    @model_validator(mode="after")
+    def _validate_content_segments(self) -> TextLayer:
+        if not isinstance(self.content, tuple):
+            return self
+
+        total_length = sum(len(segment.text) for segment in self.content)
+        if total_length > MAX_TEXT_CONTENT_LENGTH:
+            raise ValueError(
+                f"contentは{MAX_TEXT_CONTENT_LENGTH}文字までしか指定できません "
+                f"(指定文字数: {total_length})"
+            )
+
+        if self.direction == "horizontal" and any(
+            segment.tate_chu_yoko for segment in self.content
+        ):
+            raise ValueError("direction: horizontalではtate_chu_yokoを指定できません")
+
+        return self
 
     @field_validator("font")
     @classmethod
@@ -846,6 +923,7 @@ __all__ = [
     "TextAnchor",
     "TextDirection",
     "TextLayer",
+    "TextSegment",
     "TextSpec",
     "UpscaleMethod",
     "UpscaleSpec",

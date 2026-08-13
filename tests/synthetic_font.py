@@ -43,6 +43,12 @@ _CMAP_RANGES: tuple[tuple[int, int], ...] = (
 
 _NOTDEF_GLYPH = ".notdef"
 _BLOCK_GLYPH = "block"
+_DESCENDER_GLYPH = "descender"
+
+#: `_DESCENDER_GLYPH` を割り当てる文字。`g` / `j` のようにベースラインより下へ
+#: 伸びる字形を再現するためだけに使う。既存のどの `_CMAP_RANGES` にも含まれない
+#: 符号位置を選ぶことで、他のテストが使う文字の見た目を変えずに済ませている。
+DESCENDER_CHAR = "ƀ"
 
 
 def _block_glyph() -> object:
@@ -65,10 +71,28 @@ def _block_glyph() -> object:
     return pen.glyph()
 
 
+def _descender_glyph() -> object:
+    """ベースラインより下へ深く伸びる矩形のグリフを作る。
+
+    ascender から descender まで使い切ることで、字形の総高が 1em を超える
+    (`_ASCENT - _DESCENT` > `_UNITS_PER_EM`)。Pillow は ascender を基準に描くため、
+    1em ぶんの高さしか無い描画先へ描くと下端が切れる。縦中横のタイルが
+    その高さで足りているかを検証するために使う。
+    """
+    pen = TTGlyphPen(None)
+    margin = _UNITS_PER_EM // 10
+    pen.moveTo((margin, _DESCENT))
+    pen.lineTo((_UNITS_PER_EM - margin, _DESCENT))
+    pen.lineTo((_UNITS_PER_EM - margin, _ASCENT - margin))
+    pen.lineTo((margin, _ASCENT - margin))
+    pen.closePath()
+    return pen.glyph()
+
+
 def build_ttf_bytes() -> bytes:
     """最小のTrueTypeフォントをその場で組み立て、バイト列として返す。"""
     builder = FontBuilder(_UNITS_PER_EM, isTTF=True)
-    glyph_order = [_NOTDEF_GLYPH, _BLOCK_GLYPH]
+    glyph_order = [_NOTDEF_GLYPH, _BLOCK_GLYPH, _DESCENDER_GLYPH]
     builder.setupGlyphOrder(glyph_order)
 
     mapping = {
@@ -76,10 +100,15 @@ def build_ttf_bytes() -> bytes:
         for start, end in _CMAP_RANGES
         for codepoint in range(start, end + 1)
     }
+    mapping[ord(DESCENDER_CHAR)] = _DESCENDER_GLYPH
     builder.setupCharacterMap(mapping)
 
     empty_pen = TTGlyphPen(None)
-    glyphs = {_NOTDEF_GLYPH: empty_pen.glyph(), _BLOCK_GLYPH: _block_glyph()}
+    glyphs = {
+        _NOTDEF_GLYPH: empty_pen.glyph(),
+        _BLOCK_GLYPH: _block_glyph(),
+        _DESCENDER_GLYPH: _descender_glyph(),
+    }
     builder.setupGlyf(glyphs)
 
     metrics = dict.fromkeys(glyph_order, (_ADVANCE_WIDTH, 0))
@@ -99,4 +128,4 @@ def build_ttf_bytes() -> bytes:
     return buffer.getvalue()
 
 
-__all__ = ["build_ttf_bytes"]
+__all__ = ["DESCENDER_CHAR", "build_ttf_bytes"]
