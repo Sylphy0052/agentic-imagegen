@@ -15,6 +15,7 @@ ENV_KEYS = [
     "IMAGEGEN_OUTPUT_ROOT",
     "IMAGEGEN_PRESETS_ROOT",
     "IMAGEGEN_MAX_SOURCE_BYTES",
+    "IMAGEGEN_MAX_UPSCALED_PIXELS",
 ]
 
 
@@ -36,6 +37,7 @@ def test_defaults() -> None:
     assert settings.output_root.name == "outputs"
     assert settings.presets_root.name == "presets"
     assert settings.max_source_bytes == 32 * 1024 * 1024
+    assert settings.max_upscaled_pixels == 16777216
 
 
 def test_override_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -48,6 +50,7 @@ def test_override_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("IMAGEGEN_OUTPUT_ROOT", "tmp-outputs")
     monkeypatch.setenv("IMAGEGEN_PRESETS_ROOT", "tmp-presets")
     monkeypatch.setenv("IMAGEGEN_MAX_SOURCE_BYTES", "1048576")
+    monkeypatch.setenv("IMAGEGEN_MAX_UPSCALED_PIXELS", "2097152")
 
     settings = Settings.from_env()
 
@@ -60,6 +63,7 @@ def test_override_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.output_root.name == "tmp-outputs"
     assert settings.presets_root.name == "tmp-presets"
     assert settings.max_source_bytes == 1048576
+    assert settings.max_upscaled_pixels == 2097152
 
 
 def test_empty_presets_root_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -76,6 +80,7 @@ def test_empty_presets_root_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None
         ("IMAGEGEN_MAX_WIDTH", "0"),
         ("IMAGEGEN_MAX_HEIGHT", "-1"),
         ("IMAGEGEN_MAX_PIXELS", "0"),
+        ("IMAGEGEN_MAX_UPSCALED_PIXELS", "0"),
         ("IMAGEGEN_MAX_BATCH", "0"),
         ("IMAGEGEN_MAX_BATCH", "9999"),
         ("IMAGEGEN_TIMEOUT", "0"),

@@ -302,6 +302,9 @@ generation:
 - `scale`が`model_scale`を超える指定は拒否する (モデルの出力より大きくは引き伸ばさない)
 - **拡大の時点で線が補間されるため、`denoise`はlatent拡大より低めで足りる。** 0.3-0.4が目安。
   latent拡大を同じ`denoise`で使うと、拡大の粗さを2段目が補いきれず絵が崩れることがある
+- **拡大後の解像度にも上限がある。** `IMAGEGEN_MAX_UPSCALED_PIXELS` (既定16777216) と
+  突き合わせるのは最終解像度ではなく途中のピークで、モデル拡大では
+  `width x model_scale` x `height x model_scale` になる
 - pixelへ戻す往復 (VAEDecode / VAEEncode) が挟まるぶん所要時間が伸びる。
   実測は [xpu-setup.md](xpu-setup.md#所要時間とタイムアウトの目安) を参照
 - モデルは`~/ComfyUI/models/upscale_models/`へ置く。配置済みの名前はMCPの`list_upscale_models`で確認する
@@ -696,6 +699,9 @@ hires fixで`upscale.model`まで指定すると`img2img_unet_hires_model`。
 ## 環境変数による上限
 
 このリファレンスに書いた値域はハード制約で、実運用上の上限は環境変数で別途課す。
+解像度の上限はベース解像度 (`IMAGEGEN_MAX_PIXELS`) とhires fixの拡大後
+(`IMAGEGEN_MAX_UPSCALED_PIXELS`) で別に持つ。前者は1段目の生成負荷を抑えるもの、
+後者は拡大時のピークメモリを抑えるもので、目的が違うため同じ値では縛らない。
 両方を満たさない指定は拒否される (exit code 2、環境変数の設定値自体が不正なら9)。
 
 変数名・既定値・用途の一覧は [CLAUDE.mdの「環境変数」](../CLAUDE.md#環境変数) を参照。

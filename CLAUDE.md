@@ -221,6 +221,7 @@ uv run mypy src
 | `IMAGEGEN_MAX_WIDTH` | 2048 | 幅の上限 |
 | `IMAGEGEN_MAX_HEIGHT` | 2048 | 高さの上限 |
 | `IMAGEGEN_MAX_PIXELS` | 4194304 | 総pixel数の上限 (batch込み) |
+| `IMAGEGEN_MAX_UPSCALED_PIXELS` | 16777216 | hires fixの拡大後の総pixel数の上限 (batch込み) |
 | `IMAGEGEN_MAX_BATCH` | 4 | batch_sizeの上限 (4が上限。超える値を設定すると起動時にエラーになる) |
 | `IMAGEGEN_TIMEOUT` | 300 | 生成のタイムアウト秒 |
 | `IMAGEGEN_OUTPUT_ROOT` | `outputs` | 出力ルート |

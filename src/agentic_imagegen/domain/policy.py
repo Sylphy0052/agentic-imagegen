@@ -45,6 +45,34 @@ def validate_against_limits(spec: GenerationSpec, settings: Settings) -> None:
             f"> {settings.max_pixels})"
         )
 
+    _validate_upscaled_pixels(spec, settings)
+
+
+def _validate_upscaled_pixels(spec: GenerationSpec, settings: Settings) -> None:
+    """hires fixの拡大でピークになる解像度を上限と突き合わせる。
+
+    見るのは最終解像度ではなくピーク。モデル拡大は要求された倍率が小さくても
+    一度モデルの固有倍率まで広げてから縮小するため、途中がいちばん大きくなる。
+    latent拡大ではピークと最終が同じになる。
+    """
+    upscale = spec.generation.upscale
+    if upscale is None:
+        return
+
+    params = spec.generation
+    peak_scale = upscale.effective_model_scale if upscale.uses_model else upscale.scale
+    peak_width = int(params.width * peak_scale)
+    peak_height = int(params.height * peak_scale)
+    peak_pixels = peak_width * peak_height * params.batch_size
+
+    if peak_pixels > settings.max_upscaled_pixels:
+        route = "アップスケールモデルでの拡大" if upscale.uses_model else "latent拡大"
+        raise InvalidGenerationSpec(
+            f"拡大後の総pixel数が上限を超えています ({route}: "
+            f"{peak_width}x{peak_height}x{params.batch_size} = {peak_pixels} "
+            f"> {settings.max_upscaled_pixels})"
+        )
+
 
 def resolve_output_directory(directory: str, root: Path) -> Path:
     """出力先を root 配下の絶対パスへ解決する。
