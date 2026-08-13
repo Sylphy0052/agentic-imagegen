@@ -114,10 +114,30 @@ def test_invalid_sampler(sampler: str) -> None:
         GenerationSpec.model_validate(_spec_dict(generation={"sampler": sampler}))
 
 
-@pytest.mark.parametrize("scheduler", ["", "karas", "unknown"])
+@pytest.mark.parametrize("scheduler", ["", "karas", "unknown", "beta57"])
 def test_invalid_scheduler(scheduler: str) -> None:
     with pytest.raises(ValidationError):
         GenerationSpec.model_validate(_spec_dict(generation={"scheduler": scheduler}))
+
+
+# ComfyUI の comfy/samplers.py SCHEDULER_HANDLERS が受け付ける全種。
+@pytest.mark.parametrize(
+    "scheduler",
+    [
+        "normal",
+        "karras",
+        "exponential",
+        "sgm_uniform",
+        "simple",
+        "ddim_uniform",
+        "beta",
+        "linear_quadratic",
+        "kl_optimal",
+    ],
+)
+def test_valid_scheduler(scheduler: str) -> None:
+    spec = GenerationSpec.model_validate(_spec_dict(generation={"scheduler": scheduler}))
+    assert spec.generation.scheduler == scheduler
 
 
 @pytest.mark.parametrize(
