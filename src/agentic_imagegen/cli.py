@@ -168,6 +168,9 @@ def generate_images(
         typer.echo(f"directory: {result.directory}")
         for path in result.files:
             typer.echo(str(path))
+        # 合成結果は生成そのままの画像とは別ファイル。取り違えないよう印を付ける
+        for path in result.text_files:
+            typer.echo(f"text: {path}")
         typer.echo(f"metadata: {result.metadata_path}")
 
 
@@ -286,6 +289,8 @@ def _echo_batch_summary(outcomes: list[BatchOutcome]) -> None:
         if outcome.result is not None:
             for path in outcome.result.files:
                 typer.echo(f"  -> {path}")
+            for path in outcome.result.text_files:
+                typer.echo(f"  -> text: {path}")
         else:
             code = getattr(outcome.error, "exit_code", 1)
             typer.echo(f"  -> FAILED (exit {code}): {outcome.error}")
