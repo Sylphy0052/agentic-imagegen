@@ -133,13 +133,13 @@ def resolve_font(name: str, root: Path, *, project_root: Path | None = None) -> 
     if not resolved.is_file():
         raise TextCompositionError(
             f"フォントが見つかりません: {name}\n"
-            f"  探索ルート: {_display_path(resolved_root, project_root)}\n"
+            f"  探索ルート: {display_path(resolved_root, project_root)}\n"
             f"  {_describe_available_fonts(resolved_root)}"
         )
     return resolved
 
 
-def _display_path(path: Path, project_root: Path | None) -> str:
+def display_path(path: Path, project_root: Path | None) -> str:
     """パスを表示用の文字列へ丸める。
 
     services/mcp_tools.py の `_relative` と同じ方式 (作業ルート配下なら相対パス、
@@ -177,6 +177,7 @@ def _describe_available_fonts(root: Path) -> str:
 
 
 __all__ = [
+    "display_path",
     "resolve_compose_output",
     "resolve_font",
     "resolve_output_directory",

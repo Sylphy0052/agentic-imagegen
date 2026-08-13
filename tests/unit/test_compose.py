@@ -478,6 +478,150 @@ class TestComposeText:
         assert not target.exists()
 
 
+class TestComposeTextDisplayPath:
+    """project_root を渡したときの各エラーメッセージのパス表示。
+
+    絶対パスは実行環境のユーザー名とディレクトリ構成を露出する。PR #32のセキュリティ
+    監査指摘を受け、resolve_font と同じ方式 (作業ルート配下なら相対パス) を
+    compose_text / _open_image / _save 由来のメッセージにも揃える。
+    """
+
+    def test_shows_relative_path_when_output_already_exists(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        project_root = base_image.parent
+        output = project_root / "out.png"
+        output.write_bytes(b"existing")
+
+        with pytest.raises(TextCompositionError) as excinfo:
+            compose_text(
+                image=base_image,
+                spec=_spec(),
+                fonts_root=fonts_root,
+                output=output,
+                project_root=project_root,
+            )
+
+        message = str(excinfo.value)
+        assert "out.png" in message
+        assert str(output) not in message
+
+    def test_shows_relative_path_when_image_exceeds_max_pixels(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        project_root = base_image.parent
+        max_pixels = CANVAS[0] * CANVAS[1] - 1
+
+        with pytest.raises(TextCompositionError) as excinfo:
+            compose_text(
+                image=base_image,
+                spec=_spec(),
+                fonts_root=fonts_root,
+                output=project_root / "out.png",
+                max_pixels=max_pixels,
+                project_root=project_root,
+            )
+
+        message = str(excinfo.value)
+        assert base_image.name in message
+        assert str(base_image) not in message
+
+    def test_shows_relative_path_when_image_unreadable(
+        self, fonts_root: Path, tmp_path: Path
+    ) -> None:
+        project_root = tmp_path
+        broken = project_root / "broken.png"
+        broken.write_bytes(b"not an image")
+
+        with pytest.raises(TextCompositionError) as excinfo:
+            compose_text(
+                image=broken,
+                spec=_spec(),
+                fonts_root=fonts_root,
+                output=project_root / "out.png",
+                project_root=project_root,
+            )
+
+        message = str(excinfo.value)
+        assert "broken.png" in message
+        assert str(broken) not in message
+
+    def test_shows_relative_path_when_output_exists_through_dangling_symlink(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        # display_path は resolve() を経由するため、シンボリックリンク自体の名前
+        # ではなくリンク先の名前で表示される。それでもリンクの絶対パス自体は
+        # 露出しないことを確認する (表示名がリンク先へ変わること自体は許容する)。
+        project_root = base_image.parent
+        target = project_root / "target.png"
+        link = project_root / "link.png"
+        link.symlink_to(target)
+
+        with pytest.raises(TextCompositionError) as excinfo:
+            compose_text(
+                image=base_image,
+                spec=_spec(),
+                fonts_root=fonts_root,
+                output=link,
+                project_root=project_root,
+            )
+
+        message = str(excinfo.value)
+        assert "既に存在" in message
+        assert str(link) not in message
+        assert str(target) not in message
+
+    def test_shows_relative_path_when_save_fails(
+        self, base_image: Path, fonts_root: Path, tmp_path: Path
+    ) -> None:
+        project_root = tmp_path
+        output_dir = project_root / "readonly"
+        output_dir.mkdir()
+        output = output_dir / "out.png"
+        output_dir.chmod(0o500)
+        try:
+            with pytest.raises(TextCompositionError) as excinfo:
+                compose_text(
+                    image=base_image,
+                    spec=_spec(),
+                    fonts_root=fonts_root,
+                    output=output,
+                    project_root=project_root,
+                )
+        finally:
+            output_dir.chmod(0o700)
+
+        message = str(excinfo.value)
+        assert "readonly/out.png" in message
+        assert str(output) not in message
+
+    def test_keeps_absolute_path_when_project_root_omitted(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        output = base_image.parent / "out.png"
+        output.write_bytes(b"existing")
+
+        with pytest.raises(TextCompositionError, match=str(output)):
+            compose_text(image=base_image, spec=_spec(), fonts_root=fonts_root, output=output)
+
+    def test_keeps_absolute_path_when_outside_project_root(
+        self, base_image: Path, fonts_root: Path, tmp_path: Path
+    ) -> None:
+        project_root = tmp_path / "elsewhere"
+        project_root.mkdir()
+        output = base_image.parent / "out.png"
+        output.write_bytes(b"existing")
+
+        with pytest.raises(TextCompositionError, match=str(output)):
+            compose_text(
+                image=base_image,
+                spec=_spec(),
+                fonts_root=fonts_root,
+                output=output,
+                project_root=project_root,
+            )
+
+
 class TestComposeTextAlign:
     """align (`left` / `center` / `right`) が描画位置を変えることの検証。
 
