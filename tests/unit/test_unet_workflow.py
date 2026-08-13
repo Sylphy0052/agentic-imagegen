@@ -9,8 +9,10 @@ import pytest
 
 from agentic_imagegen.adapters.comfyui.workflow import (
     CLIP_LOADER_ROLE,
+    HIRES_KSAMPLER_ROLE,
     TXT2IMG_UNET_BINDING,
     UNET_LOADER_ROLE,
+    UPSCALE_ROLE,
     VAE_LOADER_ROLE,
     build_workflow,
     validate_structure,
@@ -163,3 +165,69 @@ class TestStructureValidation:
 
         with pytest.raises(WorkflowValidationError):
             validate_structure(broken, TXT2IMG_UNET_BINDING)
+
+
+class TestDerivedTemplates:
+    """img2img / hires fix との組み合わせ。CheckpointLoaderが残っていないことまで見る。"""
+
+    @pytest.mark.parametrize(
+        "name",
+        ["txt2img_unet", "txt2img_unet_hires", "img2img_unet", "img2img_unet_hires"],
+    )
+    def test_templates_pass_structure_validation(self, name: str) -> None:
+        template = load_workflow_template(name)
+
+        validate_structure(template, ALLOWED_WORKFLOWS[name])
+
+    @pytest.mark.parametrize(
+        "name",
+        ["txt2img_unet", "txt2img_unet_hires", "img2img_unet", "img2img_unet_hires"],
+    )
+    def test_no_checkpoint_loader_remains(self, name: str) -> None:
+        """1ファイルから MODEL / CLIP / VAE を取り出すノードが残っていてはいけない。"""
+        template = load_workflow_template(name)
+
+        class_types = {node["class_type"] for node in template.values()}
+        assert "CheckpointLoaderSimple" not in class_types
+
+    def test_img2img_vae_encode_uses_separate_vae(self) -> None:
+        """入力画像をVAEEncodeする側も3ローダーのVAEを見る。"""
+        binding = ALLOWED_WORKFLOWS["img2img_unet"]
+        template = load_workflow_template("img2img_unet")
+        vae_encode = binding.nodes["vae_encode"].node_id
+        vae_loader = binding.nodes[VAE_LOADER_ROLE].node_id
+
+        assert template[vae_encode]["inputs"]["vae"] == [vae_loader, 0]
+
+    def test_second_pass_uses_unet_loader(self) -> None:
+        """2段目のKSamplerもUNETLoaderから受ける。"""
+        binding = ALLOWED_WORKFLOWS["txt2img_unet_hires"]
+        template = load_workflow_template("txt2img_unet_hires")
+        second = binding.nodes[HIRES_KSAMPLER_ROLE].node_id
+        unet = binding.nodes[UNET_LOADER_ROLE].node_id
+
+        assert template[second]["inputs"]["model"] == [unet, 0]
+
+    def test_detects_second_pass_bypassing_unet_loader(self) -> None:
+        binding = ALLOWED_WORKFLOWS["txt2img_unet_hires"]
+        broken = copy.deepcopy(load_workflow_template("txt2img_unet_hires"))
+        second = binding.nodes[HIRES_KSAMPLER_ROLE].node_id
+        broken[second]["inputs"]["model"] = [binding.nodes[CLIP_LOADER_ROLE].node_id, 0]
+
+        with pytest.raises(WorkflowValidationError):
+            validate_structure(broken, binding)
+
+    def test_prepare_workflow_for_img2img_and_hires(self) -> None:
+        prepared = prepare_workflow(
+            _spec(
+                task="img2img",
+                source={"image": "inputs/base.png"},
+                generation={"seed": 7, "upscale": {"scale": 1.5, "denoise": 0.4, "steps": 6}},
+            ),
+            source_image_name="base.png",
+        )
+        binding = ALLOWED_WORKFLOWS["img2img_unet_hires"]
+        upscale = prepared.workflow[binding.nodes[UPSCALE_ROLE].node_id]["inputs"]
+
+        assert prepared.workflow_name == "img2img_unet_hires"
+        assert upscale["scale_by"] == 1.5

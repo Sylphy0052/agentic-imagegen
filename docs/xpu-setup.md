@@ -153,8 +153,13 @@ fp16の相対誤差は4.2e-4だった。
 | SD1.5 / 512x768 / 20 steps + ControlNet | Intel XPU | 61.3秒 | 300 |
 | SD1.5 / 512x768 -> 768x1152 (hires fix, 2段目8 steps) | Intel XPU | 135.7秒 | 300 |
 | 同上 + ControlNet | Intel XPU | 136.2秒 / 139.0秒 | 300 |
+| Anima (DiT系) / 640x896 / 16 steps | Intel XPU | 203.3秒 (初回) | 600 |
+| 同上 img2img (denoise 0.55) | Intel XPU | 165.7秒 | 600 |
+| 同上 + hires fix (→960x1344 / 2段目6 steps) | Intel XPU | 324.9秒 | 900 |
+| 同上 img2img + hires fix | Intel XPU | 323.6秒 | 900 |
 
-いずれもモデルロード済み (2回目以降) の値。初回はモデルロードの分だけ上乗せされる。
+SD1.5系はモデルロード済み (2回目以降) の値。初回はモデルロードの分だけ上乗せされる。
+Anima系はSD1.5系より1stepあたりが重く、配布元推奨の832x1216 / 32 stepsはさらに伸びる。
 
 ControlNet / IPAdapterを使うと1-2割、hires fixを使うと倍以上に伸びる。
 hires fixとControlNetを併用してもControlNetは1段目にしか効かないため、hires fix単独からの

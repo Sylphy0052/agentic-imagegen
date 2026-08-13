@@ -42,6 +42,9 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `img2img_controlnet_ipadapter.json` | ControlNet + IPAdapter (img2img) |
 | `img2img_lora_controlnet_ipadapter.json` | LoRA + ControlNet + IPAdapter (img2img) |
 | `txt2img_unet.json` | UNet / text encoder / VAEを別々に読むtext-to-image (DiT系) |
+| `txt2img_unet_hires.json` | DiT系 + hires fix |
+| `img2img_unet.json` | DiT系のimage-to-image |
+| `img2img_unet_hires.json` | DiT系 + hires fix (img2img) |
 
 どれを使うかは `task` と `model.loras` / `generation.upscale` / `control` / `reference` の有無、
 `model.unet` の指定で自動的に決まる。定義は
@@ -154,10 +157,16 @@ hires fixとIPAdapterの組み合わせは作っていない (Specの検証で�
 `*_ipadapter` は [ComfyUI_IPAdapter_plus](https://github.com/cubiq/ComfyUI_IPAdapter_plus)
 のノードを使う。未導入のComfyUIでは投入が拒否される。
 
-`txt2img_unet` はDiT系モデル (Animaなど) 向けで、`CheckpointLoaderSimple` を3つのローダーへ
+`*_unet` はDiT系モデル (Animaなど) 向けで、`CheckpointLoaderSimple` を3つのローダーへ
 置き換える。UNet単体で配布されるモデルはtext encoderとVAEを同梱しておらず、1ファイルから
-MODEL / CLIP / VAEを取り出す前提が崩れるため。LoRA / img2img / hires fix / ControlNet /
-IPAdapterとの組み合わせは作っていない (Specの検証で併用を拒否している)。
+MODEL / CLIP / VAEを取り出す前提が崩れるため。
+
+ローダーを分けてから他の派生をかける順で合成する。逆順にすると、後から足した2段目の
+KSamplerが `CheckpointLoaderSimple` を見たまま残る。img2img では入力画像を `VAEEncode` する
+側も `VAELoader` から受け直す。
+
+LoRA / ControlNet / IPAdapterとの組み合わせは作っていない (Specの検証で併用を拒否している)。
+`control_v11p_sd15_*` も `ip-adapter-plus_sd15` もSD1.5向けで、DiT系のUNetへは適用できない。
 
 ## GUIから書き出す手順
 

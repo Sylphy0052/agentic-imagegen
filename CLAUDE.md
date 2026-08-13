@@ -96,8 +96,9 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
 - **style presetはモデル系統ごとに用意する。** `anime-soft` はSD1.5向け、`anima-base` はAnima向け。
   品質タグとサンプラー設定はモデルの学習内容に依存するため流用しない
 - **併用できない組み合わせがある。** hires fixとIPAdapter、DiT系モデルと
-  LoRA / img2img / hires fix / ControlNet / IPAdapterは指定するとその場で拒否される。
+  LoRA / ControlNet / IPAdapterは指定するとその場で拒否される。
   hires fixとControlNetは併用できる (ControlNetが効くのは1段目だけ)。
+  DiT系モデルはimg2img / hires fixと併用できる。
   一覧は [組み合わせの可否](docs/spec-reference.md#組み合わせの可否)
 - **読める日本語が要求されたら生成に任せず `text` で合成する。**
   SD1.5 / SDXL系のモデルは日本語をほぼ描けない

@@ -267,9 +267,11 @@ model:
   vae: qwen_image_vae.safetensors
 ```
 
-- テンプレートは`txt2img_unet`へ切り替わる
-- **LoRA / img2img / hires fix / ControlNet / IPAdapterとは併用できない。**
-  テンプレートを用意していないため、指定するとその場で拒否される
+- テンプレートは`<task>_unet`へ切り替わる (`txt2img_unet` / `img2img_unet`)
+- **img2img / hires fixとは併用できる。** `generation.upscale`を足すと`<task>_unet_hires`になる
+- **LoRA / ControlNet / IPAdapterとは併用できない。** `control_v11p_sd15_*`も
+  `ip-adapter-plus_sd15`もSD1.5向けで、DiT系のUNetへは適用できない。
+  LoRAも同様に、SD1.5 / SDXL向けのものは当てられない
 - text encoderとVAEはUNetと対応関係がある。AnimaならQwen3-0.6BとQwen-Image VAE
 - モデル名はMCPの`list_diffusion_models` / `list_text_encoders` / `list_vaes`で確認する
 
@@ -525,7 +527,7 @@ outputs/
 | **hires fix** | 可 | 可 | - | 可 | **不可** | 可 |
 | **ControlNet** | 可 | 可 | 可 | - | 可 | 可 |
 | **IPAdapter** | 可 | 可 | **不可** | 可 | - | 可 |
-| **DiT系 (unet/clip/vae)** | **不可** | **不可** | **不可** | **不可** | **不可** | 可 |
+| **DiT系 (unet/clip/vae)** | **不可** | 可 | 可 | **不可** | **不可** | 可 |
 
 `text`は生成後の後処理のため、どの構成とも併用できる。
 
@@ -536,23 +538,27 @@ outputs/
 
 不可の組み合わせを指定した場合はSpecの検証時 (exit code 2) に拒否する。理由と着手条件は
 [Issue #38](https://github.com/Sylphy0052/agentic-imagegen/issues/38) (hires fixとIPAdapterの併用) と
-[Issue #39](https://github.com/Sylphy0052/agentic-imagegen/issues/39) (DiT系との併用) にまとめてある。
+[Issue #39](https://github.com/Sylphy0052/agentic-imagegen/issues/39)
+(DiT系とLoRA / ControlNet / IPAdapterの併用) にまとめてある。
 
 ## Workflowテンプレートの決まり方
 
 Specの内容から自動的に決まる。`uv run imagegen validate`の`Workflow:`行で確認できる。
 
-- `model.unet`を指定した場合は`<task>_unet` (他の分岐とは併用不可)
-- それ以外は`<task>`へ次の順で接尾辞を足す
+`<task>`へ次の順で接尾辞を足す。
 
 | 順 | 条件 | 接尾辞 |
 | --- | --- | --- |
-| 1 | `model.loras`が空でない | `_lora` |
+| 1 | `model.unet`を指定 | `_unet` |
+| 1 | `model.loras`が空でない (`model.unet`が無い場合) | `_lora` |
 | 2 | `generation.upscale`を指定 | `_hires` |
 | 3 | `control`を指定 | `_controlnet` |
 | 4 | `reference`を指定 | `_ipadapter` |
 
+`_unet`と`_lora`は同じ位置に入り、両立しない (DiT系とLoRAの併用は拒否される)。
+
 例: `task: txt2img`にLoRAとControlNetを指定すると`txt2img_lora_controlnet`。
+`task: img2img`にDiT系モデルとhires fixを指定すると`img2img_unet_hires`。
 
 テンプレートの一覧と各構成のノード内訳、作り直しの手順は
 [workflows/README.md](../workflows/README.md) を参照。
