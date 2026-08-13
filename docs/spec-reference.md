@@ -265,6 +265,7 @@ generation:
 | `clip` | string | `null` | `~/ComfyUI/models/text_encoders/`のファイル名 |
 | `vae` | string | `null` | `~/ComfyUI/models/vae/`のファイル名 |
 | `loras` | list | `[]` | 適用するLoRA。同時3件まで |
+| `clip_skip` | int | `null` | CLIPの最終層を何層手前で打ち切るか。1-12 |
 
 配置済みのcheckpointごとの絵柄とcfg / stepsの目安は
 [prompting-guide.md](prompting-guide.md#配置済みのsd15系モデル)にある。
@@ -297,6 +298,26 @@ model:
 - 同じLoRAの重複指定は拒否する。二重に積むと意図しない強度になるため
 - 指定するとテンプレートが`*_lora`へ自動的に切り替わる
 - 配置先は`~/ComfyUI/models/loras/`。実在しない名前を指定するとComfyUI側で拒否される
+
+### model.clip_skip
+
+SD1.5系のアニメ調モデルには、CLIPの最終層を1つ手前で打ち切るclip skip 2を前提に
+学習しているものが多い (NovelAI系の系譜)。配布元が推奨値を明記していることが多く、
+そこに合わせて指定する。
+
+```yaml
+model:
+  checkpoint: meinamix_v12Final.safetensors
+  clip_skip: 2
+```
+
+- 値域は1-12。ComfyUIの`CLIPSetLastLayer`は`stop_at_clip_layer`として-1から-24を
+  受け付けるが、実用は1-2程度のため`clip_skip`の値をそのまま`-clip_skip`へ変換して渡す
+- **未指定時はComfyUI既定 (clip skip 1相当、`stop_at_clip_layer: -1`) のまま動く。**
+  既存のSpecの出力に影響しない
+- `model.loras`と併用する場合、打ち切りはLoRA適用後のCLIPに対して効く
+  (`LoraLoader`の後段に挿入されるため)
+- **DiT系 (`unet` + `clip` + `vae`) とは併用できない。** text encoderの構造が異なるため
 
 ### DiT系モデル (Anima)
 

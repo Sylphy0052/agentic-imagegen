@@ -62,6 +62,14 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | 7 | `CLIPTextEncode` | negative prompt |
 | 8 | `VAEDecode` | - |
 | 9 | `SaveImage` | filename_prefix |
+| 70 | `CLIPSetLastLayer` | stop_at_clip_layer (clip skip) |
+
+`CLIPTextEncode` (6, 7) の `clip` 入力はCLIPの供給元へ直結せず、必ず70
+(`CLIPSetLastLayer`) 経由で受ける。70の `clip` 入力は素の構成では
+`CheckpointLoaderSimple` (4のスロット1) から受け、`stop_at_clip_layer` の既定値は
+`-1` (ComfyUI既定と同値の素通し)。`model.clip_skip` を指定しない限り出力は
+このノードが無かった頃と完全に一致する。全29テンプレートへ無条件に挿入してあり、
+派生テンプレートを増やしていない ([Issue #60](https://github.com/Sylphy0052/agentic-imagegen/issues/60))。
 
 `txt2img_lora.json` は上記に `LoraLoader` を3段挟んだもの。
 
@@ -71,7 +79,8 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | 11 | `LoraLoader` | 2本目 (10から受ける) |
 | 12 | `LoraLoader` | 3本目 (11から受ける) |
 
-12のMODELが `KSampler.model` へ、CLIPが `CLIPTextEncode` 2つの `clip` へ繋がる。
+12のMODELが `KSampler.model` へ、CLIPが70 (`CLIPSetLastLayer`) の `clip` へ繋がる
+(LoRA適用後のCLIPに対して層を打ち切るため、`CLIPTextEncode` へは直結しない)。
 `VAEDecode.vae` は `LoraLoader` がVAEを出さないため `CheckpointLoaderSimple` 直結のまま。
 
 指定されたLoRAは先頭のスロットから順に割り当てる。余ったスロットは
@@ -145,6 +154,7 @@ txt2img.json  (手書きベース)
 | 40-43 | ControlNet (LoadImage / Canny / ControlNetLoader / ControlNetApplyAdvanced) |
 | 50-53 | IPAdapter (LoadImage / IPAdapterModelLoader / CLIPVisionLoader / IPAdapterAdvanced) |
 | 60-62 | DiT系のローダー分割 (UNETLoader / CLIPLoader / VAELoader) |
+| 70 | clip skip (CLIPSetLastLayer、全テンプレート共通で1個) |
 
 hires fixとControlNetの組み合わせ (`*_hires_controlnet`) は、hiresを重ねてからControlNetを
 かける順で合成している。この順にすると `ControlNetApplyAdvanced` が差し替えるのは1段目の

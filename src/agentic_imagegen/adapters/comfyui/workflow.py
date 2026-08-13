@@ -51,10 +51,14 @@ class WorkflowBinding:
     links: tuple[LinkRef, ...]
 
 
+#: clip skip (CLIPSetLastLayer) の役割名。全テンプレートへ無条件に挿入する。
+CLIP_SKIP_ROLE: Final = "clip_skip"
+
 TXT2IMG_BINDING: Final = WorkflowBinding(
     name="txt2img",
     nodes={
         "checkpoint": NodeRef("4", "CheckpointLoaderSimple", ("ckpt_name",)),
+        CLIP_SKIP_ROLE: NodeRef("70", "CLIPSetLastLayer", ("stop_at_clip_layer",)),
         "positive_prompt": NodeRef("6", "CLIPTextEncode", ("text",)),
         "negative_prompt": NodeRef("7", "CLIPTextEncode", ("text",)),
         "latent": NodeRef("5", "EmptyLatentImage", ("width", "height", "batch_size")),
@@ -70,6 +74,10 @@ TXT2IMG_BINDING: Final = WorkflowBinding(
         LinkRef("ksampler", "negative", "negative_prompt"),
         LinkRef("ksampler", "latent_image", "latent"),
         LinkRef("ksampler", "model", "checkpoint"),
+        # CLIPTextEncodeはCLIPの供給元へ直結せず、必ずCLIPSetLastLayer経由で受ける。
+        LinkRef("positive_prompt", "clip", CLIP_SKIP_ROLE),
+        LinkRef("negative_prompt", "clip", CLIP_SKIP_ROLE),
+        LinkRef(CLIP_SKIP_ROLE, "clip", "checkpoint"),
     ),
 )
 
@@ -95,8 +103,8 @@ def _to_separate_loaders(base: WorkflowBinding, *, name: str) -> WorkflowBinding
     links = [link for link in base.links if link.expected_role != "checkpoint"]
     links += [
         LinkRef("ksampler", "model", UNET_LOADER_ROLE),
-        LinkRef("positive_prompt", "clip", CLIP_LOADER_ROLE),
-        LinkRef("negative_prompt", "clip", CLIP_LOADER_ROLE),
+        # CLIPTextEncodeは変わらずclip_skip経由。clip_skipの供給元だけ差し替える。
+        LinkRef(CLIP_SKIP_ROLE, "clip", CLIP_LOADER_ROLE),
         LinkRef("vae_decode", "vae", VAE_LOADER_ROLE),
     ]
     if "vae_encode" in nodes:
@@ -125,16 +133,21 @@ def _with_lora_chain(base: WorkflowBinding, *, name: str, first_node_id: int) ->
     for index, role in enumerate(LORA_SLOT_ROLES):
         nodes[role] = NodeRef(str(first_node_id + index), "LoraLoader", _LORA_INPUTS)
 
-    # KSamplerのmodelはLoRAの最終段から来るようになるため、元のリンクを差し替える
-    links = [link for link in base.links if link.input_key != "model"]
+    # KSamplerのmodelとclip_skipの供給元はLoRAの最終段から来るようになるため、
+    # 元のリンクを差し替える。CLIPTextEncodeは変わらずclip_skip経由のまま。
+    links = [
+        link
+        for link in base.links
+        if link.input_key != "model"
+        and not (link.source_node == CLIP_SKIP_ROLE and link.input_key == "clip")
+    ]
     upstream = "checkpoint"
     for role in LORA_SLOT_ROLES:
         links.append(LinkRef(role, "model", upstream))
         links.append(LinkRef(role, "clip", upstream))
         upstream = role
     links.append(LinkRef("ksampler", "model", upstream))
-    links.append(LinkRef("positive_prompt", "clip", upstream))
-    links.append(LinkRef("negative_prompt", "clip", upstream))
+    links.append(LinkRef(CLIP_SKIP_ROLE, "clip", upstream))
 
     return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
 
@@ -196,6 +209,7 @@ IMG2IMG_BINDING: Final = WorkflowBinding(
     name="img2img",
     nodes={
         "checkpoint": NodeRef("4", "CheckpointLoaderSimple", ("ckpt_name",)),
+        CLIP_SKIP_ROLE: NodeRef("70", "CLIPSetLastLayer", ("stop_at_clip_layer",)),
         "positive_prompt": NodeRef("6", "CLIPTextEncode", ("text",)),
         "negative_prompt": NodeRef("7", "CLIPTextEncode", ("text",)),
         "source_image": NodeRef("10", "LoadImage", ("image",)),
@@ -215,6 +229,10 @@ IMG2IMG_BINDING: Final = WorkflowBinding(
         LinkRef("ksampler", "model", "checkpoint"),
         LinkRef("vae_encode", "pixels", "source_image"),
         LinkRef("vae_encode", "vae", "checkpoint"),
+        # CLIPTextEncodeはCLIPの供給元へ直結せず、必ずCLIPSetLastLayer経由で受ける。
+        LinkRef("positive_prompt", "clip", CLIP_SKIP_ROLE),
+        LinkRef("negative_prompt", "clip", CLIP_SKIP_ROLE),
+        LinkRef(CLIP_SKIP_ROLE, "clip", "checkpoint"),
     ),
 )
 
@@ -491,6 +509,7 @@ def build_workflow(
     inputs_of("save_image")["filename_prefix"] = spec.output.prefix
 
     _inject_loras(spec, binding, inputs_of)
+    _inject_clip_skip(spec, binding, inputs_of)
     _inject_source_image(spec, binding, inputs_of, source_image_name)
     _inject_upscale(spec, binding, inputs_of, seed=seed)
     _inject_controlnet(spec, binding, inputs_of, control_image_name)
@@ -528,6 +547,27 @@ def _inject_model(
             "Specでは unet / clip / vae が指定されています"
         )
     inputs_of("checkpoint")["ckpt_name"] = spec.model.checkpoint
+
+
+def _inject_clip_skip(
+    spec: GenerationSpec,
+    binding: WorkflowBinding,
+    inputs_of: Callable[[str], dict[str, Any]],
+) -> None:
+    """CLIPSetLastLayerへclip skipの値を注入する。
+
+    未指定 (None) の場合はテンプレートの既定値 (stop_at_clip_layer=-1、ComfyUI既定と
+    同値の素通し) をそのまま使う。これにより model.clip_skip 未指定時の出力は
+    現状と完全に一致する。
+    """
+    if CLIP_SKIP_ROLE not in binding.nodes:
+        return
+
+    clip_skip = spec.model.clip_skip
+    if clip_skip is None:
+        return
+
+    inputs_of(CLIP_SKIP_ROLE)["stop_at_clip_layer"] = -clip_skip
 
 
 def _inject_reference(
@@ -694,6 +734,7 @@ def _inject_loras(
 
 
 __all__ = [
+    "CLIP_SKIP_ROLE",
     "CONTROL_APPLY_ROLE",
     "CONTROL_IMAGE_ROLE",
     "CONTROL_LOADER_ROLE",
