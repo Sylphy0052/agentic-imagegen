@@ -81,6 +81,38 @@ def test_normalize(tagcheck: types.ModuleType, raw: str, expected: str) -> None:
     assert tagcheck.normalize(raw) == expected
 
 
+# --- strip_weight --------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # 重みを付けたまま問い合わせると実在するタグでも「存在しない」と誤報する。
+        ("(1girl:1.3)", "1girl"),
+        ("(masterpiece:1.2)", "masterpiece"),
+        ("[night:0.8]", "night"),
+        ("(solo)", "solo"),
+        ("((solo))", "solo"),
+        ("(hair over one eye:1.1)", "hair over one eye"),
+        # 括弧が無ければ触らない。Danbooruに実在する顔文字タグを壊さないため。
+        (":3", ":3"),
+        (":d", ":d"),
+        ("1girl", "1girl"),
+        ("^_^", "^_^"),
+    ],
+)
+def test_strip_weight(tagcheck: types.ModuleType, raw: str, expected: str) -> None:
+    assert tagcheck.strip_weight(raw) == expected
+
+
+def test_normalize_drops_weight(tagcheck: types.ModuleType) -> None:
+    assert tagcheck.normalize("(Hair Over One Eye:1.3),") == "hair_over_one_eye"
+
+
+def test_normalize_keeps_emoticon_tag(tagcheck: types.ModuleType) -> None:
+    assert tagcheck.normalize(":3,") == ":3"
+
+
 # --- verdict -------------------------------------------------------------
 
 
@@ -103,6 +135,12 @@ def test_verdict_missing(tagcheck: types.ModuleType, count: int | None) -> None:
 
 def test_verdict_quality_label_ignores_count(tagcheck: types.ModuleType) -> None:
     assert "品質ラベル" in tagcheck.verdict("masterpiece", 0)
+
+
+@pytest.mark.parametrize("score", [f"score_{n}" for n in range(1, 10)])
+def test_verdict_covers_all_aesthetic_scores(tagcheck: types.ModuleType, score: str) -> None:
+    """references/tag-replacements.md は score_1 から score_9 を品質ラベルと書いている。"""
+    assert "品質ラベル" in tagcheck.verdict(score, 0)
 
 
 def test_verdict_legacy_tag_ignores_count(tagcheck: types.ModuleType) -> None:

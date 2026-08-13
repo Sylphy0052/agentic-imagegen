@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -44,17 +45,17 @@ QUALITY_LABELS = frozenset(
         "worst_quality",
         "high_score",
         "great_score",
-        "score_1",
-        "score_2",
-        "score_3",
-        "score_7",
-        "score_8",
-        "score_9",
     }
+    # Anima系のaesthetic score。references/tag-replacements.md の記述
+    # (score_1 から score_9) と食い違わないよう連番で生成する。
+    | {f"score_{n}" for n in range(1, 10)}
 )
 
 # 現在のDanbooruでは整理されているが、古い世代のcheckpointの学習データには存在したもの。
 LEGACY_TAGS = frozenset({"bangs"})
+
+# A1111系の重み付け記法。`(tag:1.3)` / `(tag)` / `[tag]` を1段ずつ剥がす。
+_WEIGHTED = re.compile(r"[(\[]\s*(?P<tag>.+?)\s*(?::\s*[0-9]*\.?[0-9]+\s*)?[)\]]")
 
 MISSING = "存在しない (置換または削除)"
 WEAK = "件数が少なく効きにくい (置換を検討)"
@@ -73,13 +74,27 @@ FETCH_ERRORS = (
 )
 
 
+def strip_weight(tag: str) -> str:
+    """`(tag:1.3)` のような重み付け記法からタグ名だけを取り出す。
+
+    重みを付けたまま問い合わせると実在するタグでも「存在しない」と誤報する。
+    外すのは括弧で囲まれている場合だけにする。`:3` や `:d` はDanbooruに実在する
+    顔文字タグであり、コロン以降を無条件に落とすとこれらを壊す。
+    """
+    while True:
+        stripped = _WEIGHTED.fullmatch(tag.strip())
+        if stripped is None:
+            return tag.strip()
+        tag = stripped.group("tag")
+
+
 def normalize(tag: str) -> str:
     """問い合わせ用のタグ名へ揃える。
 
     プロンプトをシェルへ貼ると `1girl, solo` のようにカンマが各トークンへ残る。
     そのまま問い合わせると実在するタグを「存在しない」と誤判定するため落とす。
     """
-    return tag.strip().strip(",").strip().lower().replace(" ", "_")
+    return strip_weight(tag.strip().strip(",")).lower().replace(" ", "_")
 
 
 def build_url(tag: str) -> str:
