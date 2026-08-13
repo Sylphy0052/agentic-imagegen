@@ -39,7 +39,7 @@
     "inputs": {
       "text": "",
       "clip": [
-        "61",
+        "70",
         0
       ]
     }
@@ -49,7 +49,7 @@
     "inputs": {
       "text": "",
       "clip": [
-        "61",
+        "70",
         0
       ]
     }
@@ -133,6 +133,16 @@
     "class_type": "VAELoader",
     "inputs": {
       "vae_name": "qwen_image_vae.safetensors"
+    }
+  },
+  "70": {
+    "class_type": "CLIPSetLastLayer",
+    "inputs": {
+      "stop_at_clip_layer": -1,
+      "clip": [
+        "61",
+        0
+      ]
     }
   }
 }

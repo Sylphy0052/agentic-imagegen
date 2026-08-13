@@ -45,8 +45,8 @@
     "inputs": {
       "text": "",
       "clip": [
-        "12",
-        1
+        "70",
+        0
       ]
     }
   },
@@ -55,8 +55,8 @@
     "inputs": {
       "text": "",
       "clip": [
-        "12",
-        1
+        "70",
+        0
       ]
     }
   },
@@ -127,6 +127,16 @@
       ],
       "clip": [
         "11",
+        1
+      ]
+    }
+  },
+  "70": {
+    "class_type": "CLIPSetLastLayer",
+    "inputs": {
+      "stop_at_clip_layer": -1,
+      "clip": [
+        "12",
         1
       ]
     }

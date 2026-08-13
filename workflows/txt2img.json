@@ -32,14 +32,14 @@
     "class_type": "CLIPTextEncode",
     "inputs": {
       "text": "",
-      "clip": ["4", 1]
+      "clip": ["70", 0]
     }
   },
   "7": {
     "class_type": "CLIPTextEncode",
     "inputs": {
       "text": "",
-      "clip": ["4", 1]
+      "clip": ["70", 0]
     }
   },
   "8": {
@@ -54,6 +54,13 @@
     "inputs": {
       "filename_prefix": "imagegen",
       "images": ["8", 0]
+    }
+  },
+  "70": {
+    "class_type": "CLIPSetLastLayer",
+    "inputs": {
+      "stop_at_clip_layer": -1,
+      "clip": ["4", 1]
     }
   }
 }

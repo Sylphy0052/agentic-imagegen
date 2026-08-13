@@ -58,6 +58,7 @@ REFERENCE_APPLY = "53"
 UNET_LOADER = "60"
 UNET_CLIP_LOADER = "61"
 UNET_VAE_LOADER = "62"
+CLIP_SKIP = "70"
 
 DEFAULT_LORA = "add_detail.safetensors"
 DEFAULT_SOURCE_IMAGE = "example.png"
@@ -89,6 +90,7 @@ OUTPUT_COUNTS = {
     "CLIPLoader": 1,
     "VAELoader": 1,
     "IPAdapterAdvanced": 1,
+    "CLIPSetLastLayer": 1,
 }
 
 Graph = dict[str, dict[str, Any]]
@@ -138,8 +140,8 @@ def to_separate_loaders(graph: Graph) -> Graph:
     }
 
     graph[KSAMPLER]["inputs"]["model"] = [UNET_LOADER, 0]
-    graph[POSITIVE]["inputs"]["clip"] = [UNET_CLIP_LOADER, 0]
-    graph[NEGATIVE]["inputs"]["clip"] = [UNET_CLIP_LOADER, 0]
+    # CLIPTextEncodeは変わらずCLIPSetLastLayer経由。供給元だけ差し替える
+    graph[CLIP_SKIP]["inputs"]["clip"] = [UNET_CLIP_LOADER, 0]
     graph[VAE_DECODE]["inputs"]["vae"] = [UNET_VAE_LOADER, 0]
     if IMG2IMG_VAE_ENCODE in graph:
         # img2imgでは入力画像をVAEEncodeする側もCheckpointLoaderのVAEを見ている
@@ -180,8 +182,9 @@ def with_lora_chain(graph: Graph, node_ids: tuple[str, ...]) -> Graph:
 
     last = node_ids[-1]
     graph[KSAMPLER]["inputs"]["model"] = [last, 0]
-    graph[POSITIVE]["inputs"]["clip"] = [last, 1]
-    graph[NEGATIVE]["inputs"]["clip"] = [last, 1]
+    # CLIPTextEncodeは変わらずCLIPSetLastLayer経由。CLIPSetLastLayerの供給元を
+    # LoRAチェーンの最終段へ差し替える (LoRA適用後のCLIPに対して層を打ち切るため)
+    graph[CLIP_SKIP]["inputs"]["clip"] = [last, 1]
     # VAE は LoraLoader を通らないため CheckpointLoader 直結のまま
     return graph
 

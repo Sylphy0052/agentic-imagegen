@@ -93,6 +93,11 @@ ALLOWED_LORA_SUFFIXES: Final = frozenset({".safetensors", ".pt", ".ckpt"})
 #: 同時に適用できるLoRAの本数。Workflowテンプレート側のLoraLoaderの段数と一致させる。
 MAX_LORAS: Final = 3
 
+#: clip_skipの実用上の範囲。ComfyUIのCLIPSetLastLayerは-1から-24を受け付けるが、
+#: 実用は1-2 (NovelAI系の慣習で2まで) のため、余裕を持たせつつ絞る。
+MIN_CLIP_SKIP: Final = 1
+MAX_CLIP_SKIP: Final = 12
+
 #: strengthの実用上の範囲。ComfyUI自体は±100を許すが、事故を防ぐため絞る。
 LORA_STRENGTH_LIMIT: Final = 10.0
 
@@ -320,6 +325,10 @@ class ModelSpec(_StrictModel):
     vae: str | None = None
     #: 適用順に並べる。Workflowテンプレートの LoraLoader の段へ先頭から割り当てる。
     loras: tuple[LoraSpec, ...] = ()
+    #: CLIPの最終層を何層手前で打ち切るか。未指定はComfyUI既定 (clip skip 1相当) のまま。
+    #: LoRAがある場合はLoRA適用後のCLIPに対して効かせる。DiT系 (unet/clip/vae) とは
+    #: text encoderの構造が異なるため併用できない。
+    clip_skip: Annotated[int, Field(ge=MIN_CLIP_SKIP, le=MAX_CLIP_SKIP)] | None = None
 
     @property
     def uses_separate_loaders(self) -> bool:
@@ -356,8 +365,16 @@ class ModelSpec(_StrictModel):
                 )
             )
 
+        unsupported = []
         if self.loras:
-            raise ValueError("unet / clip / vae の指定とLoRAの併用は未対応です")
+            unsupported.append("LoRA")
+        if self.clip_skip is not None:
+            unsupported.append("clip_skip")
+
+        if unsupported:
+            raise ValueError(
+                "unet / clip / vae の指定と{}の併用は未対応です".format(" / ".join(unsupported))
+            )
 
         return self
 
