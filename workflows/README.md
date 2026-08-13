@@ -55,6 +55,38 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `txt2img_lora_hires_model_controlnet.json` | LoRA + モデル拡大のhires fix + ControlNet |
 | `img2img_hires_model_controlnet.json` | モデル拡大のhires fix + ControlNet (img2img) |
 | `img2img_lora_hires_model_controlnet.json` | LoRA + モデル拡大のhires fix + ControlNet (img2img) |
+| `txt2img_vae.json` | 外部VAEへ差し替えたtext-to-image (`CheckpointLoaderSimple`のVAE出力を`VAELoader`へ差し替えた構成) |
+| `txt2img_vae_lora.json` | 外部VAE + LoRA |
+| `img2img_vae.json` | 外部VAEへ差し替えたimage-to-image |
+| `img2img_vae_lora.json` | 外部VAE + LoRA (img2img) |
+| `txt2img_vae_hires.json` | 外部VAE + hires fix |
+| `txt2img_vae_lora_hires.json` | 外部VAE + LoRA + hires fix |
+| `img2img_vae_hires.json` | 外部VAE + hires fix (img2img) |
+| `img2img_vae_lora_hires.json` | 外部VAE + LoRA + hires fix (img2img) |
+| `txt2img_vae_hires_model.json` | 外部VAE + モデル拡大のhires fix |
+| `txt2img_vae_lora_hires_model.json` | 外部VAE + LoRA + モデル拡大のhires fix |
+| `img2img_vae_hires_model.json` | 外部VAE + モデル拡大のhires fix (img2img) |
+| `img2img_vae_lora_hires_model.json` | 外部VAE + LoRA + モデル拡大のhires fix (img2img) |
+| `txt2img_vae_controlnet.json` | 外部VAE + ControlNet |
+| `txt2img_vae_lora_controlnet.json` | 外部VAE + LoRA + ControlNet |
+| `img2img_vae_controlnet.json` | 外部VAE + ControlNet (img2img) |
+| `img2img_vae_lora_controlnet.json` | 外部VAE + LoRA + ControlNet (img2img) |
+| `txt2img_vae_hires_controlnet.json` | 外部VAE + hires fix + ControlNet |
+| `txt2img_vae_lora_hires_controlnet.json` | 外部VAE + LoRA + hires fix + ControlNet |
+| `img2img_vae_hires_controlnet.json` | 外部VAE + hires fix + ControlNet (img2img) |
+| `img2img_vae_lora_hires_controlnet.json` | 外部VAE + LoRA + hires fix + ControlNet (img2img) |
+| `txt2img_vae_hires_model_controlnet.json` | 外部VAE + モデル拡大のhires fix + ControlNet |
+| `txt2img_vae_lora_hires_model_controlnet.json` | 外部VAE + LoRA + モデル拡大のhires fix + ControlNet |
+| `img2img_vae_hires_model_controlnet.json` | 外部VAE + モデル拡大のhires fix + ControlNet (img2img) |
+| `img2img_vae_lora_hires_model_controlnet.json` | 外部VAE + LoRA + モデル拡大のhires fix + ControlNet (img2img) |
+| `txt2img_vae_ipadapter.json` | 外部VAE + IPAdapter |
+| `txt2img_vae_lora_ipadapter.json` | 外部VAE + LoRA + IPAdapter |
+| `img2img_vae_ipadapter.json` | 外部VAE + IPAdapter (img2img) |
+| `img2img_vae_lora_ipadapter.json` | 外部VAE + LoRA + IPAdapter (img2img) |
+| `txt2img_vae_controlnet_ipadapter.json` | 外部VAE + ControlNet + IPAdapter |
+| `txt2img_vae_lora_controlnet_ipadapter.json` | 外部VAE + LoRA + ControlNet + IPAdapter |
+| `img2img_vae_controlnet_ipadapter.json` | 外部VAE + ControlNet + IPAdapter (img2img) |
+| `img2img_vae_lora_controlnet_ipadapter.json` | 外部VAE + LoRA + ControlNet + IPAdapter (img2img) |
 
 どれを使うかは `task` と `model.loras` / `generation.upscale` / `control` / `reference` の有無、
 `model.unet` の指定で自動的に決まる。定義は
@@ -142,6 +174,8 @@ txt2img.json  (手書きベース)
   │                     + 2段目 KSampler (pixel空間で拡大する版)
   ├─ *_controlnet       CLIPTextEncode と KSampler の間に ControlNet
   ├─ *_ipadapter        MODEL の経路に IPAdapterAdvanced
+  ├─ *_vae              CheckpointLoaderのVAE出力 ([node, 2]) を参照する全ノードを
+  │                     VAELoader へ差し替え (checkpoint系のみ、他の軸をかけた後に適用)
   └─ txt2img_unet       CheckpointLoader -> UNETLoader + CLIPLoader + VAELoader
 ```
 
@@ -168,6 +202,7 @@ txt2img.json  (手書きベース)
 | 50-53 | IPAdapter (LoadImage / IPAdapterModelLoader / CLIPVisionLoader / IPAdapterAdvanced) |
 | 60-62 | DiT系のローダー分割 (UNETLoader / CLIPLoader / VAELoader) |
 | 70 | clip skip (CLIPSetLastLayer、全テンプレート共通で1個) |
+| 80 | 外部VAE (VAELoader、checkpoint系のみ) |
 
 hires fixとControlNetの組み合わせ (`*_hires_controlnet`) は、hiresを重ねてからControlNetを
 かける順で合成している。この順にすると `ControlNetApplyAdvanced` が差し替えるのは1段目の
@@ -197,6 +232,19 @@ KSamplerが `CheckpointLoaderSimple` を見たまま残る。img2img では入�
 
 LoRA / ControlNet / IPAdapterとの組み合わせは作っていない (Specの検証で併用を拒否している)。
 `control_v11p_sd15_*` も `ip-adapter-plus_sd15` もSD1.5向けで、DiT系のUNetへは適用できない。
+
+`*_vae` はcheckpoint系向けで、checkpoint同梱のVAEではなく外部VAE
+(`vae-ft-mse-840000` / `klF8Anime2VAE` など、色褪せ・眠い線を避けるために
+差し替えるのが通例) を使う版。`CheckpointLoaderSimple` を残したまま、そのVAE出力
+(`[node, 2]`) を参照している全ノードを機械的に走査して `VAELoader` へ差し替える
+(特定のノードIDを決め打ちしない)。決め打ちしないのは、`*_hires_model` のように
+他の軸で `VAEDecode` / `VAEEncode` が増えるテンプレートでも取りこぼさないため。
+
+**checkpoint系32件それぞれのローダー段の合成の最後にかける。** LoRA / hires fix /
+ControlNet / IPAdapterを組み合わせ終えたグラフへ最後に `with_external_vae` を
+かけることで、他の軸が増やしたVAEDecode / VAEEncodeの参照も一緒に拾える。
+DiT系 (`*_unet`) は既に独自の `VAELoader` ルートを持つため対象外
+([Issue #57](https://github.com/Sylphy0052/agentic-imagegen/issues/57))。
 
 ## GUIから書き出す手順
 

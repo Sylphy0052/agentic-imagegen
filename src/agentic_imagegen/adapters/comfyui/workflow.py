@@ -113,6 +113,41 @@ def _to_separate_loaders(base: WorkflowBinding, *, name: str) -> WorkflowBinding
     return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
 
 
+def _with_external_vae(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
+    """既存のbindingへ 外部VAE (VAELoader) を追加し、VAEの参照元を差し替える。
+
+    checkpoint同梱のVAEではなく、色褪せ・眠い線を避けるために使う外部VAE
+    (vae-ft-mse-840000 / klF8Anime2VAE など) へ差し替える版を組み立てる。
+    DiT系は既に独自の VAELoader ルートを持つため、この関数は checkpoint系の
+    bindingにのみ適用する。
+
+    「vaeの入力がcheckpointを指す」と明示されているリンク (img2imgの
+    vae_encode、hires (model) 版が増やすVAEDecode / VAEEncodeなど) をまとめて
+    VAELoaderへ差し替える。最終段のVAEDecode (node 8) は checkpoint系では
+    そもそもリンクとして明示されていない (VAEはLoraLoaderを通らずcheckpoint
+    直結のままであることを前提に検証していなかったため) ので、常に差し替え
+    対象へ加える。取りこぼすと、そのノードだけ同梱VAEを見たまま残ってしまう。
+    """
+    nodes = dict(base.nodes)
+    nodes[VAE_LOADER_ROLE] = NodeRef("80", "VAELoader", ("vae_name",))
+    nodes["vae_decode"] = NodeRef("8", "VAEDecode", ())
+
+    replaced_sources = {
+        link.source_node
+        for link in base.links
+        if link.input_key == "vae" and link.expected_role == "checkpoint"
+    }
+    replaced_sources.add("vae_decode")
+
+    links = [
+        link
+        for link in base.links
+        if not (link.input_key == "vae" and link.expected_role == "checkpoint")
+    ]
+    links.extend(LinkRef(source, "vae", VAE_LOADER_ROLE) for source in sorted(replaced_sources))
+    return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
+
+
 #: LoRAスロットの役割名。テンプレートのLoraLoaderの段数と一致させる。
 LORA_SLOT_ROLES: Final = ("lora_1", "lora_2", "lora_3")
 
@@ -497,6 +532,99 @@ IMG2IMG_LORA_CONTROLNET_IPADAPTER_BINDING: Final = _with_ipadapter(
     IMG2IMG_LORA_CONTROLNET_BINDING, name="img2img_lora_controlnet_ipadapter"
 )
 
+#: 外部VAE (checkpoint + vae)。checkpoint系32件それぞれの派生。ローダー段の合成
+#: のため、他の軸 (LoRA / hires fix / ControlNet / IPAdapter) を組み合わせ終えた
+#: bindingへ最後にかける。これにより後から足されたVAEDecode / VAEEncodeの
+#: VAE参照も一緒に差し替えの検証対象になる。DiT系 (`*_unet`) は対象外。
+TXT2IMG_VAE_BINDING: Final = _with_external_vae(TXT2IMG_BINDING, name="txt2img_vae")
+TXT2IMG_VAE_LORA_BINDING: Final = _with_external_vae(TXT2IMG_LORA_BINDING, name="txt2img_vae_lora")
+TXT2IMG_VAE_HIRES_BINDING: Final = _with_external_vae(
+    TXT2IMG_HIRES_BINDING, name="txt2img_vae_hires"
+)
+TXT2IMG_VAE_LORA_HIRES_BINDING: Final = _with_external_vae(
+    TXT2IMG_LORA_HIRES_BINDING, name="txt2img_vae_lora_hires"
+)
+TXT2IMG_VAE_HIRES_MODEL_BINDING: Final = _with_external_vae(
+    TXT2IMG_HIRES_MODEL_BINDING, name="txt2img_vae_hires_model"
+)
+TXT2IMG_VAE_LORA_HIRES_MODEL_BINDING: Final = _with_external_vae(
+    TXT2IMG_LORA_HIRES_MODEL_BINDING, name="txt2img_vae_lora_hires_model"
+)
+IMG2IMG_VAE_BINDING: Final = _with_external_vae(IMG2IMG_BINDING, name="img2img_vae")
+IMG2IMG_VAE_LORA_BINDING: Final = _with_external_vae(IMG2IMG_LORA_BINDING, name="img2img_vae_lora")
+IMG2IMG_VAE_HIRES_BINDING: Final = _with_external_vae(
+    IMG2IMG_HIRES_BINDING, name="img2img_vae_hires"
+)
+IMG2IMG_VAE_LORA_HIRES_BINDING: Final = _with_external_vae(
+    IMG2IMG_LORA_HIRES_BINDING, name="img2img_vae_lora_hires"
+)
+IMG2IMG_VAE_HIRES_MODEL_BINDING: Final = _with_external_vae(
+    IMG2IMG_HIRES_MODEL_BINDING, name="img2img_vae_hires_model"
+)
+IMG2IMG_VAE_LORA_HIRES_MODEL_BINDING: Final = _with_external_vae(
+    IMG2IMG_LORA_HIRES_MODEL_BINDING, name="img2img_vae_lora_hires_model"
+)
+TXT2IMG_VAE_CONTROLNET_BINDING: Final = _with_external_vae(
+    TXT2IMG_CONTROLNET_BINDING, name="txt2img_vae_controlnet"
+)
+TXT2IMG_VAE_LORA_CONTROLNET_BINDING: Final = _with_external_vae(
+    TXT2IMG_LORA_CONTROLNET_BINDING, name="txt2img_vae_lora_controlnet"
+)
+IMG2IMG_VAE_CONTROLNET_BINDING: Final = _with_external_vae(
+    IMG2IMG_CONTROLNET_BINDING, name="img2img_vae_controlnet"
+)
+IMG2IMG_VAE_LORA_CONTROLNET_BINDING: Final = _with_external_vae(
+    IMG2IMG_LORA_CONTROLNET_BINDING, name="img2img_vae_lora_controlnet"
+)
+TXT2IMG_VAE_HIRES_CONTROLNET_BINDING: Final = _with_external_vae(
+    TXT2IMG_HIRES_CONTROLNET_BINDING, name="txt2img_vae_hires_controlnet"
+)
+TXT2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING: Final = _with_external_vae(
+    TXT2IMG_LORA_HIRES_CONTROLNET_BINDING, name="txt2img_vae_lora_hires_controlnet"
+)
+IMG2IMG_VAE_HIRES_CONTROLNET_BINDING: Final = _with_external_vae(
+    IMG2IMG_HIRES_CONTROLNET_BINDING, name="img2img_vae_hires_controlnet"
+)
+IMG2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING: Final = _with_external_vae(
+    IMG2IMG_LORA_HIRES_CONTROLNET_BINDING, name="img2img_vae_lora_hires_controlnet"
+)
+TXT2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_external_vae(
+    TXT2IMG_HIRES_MODEL_CONTROLNET_BINDING, name="txt2img_vae_hires_model_controlnet"
+)
+TXT2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_external_vae(
+    TXT2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING, name="txt2img_vae_lora_hires_model_controlnet"
+)
+IMG2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_external_vae(
+    IMG2IMG_HIRES_MODEL_CONTROLNET_BINDING, name="img2img_vae_hires_model_controlnet"
+)
+IMG2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_external_vae(
+    IMG2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING, name="img2img_vae_lora_hires_model_controlnet"
+)
+TXT2IMG_VAE_IPADAPTER_BINDING: Final = _with_external_vae(
+    TXT2IMG_IPADAPTER_BINDING, name="txt2img_vae_ipadapter"
+)
+TXT2IMG_VAE_LORA_IPADAPTER_BINDING: Final = _with_external_vae(
+    TXT2IMG_LORA_IPADAPTER_BINDING, name="txt2img_vae_lora_ipadapter"
+)
+IMG2IMG_VAE_IPADAPTER_BINDING: Final = _with_external_vae(
+    IMG2IMG_IPADAPTER_BINDING, name="img2img_vae_ipadapter"
+)
+IMG2IMG_VAE_LORA_IPADAPTER_BINDING: Final = _with_external_vae(
+    IMG2IMG_LORA_IPADAPTER_BINDING, name="img2img_vae_lora_ipadapter"
+)
+TXT2IMG_VAE_CONTROLNET_IPADAPTER_BINDING: Final = _with_external_vae(
+    TXT2IMG_CONTROLNET_IPADAPTER_BINDING, name="txt2img_vae_controlnet_ipadapter"
+)
+TXT2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING: Final = _with_external_vae(
+    TXT2IMG_LORA_CONTROLNET_IPADAPTER_BINDING, name="txt2img_vae_lora_controlnet_ipadapter"
+)
+IMG2IMG_VAE_CONTROLNET_IPADAPTER_BINDING: Final = _with_external_vae(
+    IMG2IMG_CONTROLNET_IPADAPTER_BINDING, name="img2img_vae_controlnet_ipadapter"
+)
+IMG2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING: Final = _with_external_vae(
+    IMG2IMG_LORA_CONTROLNET_IPADAPTER_BINDING, name="img2img_vae_lora_controlnet_ipadapter"
+)
+
 
 def resolve_seed(seed: int) -> int:
     """seedが -1 ならランダムな値へ解決する。それ以外はそのまま返す。"""
@@ -633,6 +761,11 @@ def _inject_model(
     checkpoint 1ファイルのテンプレートと、UNet / CLIP / VAE を別々に読む
     テンプレートで、Spec側の指定の仕方も変わる。食い違ったまま投入すると
     ComfyUI側で分かりにくい失敗になるため、ここで拒否する。
+
+    外部VAE (checkpoint + vae) 用のテンプレートは checkpoint に加えて
+    VAELoaderへの注入も行う。DiT系のVAELoader注入 (上のブロック) とは
+    `UNET_LOADER_ROLE in binding.nodes` の分岐で棲み分けており、
+    checkpoint系のVAELoaderがこの分岐へ紛れ込むことはない。
     """
     if UNET_LOADER_ROLE in binding.nodes:
         model = spec.model
@@ -652,6 +785,14 @@ def _inject_model(
             "Specでは unet / clip / vae が指定されています"
         )
     inputs_of("checkpoint")["ckpt_name"] = spec.model.checkpoint
+
+    if VAE_LOADER_ROLE in binding.nodes:
+        if spec.model.vae is None:
+            raise WorkflowValidationError(
+                f"Workflow ({binding.name}) は外部VAE (model.vae) の指定を要求しますが、"
+                "Specに指定されていません"
+            )
+        inputs_of(VAE_LOADER_ROLE)["vae_name"] = spec.model.vae
 
 
 def _inject_clip_skip(
@@ -884,6 +1025,22 @@ __all__ = [
     "IMG2IMG_UNET_BINDING",
     "IMG2IMG_UNET_HIRES_BINDING",
     "IMG2IMG_UNET_HIRES_MODEL_BINDING",
+    "IMG2IMG_VAE_BINDING",
+    "IMG2IMG_VAE_CONTROLNET_BINDING",
+    "IMG2IMG_VAE_CONTROLNET_IPADAPTER_BINDING",
+    "IMG2IMG_VAE_HIRES_BINDING",
+    "IMG2IMG_VAE_HIRES_CONTROLNET_BINDING",
+    "IMG2IMG_VAE_HIRES_MODEL_BINDING",
+    "IMG2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING",
+    "IMG2IMG_VAE_IPADAPTER_BINDING",
+    "IMG2IMG_VAE_LORA_BINDING",
+    "IMG2IMG_VAE_LORA_CONTROLNET_BINDING",
+    "IMG2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING",
+    "IMG2IMG_VAE_LORA_HIRES_BINDING",
+    "IMG2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING",
+    "IMG2IMG_VAE_LORA_HIRES_MODEL_BINDING",
+    "IMG2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING",
+    "IMG2IMG_VAE_LORA_IPADAPTER_BINDING",
     "LORA_SLOT_ROLES",
     "REFERENCE_APPLY_ROLE",
     "REFERENCE_CLIP_VISION_ROLE",
@@ -907,6 +1064,22 @@ __all__ = [
     "TXT2IMG_LORA_IPADAPTER_BINDING",
     "TXT2IMG_UNET_HIRES_BINDING",
     "TXT2IMG_UNET_HIRES_MODEL_BINDING",
+    "TXT2IMG_VAE_BINDING",
+    "TXT2IMG_VAE_CONTROLNET_BINDING",
+    "TXT2IMG_VAE_CONTROLNET_IPADAPTER_BINDING",
+    "TXT2IMG_VAE_HIRES_BINDING",
+    "TXT2IMG_VAE_HIRES_CONTROLNET_BINDING",
+    "TXT2IMG_VAE_HIRES_MODEL_BINDING",
+    "TXT2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING",
+    "TXT2IMG_VAE_IPADAPTER_BINDING",
+    "TXT2IMG_VAE_LORA_BINDING",
+    "TXT2IMG_VAE_LORA_CONTROLNET_BINDING",
+    "TXT2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING",
+    "TXT2IMG_VAE_LORA_HIRES_BINDING",
+    "TXT2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING",
+    "TXT2IMG_VAE_LORA_HIRES_MODEL_BINDING",
+    "TXT2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING",
+    "TXT2IMG_VAE_LORA_IPADAPTER_BINDING",
     "UPSCALE_MODEL_APPLY_ROLE",
     "UPSCALE_MODEL_DECODE_ROLE",
     "UPSCALE_MODEL_ENCODE_ROLE",

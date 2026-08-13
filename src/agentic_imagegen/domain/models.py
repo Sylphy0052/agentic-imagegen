@@ -395,14 +395,17 @@ class LoraSpec(_StrictModel):
 class ModelSpec(_StrictModel):
     """使用するモデル。
 
-    指定の仕方は2通りあり、どちらか一方だけを使う。
+    指定の仕方は2通りある。
 
-    - `checkpoint`: UNet / CLIP / VAE を1ファイルに含む従来形式 (SD1.5 / SDXL 系)
+    - `checkpoint`: UNet / CLIP / VAE を1ファイルに含む従来形式 (SD1.5 / SDXL 系)。
+      `vae` を追加で指定すると、checkpoint 同梱の VAE ではなく外部VAE (色褪せ・
+      眠い線を避けるために差し替える vae-ft-mse-840000 / klF8Anime2VAE など) を使う
     - `unet` + `clip` + `vae`: 3つを別々に読む形式 (Anima などのDiT系)
 
     DiT系のモデルはUNet単体で配布され、text encoderとVAEを同梱しないため、
-    ローダーを分ける必要がある。両方を同時に書けると「どちらが効くのか」が
-    読み取れなくなるため、排他にしている。
+    ローダーを分ける必要がある。`checkpoint` と `unet` / `clip` を同時に書けると
+    「どちらが効くのか」が読み取れなくなるため、この2つは排他にしている
+    (`checkpoint` と `vae` は併用できる)。
     """
 
     checkpoint: str | None = None
@@ -410,7 +413,8 @@ class ModelSpec(_StrictModel):
     unet: str | None = None
     #: DiT系モデルのtext encoder。~/ComfyUI/models/text_encoders/ に置く。
     clip: str | None = None
-    #: DiT系モデルのVAE。~/ComfyUI/models/vae/ に置く。
+    #: 外部VAE。~/ComfyUI/models/vae/ に置く。`checkpoint` と併用すると同梱VAEの
+    #: 代わりに使う外部VAEになり、`unet` + `clip` と併用するとDiT系のVAE (必須) になる。
     vae: str | None = None
     #: 適用順に並べる。Workflowテンプレートの LoraLoader の段へ先頭から割り当てる。
     loras: tuple[LoraSpec, ...] = ()
@@ -424,6 +428,15 @@ class ModelSpec(_StrictModel):
         """UNet / CLIP / VAE を別々に読む形式かどうか。"""
         return self.unet is not None
 
+    @property
+    def uses_external_vae(self) -> bool:
+        """checkpoint と外部VAEを併用する指定かどうか。
+
+        DiT系 (`uses_separate_loaders`) はそもそも `checkpoint` を持たないため、
+        こちらには含めない。
+        """
+        return self.checkpoint is not None and self.vae is not None
+
     @field_validator("checkpoint", "unet", "clip", "vae")
     @classmethod
     def _reject_unsafe_path(cls, value: str | None) -> str | None:
@@ -433,7 +446,10 @@ class ModelSpec(_StrictModel):
 
     @model_validator(mode="after")
     def _validate_loader_combination(self) -> ModelSpec:
-        separate = {"unet": self.unet, "clip": self.clip, "vae": self.vae}
+        # unet / clip は checkpoint と排他。vae は checkpoint (外部VAE) /
+        # unet+clip (DiT系のVAE、必須) のどちらとも組める独立した軸のため、
+        # ここでは分けて扱う。
+        separate = {"unet": self.unet, "clip": self.clip}
         specified = [key for key, value in separate.items() if value is not None]
 
         if self.checkpoint is not None:
@@ -444,13 +460,20 @@ class ModelSpec(_StrictModel):
             return self
 
         if not specified:
+            if self.vae is not None:
+                raise ValueError(
+                    "vae は単体では指定できません。checkpoint と組み合わせるか、"
+                    "unet / clip と併せて3つ指定してください"
+                )
             raise ValueError("checkpoint、または unet / clip / vae の3つを指定してください")
 
         missing = sorted(key for key, value in separate.items() if value is None)
+        if self.vae is None:
+            missing.append("vae")
         if missing:
             raise ValueError(
                 "unet / clip / vae は3つセットで指定してください (不足: {})".format(
-                    " / ".join(missing)
+                    " / ".join(sorted(missing))
                 )
             )
 

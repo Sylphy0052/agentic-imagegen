@@ -318,17 +318,23 @@ generation:
 
 ## model
 
-指定の仕方は2通りあり、どちらか一方だけを使う。両方書くと拒否される。
+指定の仕方は2通りある。
 
-- `checkpoint`: UNet / CLIP / VAEを1ファイルに含む従来形式 (SD1.5 / SDXL系)
+- `checkpoint`: UNet / CLIP / VAEを1ファイルに含む従来形式 (SD1.5 / SDXL系)。
+  `vae`を追加で指定すると、checkpoint同梱のVAEではなく外部VAEへ差し替える
+  (色褪せ・眠い線を避けるために `vae-ft-mse-840000` / `klF8Anime2VAE` などへ
+  差し替えるのが通例)
 - `unet` + `clip` + `vae`: 3つを別々に読む形式 (AnimaなどのDiT系)
+
+`checkpoint`と`unet` / `clip`は同時に指定できない (`checkpoint`と`vae`は併用できる)。
+`vae`を単体で指定することはできない。
 
 | キー | 型 | 既定値 | 内容 |
 | --- | --- | --- | --- |
 | `checkpoint` | string | `null` | `~/ComfyUI/models/checkpoints/`のファイル名 |
 | `unet` | string | `null` | `~/ComfyUI/models/diffusion_models/`のファイル名 |
 | `clip` | string | `null` | `~/ComfyUI/models/text_encoders/`のファイル名 |
-| `vae` | string | `null` | `~/ComfyUI/models/vae/`のファイル名 |
+| `vae` | string | `null` | `~/ComfyUI/models/vae/`のファイル名。`checkpoint`と併用すると同梱VAEの代わりに使う外部VAE、`unet` + `clip`と併用すると必須のDiT系VAE |
 | `loras` | list | `[]` | 適用するLoRA。同時3件まで |
 | `clip_skip` | int | `null` | CLIPの最終層を何層手前で打ち切るか。1-12 |
 
@@ -661,15 +667,16 @@ outputs/
 
 ## 組み合わせの可否
 
-| | LoRA | img2img | hires fix | ControlNet | IPAdapter | text | clip_skip |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| **LoRA** | - | 可 | 可 | 可 | 可 | 可 | 可 |
-| **img2img** | 可 | - | 可 | 可 | 可 | 可 | 可 |
-| **hires fix** | 可 | 可 | - | 可 | **不可** | 可 | 可 |
-| **ControlNet** | 可 | 可 | 可 | - | 可 | 可 | 可 |
-| **IPAdapter** | 可 | 可 | **不可** | 可 | - | 可 | 可 |
-| **DiT系 (unet/clip/vae)** | **不可** | 可 | 可 | **不可** | **不可** | 可 | **不可** |
-| **clip_skip** | 可 | 可 | 可 | 可 | 可 | 可 | - |
+| | LoRA | img2img | hires fix | ControlNet | IPAdapter | 外部VAE | text | clip_skip |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **LoRA** | - | 可 | 可 | 可 | 可 | 可 | 可 | 可 |
+| **img2img** | 可 | - | 可 | 可 | 可 | 可 | 可 | 可 |
+| **hires fix** | 可 | 可 | - | 可 | **不可** | 可 | 可 | 可 |
+| **ControlNet** | 可 | 可 | 可 | - | 可 | 可 | 可 | 可 |
+| **IPAdapter** | 可 | 可 | **不可** | 可 | - | 可 | 可 | 可 |
+| **外部VAE (checkpoint+vae)** | 可 | 可 | 可 | 可 | 可 | - | 可 | 可 |
+| **DiT系 (unet/clip/vae)** | **不可** | 可 | 可 | **不可** | **不可** | **不可** | 可 | **不可** |
+| **clip_skip** | 可 | 可 | 可 | 可 | 可 | 可 | 可 | - |
 
 `text`は生成後の後処理のため、どの構成とも併用できる。
 
@@ -677,6 +684,10 @@ outputs/
 構図は1段目で決まるため、2段目は拡大後の解像度で描き足すことに徹する。2段目にも効かせると
 拡大後の解像度でControlNetの推論が追加で走り、得られるものに対して所要時間が伸びすぎる。
 `control.end_percent`は1段目の進行度に対する指定として読む。
+
+**外部VAEは`checkpoint`と組み合わせる指定 (`checkpoint` + `vae`) のため、
+`checkpoint`を持たないDiT系 (unet/clip/vae) では意味を持たず併用できない。**
+DiT系は`vae`が3点セットの必須項目として既に外部VAEを使っている。
 
 不可の組み合わせを指定した場合はSpecの検証時 (exit code 2) に拒否する。理由と着手条件は
 [Issue #38](https://github.com/Sylphy0052/agentic-imagegen/issues/38) (hires fixとIPAdapterの併用) と
@@ -692,15 +703,19 @@ Specの内容から自動的に決まる。`uv run imagegen validate`の`Workflo
 | 順 | 条件 | 接尾辞 |
 | --- | --- | --- |
 | 1 | `model.unet`を指定 | `_unet` |
-| 1 | `model.loras`が空でない (`model.unet`が無い場合) | `_lora` |
-| 2 | `generation.upscale`を指定 | `_hires` (`upscale.model`を指定した場合は`_hires_model`) |
-| 3 | `control`を指定 | `_controlnet` |
-| 4 | `reference`を指定 | `_ipadapter` |
+| 1 | `model.checkpoint`と`model.vae`を併用 (`model.unet`が無い場合) | `_vae` |
+| 2 | `model.loras`が空でない (`model.unet`が無い場合) | `_lora` |
+| 3 | `generation.upscale`を指定 | `_hires` (`upscale.model`を指定した場合は`_hires_model`) |
+| 4 | `control`を指定 | `_controlnet` |
+| 5 | `reference`を指定 | `_ipadapter` |
 
-`_unet`と`_lora`は同じ位置に入り、両立しない (DiT系とLoRAの併用は拒否される)。
+`_unet`と`_vae`は同じ位置に入り、両立しない (DiT系は`checkpoint`を持たないため)。
+`_vae`と`_lora`は別軸のため併用でき、その場合は`_vae`が先に付く
+(`VAELoader`もグラフ上流のローダー段のため、`_unet`と同じ理由で手前に置く)。
 
 例: `task: txt2img`にLoRAとControlNetを指定すると`txt2img_lora_controlnet`。
 `task: img2img`にDiT系モデルとhires fixを指定すると`img2img_unet_hires`。
+`task: txt2img`に外部VAEとLoRAとhires fixを指定すると`txt2img_vae_lora_hires`。
 hires fixで`upscale.model`まで指定すると`img2img_unet_hires_model`。
 
 テンプレートの一覧と各構成のノード内訳、作り直しの手順は

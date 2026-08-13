@@ -32,6 +32,22 @@ from agentic_imagegen.adapters.comfyui.workflow import (
     IMG2IMG_UNET_BINDING,
     IMG2IMG_UNET_HIRES_BINDING,
     IMG2IMG_UNET_HIRES_MODEL_BINDING,
+    IMG2IMG_VAE_BINDING,
+    IMG2IMG_VAE_CONTROLNET_BINDING,
+    IMG2IMG_VAE_CONTROLNET_IPADAPTER_BINDING,
+    IMG2IMG_VAE_HIRES_BINDING,
+    IMG2IMG_VAE_HIRES_CONTROLNET_BINDING,
+    IMG2IMG_VAE_HIRES_MODEL_BINDING,
+    IMG2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING,
+    IMG2IMG_VAE_IPADAPTER_BINDING,
+    IMG2IMG_VAE_LORA_BINDING,
+    IMG2IMG_VAE_LORA_CONTROLNET_BINDING,
+    IMG2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING,
+    IMG2IMG_VAE_LORA_HIRES_BINDING,
+    IMG2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING,
+    IMG2IMG_VAE_LORA_HIRES_MODEL_BINDING,
+    IMG2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING,
+    IMG2IMG_VAE_LORA_IPADAPTER_BINDING,
     TXT2IMG_BINDING,
     TXT2IMG_CONTROLNET_BINDING,
     TXT2IMG_CONTROLNET_IPADAPTER_BINDING,
@@ -51,6 +67,22 @@ from agentic_imagegen.adapters.comfyui.workflow import (
     TXT2IMG_UNET_BINDING,
     TXT2IMG_UNET_HIRES_BINDING,
     TXT2IMG_UNET_HIRES_MODEL_BINDING,
+    TXT2IMG_VAE_BINDING,
+    TXT2IMG_VAE_CONTROLNET_BINDING,
+    TXT2IMG_VAE_CONTROLNET_IPADAPTER_BINDING,
+    TXT2IMG_VAE_HIRES_BINDING,
+    TXT2IMG_VAE_HIRES_CONTROLNET_BINDING,
+    TXT2IMG_VAE_HIRES_MODEL_BINDING,
+    TXT2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING,
+    TXT2IMG_VAE_IPADAPTER_BINDING,
+    TXT2IMG_VAE_LORA_BINDING,
+    TXT2IMG_VAE_LORA_CONTROLNET_BINDING,
+    TXT2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING,
+    TXT2IMG_VAE_LORA_HIRES_BINDING,
+    TXT2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING,
+    TXT2IMG_VAE_LORA_HIRES_MODEL_BINDING,
+    TXT2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING,
+    TXT2IMG_VAE_LORA_IPADAPTER_BINDING,
     WorkflowBinding,
     build_workflow,
     resolve_seed,
@@ -102,6 +134,40 @@ ALLOWED_WORKFLOWS: Final[dict[str, WorkflowBinding]] = {
     "txt2img_lora_hires_model_controlnet": TXT2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING,
     "img2img_hires_model_controlnet": IMG2IMG_HIRES_MODEL_CONTROLNET_BINDING,
     "img2img_lora_hires_model_controlnet": IMG2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING,
+    # 外部VAE (checkpoint + vae)。checkpoint系32件それぞれの派生。DiT系 (unet系) は
+    # 既に独自のVAELoaderルートを持つため対象外
+    "txt2img_vae": TXT2IMG_VAE_BINDING,
+    "txt2img_vae_lora": TXT2IMG_VAE_LORA_BINDING,
+    "img2img_vae": IMG2IMG_VAE_BINDING,
+    "img2img_vae_lora": IMG2IMG_VAE_LORA_BINDING,
+    "txt2img_vae_hires": TXT2IMG_VAE_HIRES_BINDING,
+    "txt2img_vae_lora_hires": TXT2IMG_VAE_LORA_HIRES_BINDING,
+    "img2img_vae_hires": IMG2IMG_VAE_HIRES_BINDING,
+    "img2img_vae_lora_hires": IMG2IMG_VAE_LORA_HIRES_BINDING,
+    "txt2img_vae_hires_model": TXT2IMG_VAE_HIRES_MODEL_BINDING,
+    "txt2img_vae_lora_hires_model": TXT2IMG_VAE_LORA_HIRES_MODEL_BINDING,
+    "img2img_vae_hires_model": IMG2IMG_VAE_HIRES_MODEL_BINDING,
+    "img2img_vae_lora_hires_model": IMG2IMG_VAE_LORA_HIRES_MODEL_BINDING,
+    "txt2img_vae_controlnet": TXT2IMG_VAE_CONTROLNET_BINDING,
+    "txt2img_vae_lora_controlnet": TXT2IMG_VAE_LORA_CONTROLNET_BINDING,
+    "img2img_vae_controlnet": IMG2IMG_VAE_CONTROLNET_BINDING,
+    "img2img_vae_lora_controlnet": IMG2IMG_VAE_LORA_CONTROLNET_BINDING,
+    "txt2img_vae_hires_controlnet": TXT2IMG_VAE_HIRES_CONTROLNET_BINDING,
+    "txt2img_vae_lora_hires_controlnet": TXT2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING,
+    "img2img_vae_hires_controlnet": IMG2IMG_VAE_HIRES_CONTROLNET_BINDING,
+    "img2img_vae_lora_hires_controlnet": IMG2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING,
+    "txt2img_vae_hires_model_controlnet": TXT2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING,
+    "txt2img_vae_lora_hires_model_controlnet": TXT2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING,
+    "img2img_vae_hires_model_controlnet": IMG2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING,
+    "img2img_vae_lora_hires_model_controlnet": IMG2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING,
+    "txt2img_vae_ipadapter": TXT2IMG_VAE_IPADAPTER_BINDING,
+    "txt2img_vae_lora_ipadapter": TXT2IMG_VAE_LORA_IPADAPTER_BINDING,
+    "img2img_vae_ipadapter": IMG2IMG_VAE_IPADAPTER_BINDING,
+    "img2img_vae_lora_ipadapter": IMG2IMG_VAE_LORA_IPADAPTER_BINDING,
+    "txt2img_vae_controlnet_ipadapter": TXT2IMG_VAE_CONTROLNET_IPADAPTER_BINDING,
+    "txt2img_vae_lora_controlnet_ipadapter": TXT2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING,
+    "img2img_vae_controlnet_ipadapter": IMG2IMG_VAE_CONTROLNET_IPADAPTER_BINDING,
+    "img2img_vae_lora_controlnet_ipadapter": IMG2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING,
 }
 
 
@@ -117,8 +183,13 @@ def resolve_workflow_name(spec: GenerationSpec) -> str:
         # 接尾辞も先頭へ置く。LoRA / ControlNet / IPAdapter との組み合わせは
         # Specのバリデーションで拒否している
         suffix += "_unet"
-    elif spec.model.loras:
-        suffix += "_lora"
+    else:
+        if spec.model.uses_external_vae:
+            # checkpoint同梱ではなく外部VAEを使う指定。VAELoaderもグラフ上流の
+            # ローダー段のため、_unet と同じ位置 (LoRAより手前) へ置く
+            suffix += "_vae"
+        if spec.model.loras:
+            suffix += "_lora"
     if spec.generation.upscale is not None:
         # 拡大の経路がlatentとpixelで別テンプレートになる
         suffix += "_hires_model" if spec.generation.upscale.uses_model else "_hires"
