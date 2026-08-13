@@ -188,6 +188,10 @@ style presetを系統ごとに分けているのはこのため。
   `post_count` では判定しない
 - **ShiratakiMix XLだけサンプラーの系統が違う。** `euler_ancestral`でも生成できるが、
   配布元のサンプルはDPM++系 + karrasで作られている
+- **SDE系サンプラーはstepsを削ると破綻する。** `dpmpp_3m_sde` + `karras`を
+  steps 8で流すと収束せず、ほぼ真っ白な画像になる (2026-08-13にXPUで確認)。
+  steps 24では正常に生成できる。動作確認のためにstepsを落とす場合は
+  `sdxl-illustrious` (`euler_ancestral`) を使う
 - ComfyUIへ実在するSDXL checkpointは`novaAnimeXL_ilV190.safetensors`と
   `AnythingXL_xl.safetensors`。animagineXL / hassakuXL / shiratakimixXL /
   waiNSFWIllustriousは未配置のため、使う前に

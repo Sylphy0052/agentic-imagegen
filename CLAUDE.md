@@ -177,6 +177,8 @@ uv run mypy src
 - ComfyUIが必要なテストには `@pytest.mark.integration` を付ける。通常の `uv run pytest` ではskipされる
 - Integration Testは低負荷設定 (512x512以下 / steps 2-4 / batch_size 1) にする。
   必要なモデルがComfyUIに無いケース (ControlNet / DiT系) は失敗ではなくskipする
+- **SDE系のsampler (`*_sde`) を低stepsで使わない。** 収束せず絵が破綻するため、
+  出力の妥当性を見る確認には使えない。低負荷で流すなら `euler` / `euler_ancestral` を選ぶ
 
 ### 実装方針
 

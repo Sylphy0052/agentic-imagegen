@@ -157,9 +157,13 @@ fp16の相対誤差は4.2e-4だった。
 | 同上 img2img (denoise 0.55) | Intel XPU | 165.7秒 | 600 |
 | 同上 + hires fix (→960x1344 / 2段目6 steps) | Intel XPU | 324.9秒 | 900 |
 | 同上 img2img + hires fix | Intel XPU | 323.6秒 | 900 |
+| SDXL / 832x1216 / 8 steps | Intel XPU | 299.7秒 (初回) | 600 |
+| SDXL / 832x1216 / 24 steps | Intel XPU | 362.6秒 | 600 |
 
 SD1.5系はモデルロード済み (2回目以降) の値。初回はモデルロードの分だけ上乗せされる。
 Anima系はSD1.5系より1stepあたりが重く、配布元推奨の832x1216 / 32 stepsはさらに伸びる。
+SDXL系はモデルのロードだけで数分かかるため、初回とロード済みの差がSD1.5系より大きい。
+配布元推奨のsteps 30やhires fixとの併用は未計測。
 
 ControlNet / IPAdapterを使うと1-2割、hires fixを使うと倍以上に伸びる。
 hires fixとControlNetを併用してもControlNetは1段目にしか効かないため、hires fix単独からの
