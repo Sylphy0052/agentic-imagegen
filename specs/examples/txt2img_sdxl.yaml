@@ -1,0 +1,45 @@
+# GenerationSpec のサンプル (SDXL / Illustrious系 + hires fix)
+#
+# 検証:  uv run imagegen validate specs/examples/txt2img_sdxl.yaml
+# 生成:  uv run imagegen generate specs/examples/txt2img_sdxl.yaml
+#
+# 832x1216 で構図を作り、hires fix で 1248x1824 まで引き上げる SDXL 系の構成。
+#
+# 実運用では 1024x1536 を 2倍 (2048x3072) へ引き上げる形が定番だが、この値は
+# IMAGEGEN_MAX_HEIGHT (2048) と IMAGEGEN_MAX_PIXELS (4194304) の既定を超えるため
+# そのままでは拒否される。上限を引き上げれば通せる (環境変数は CLAUDE.md を参照)。
+#
+# SDXL は SD1.5 の 3-4 倍の計算量になる。CPU 推論では実用的な時間で終わらないため、
+# XPU (docs/xpu-setup.md) を用意してから実行する。
+
+version: "1"
+task: txt2img
+
+presets:
+  character: anime-girl-trailrun
+  scene: studio-white-dynamic
+  style: sdxl-illustrious
+
+generation:
+  # SDXL の標準アスペクトのひとつ。1024x1024 相当の画素数で縦長を取れる
+  width: 832
+  height: 1216
+  seed: -1
+  batch_size: 1
+
+  # steps / cfg / sampler / scheduler は style preset 側で指定済み
+  # (euler_ancestral / normal / cfg 7.0 / steps 30)。
+  # 2段目は1段目と同じ cfg / sampler で走る。
+  upscale:
+    scale: 1.5
+    # SDXL では 0.35-0.5 が扱いやすい。上げるほど1段目の構図から離れる
+    denoise: 0.4
+    steps: 10
+
+model:
+  # ~/ComfyUI/models/checkpoints/ に実在する Illustrious 系 checkpoint
+  checkpoint: novaAnimeXL_ilV190.safetensors
+
+output:
+  directory: outputs
+  prefix: sdxl_sample

@@ -1,0 +1,13 @@
+# トレイルランニング装備の女性キャラクタpreset。
+# 人物の外見・服装・表情だけを書く。構図や画風は scene / style 側の責務とする。
+
+description: 茶髪ハイポニーテールの活発なアニメ調女性キャラクタ。トレイルラン装備
+
+prompt:
+  positive: >
+    1girl, solo, brown hair, high ponytail, brown eyes, athletic,
+    tank top, running shorts, trail leggings, trail running shoes, small backpack,
+    wristwatch, sweat, smile, cheerful
+
+  negative: >
+    bad anatomy, bad hands, extra fingers

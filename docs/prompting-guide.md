@@ -80,9 +80,10 @@ A1111 / Forgeでは品質タグを先頭へ置く書き方が通例だが、pres
 | 項目 | 目安 |
 | --- | --- |
 | トークン上限 | 248 |
-| cfg | 3-6 (6を超えると過処理になりやすい) |
-| steps | 20-32 |
-| sampler / scheduler | `euler` / `normal` |
+| 解像度 | 1024x1024相当の画素数。縦長は832x1216 / 1024x1536 |
+| cfg | 4.5-7 (7.5を超えると彩度が飽和し、3未満は色が抜ける) |
+| steps | 20-30 |
+| sampler / scheduler | `euler_ancestral` / `normal` |
 
 - **品質タグは先頭、構図のmodifierは末尾へ置く。** 後方のタグほど効果が薄まるため、
   重要な要素ほど前に置く
@@ -91,6 +92,52 @@ A1111 / Forgeでは品質タグを先頭へ置く書き方が通例だが、pres
 - **タグはDanbooruに実在する表記を使う。** 学習データが少ないタグはLoRAなしでは効かない。
   キャラクタ名もDanbooruの表記順に従う
 - v2.0以降は自然文とタグの併用に対応する
+- **配布元はclip skip 2を推奨するが指定できない**
+  ([Issue #60](https://github.com/Sylphy0052/agentic-imagegen/issues/60))。
+  既定は1相当のため、clip skip 1で運用している場合との差は出ない
+
+### モデルごとの推奨設定
+
+同じSDXLでも、fine-tuneの系統ごとに品質タグの語彙とサンプラー設定が割れる。
+style presetを系統ごとに分けているのはこのため。
+
+| モデル | sampler / scheduler | cfg | steps | 品質タグの語彙 | style preset |
+| --- | --- | --- | --- | --- | --- |
+| Illustrious系 (novaAnimeXL / hassakuXL / waiNSFWIllustrious) | `euler_ancestral` / `normal` | 7 | 30 | `masterpiece, best quality, ultra-detailed, high res` | `sdxl-illustrious` |
+| Animagine XL 4.0 | `euler_ancestral` / `normal` | 5-6 | 25 | `masterpiece, high score, great score, absurdres` | `sdxl-animagine` |
+| AnythingXL | `euler_ancestral` / `normal` | 5-7 | 25-30 | Illustrious系と同じ | `sdxl-illustrious` |
+| ShiratakiMix XL | `dpmpp_3m_sde` / `karras` | 7.5 (3-8) | 20以上 | Illustrious系と同じ | `sdxl-shiratakimix` |
+
+- **Animagine XLの品質タグは他系統へ流用しない。** `high score` / `great score` は
+  Animagineの学習語彙で、Illustrious系では効かない。逆も同じ
+- **ShiratakiMix XLだけサンプラーの系統が違う。** `euler_ancestral`でも生成できるが、
+  配布元のサンプルはDPM++系 + karrasで作られている
+- ComfyUIへ実在するSDXL checkpointは`novaAnimeXL_ilV190.safetensors`と
+  `AnythingXL_xl.safetensors`。animagineXL / hassakuXL / shiratakimixXL /
+  waiNSFWIllustriousは未配置のため、使う前に
+  `~/ComfyUI/models/checkpoints/` へ置く
+
+### SDXLでのhires fix
+
+832x1216で構図を作り、`upscale.scale: 1.5`で1248x1824へ引き上げる。
+
+- `denoise`は0.35-0.5がSDXLで扱いやすい。SD1.5系より低めの値で足りる
+- `upscale.steps`は1段目の1/3程度 (steps 30なら10)
+- **実運用の定番である1024x1536の2倍 (2048x3072) は既定の上限を超える。**
+  `IMAGEGEN_MAX_HEIGHT` (2048) と`IMAGEGEN_MAX_PIXELS` (4194304) の両方に当たるため、
+  通すには環境変数を引き上げる
+- **配布元が推奨する`R-ESRGAN 4x+Anime6B`は使えない**
+  (latent拡大のみ。[Issue #58](https://github.com/Sylphy0052/agentic-imagegen/issues/58))
+- **`sdxlVAE`のような外部VAEへの差し替えも未対応**
+  ([Issue #57](https://github.com/Sylphy0052/agentic-imagegen/issues/57))。
+  checkpoint同梱のVAEを使う
+
+SDXLはSD1.5の3-4倍の計算量になる。CPU推論では実用的な時間で終わらないため、
+XPU ([xpu-setup.md](xpu-setup.md)) を用意してから使う。
+
+構成例は [specs/examples/txt2img_sdxl.yaml](../specs/examples/txt2img_sdxl.yaml)、
+preset本体は [presets/styles/sdxl-illustrious.yaml](../presets/styles/sdxl-illustrious.yaml)
+にある。
 
 ## Anima系 (hassakuAnima_v13など、DiT + Qwen3-0.6B)
 

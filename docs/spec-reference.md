@@ -118,9 +118,21 @@ generation:
 - 適用したpreset名は解決後のSpecに残り、`metadata.json`にも記録される
 
 軸の責務を混ぜない。解像度とseedは再現性に直結するためpresetには書かず、Spec側で指定する。
-style presetはモデル系統ごとに用意する (`anime-soft` / `anime-detailed`はSD1.5向け、
-`anima-base`はAnima向け)。品質タグとサンプラー設定はモデルの学習内容に依存するため流用しない。
-SD1.5向けの2つはsteps 20の`anime-soft`とsteps 30の`anime-detailed`で、負荷に応じて選ぶ。
+style presetはモデル系統ごとに用意する。品質タグとサンプラー設定はモデルの学習内容に
+依存するため流用しない。
+
+| style preset | 対象 | sampler / scheduler | cfg | steps |
+| --- | --- | --- | --- | --- |
+| `anime-soft` | SD1.5 | `dpmpp_2m` / `karras` | 5.5 | 20 |
+| `anime-detailed` | SD1.5 | `dpmpp_2m` / `karras` | 7.0 | 30 |
+| `sdxl-illustrious` | SDXL (Illustrious系 / AnythingXL) | `euler_ancestral` / `normal` | 7.0 | 30 |
+| `sdxl-animagine` | SDXL (Animagine XL系) | `euler_ancestral` / `normal` | 6.0 | 25 |
+| `sdxl-shiratakimix` | SDXL (ShiratakiMix XL系) | `dpmpp_3m_sde` / `karras` | 7.5 | 28 |
+| `anima-base` | DiT系 (Anima) | `er_sde` / `simple` | 4.5 | 32 |
+
+SD1.5向けの2つは負荷で選ぶ (`anime-soft`が下描き、`anime-detailed`が仕上げ)。
+SDXL向けの3つはcheckpointのfine-tune系統で選ぶ。系統ごとの違いは
+[prompting-guide.md](prompting-guide.md#モデルごとの推奨設定) を参照。
 
 ## generation
 
