@@ -98,7 +98,8 @@ python3 .claude/skills/prompt-builder/scripts/tagcheck.py --prompt "1girl, solo,
 
 - **確認はアンダースコア表記で行う。** Danbooruのタグ名は `hair_over_one_eye` の形で登録されている。
   プロンプトへ書くときはスペース区切りでよい (CLIPはどちらも同じに解釈する)
-- **`post_count` が0または数十なら効かないと判断する。** 数千以上あれば学習に寄与している
+- **`post_count` が0なら存在しないタグと判断する。** 1,000件未満は学習への寄与が小さく、
+  より一般的なタグへの置換を検討する (`tagcheck.py` の判定もこの閾値による)
 - **置換先が見つからない語は消す。** `mysterious` や `melancholic` のような形容は
   対応するタグが無く、雰囲気を足す働きもしない
 

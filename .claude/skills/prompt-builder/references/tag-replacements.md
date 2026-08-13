@@ -52,6 +52,7 @@
 | 頭身の低い絵柄 | `super deformed` | 0 | `chibi` | 372,093 |
 | 低解像度 | `loweres` (typo) | - | `lowres` | 112,068 |
 | 解剖の破綻 | `deformed anatomy` / `deformed fingers` | 0 | `bad anatomy` | 17,879 |
+| ラフな線画 | `sketches` | 0 | `sketch` | 193,288 |
 
 negativeはpositiveほど学習タグ語彙に縛られない。
 `photorealistic` 1,742 のように件数が少ない語も使ってよい。
