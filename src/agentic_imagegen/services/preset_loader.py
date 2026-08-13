@@ -14,6 +14,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
+from agentic_imagegen.domain.policy import display_path
 from agentic_imagegen.domain.presets import (
     PRESET_NAME_PATTERN,
     PresetDocument,
@@ -28,8 +29,14 @@ from agentic_imagegen.errors import InvalidGenerationSpec
 PRESETS_KEY = "presets"
 
 
-def load_preset(kind: PresetKind, name: str, *, root: Path) -> PresetDocument:
-    """1つのpresetファイルを読み込む。"""
+def load_preset(
+    kind: PresetKind, name: str, *, root: Path, project_root: Path | None = None
+) -> PresetDocument:
+    """1つのpresetファイルを読み込む。
+
+    project_root を渡すと、エラーメッセージへ出すpresetの位置を作業ルートからの
+    相対パスへ丸める (作業ルートの外を指す場合は絶対パスのまま)。
+    """
     if not PRESET_NAME_PATTERN.fullmatch(name):
         raise InvalidGenerationSpec(
             f"preset名は英数字で始まり、英数字・ドット・アンダースコア・ハイフンのみ使用できます "
@@ -37,28 +44,33 @@ def load_preset(kind: PresetKind, name: str, *, root: Path) -> PresetDocument:
         )
 
     path = root / kind.directory / f"{name}.yaml"
+    shown = display_path(path, project_root)
     if not path.is_file():
-        raise InvalidGenerationSpec(f"presetが見つかりません: {kind.value}/{name} ({path})")
+        raise InvalidGenerationSpec(f"presetが見つかりません: {kind.value}/{name} ({shown})")
 
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
-        raise InvalidGenerationSpec(f"presetのYAML解析に失敗しました: {path}") from exc
+        raise InvalidGenerationSpec(f"presetのYAML解析に失敗しました: {shown}") from exc
     except OSError as exc:
-        raise InvalidGenerationSpec(f"presetを読み込めません: {path}") from exc
+        raise InvalidGenerationSpec(f"presetを読み込めません: {shown}") from exc
 
     if raw is None:
         raw = {}
     if not isinstance(raw, dict):
-        raise InvalidGenerationSpec(f"presetのトップレベルはマッピングである必要があります: {path}")
+        raise InvalidGenerationSpec(
+            f"presetのトップレベルはマッピングである必要があります: {shown}"
+        )
 
     try:
         return PresetDocument.model_validate(raw)
     except ValidationError as exc:
-        raise InvalidGenerationSpec(_format_validation_error(exc, path)) from exc
+        raise InvalidGenerationSpec(_format_validation_error(exc, shown)) from exc
 
 
-def apply_presets(payload: dict[str, Any], *, root: Path) -> tuple[dict[str, Any], dict[str, str]]:
+def apply_presets(
+    payload: dict[str, Any], *, root: Path, project_root: Path | None = None
+) -> tuple[dict[str, Any], dict[str, str]]:
     """Specのpayloadにpresetを適用し、(展開後payload, 適用したpreset名) を返す。
 
     優先順位は spec > style > scene > character。
@@ -69,7 +81,8 @@ def apply_presets(payload: dict[str, Any], *, root: Path) -> tuple[dict[str, Any
 
     refs = _parse_refs(payload[PRESETS_KEY])
     documents = [
-        (kind, load_preset(kind, name, root=root)) for kind, name in iter_preset_refs(refs)
+        (kind, load_preset(kind, name, root=root, project_root=project_root))
+        for kind, name in iter_preset_refs(refs)
     ]
 
     resolved = copy.deepcopy(payload)
@@ -111,7 +124,7 @@ def _parse_refs(value: Any) -> PresetRefs:
         raise InvalidGenerationSpec(_format_validation_error(exc, None)) from exc
 
 
-def _format_validation_error(exc: ValidationError, source: Path | None) -> str:
+def _format_validation_error(exc: ValidationError, source: str | None) -> str:
     lines = [f"presetの検証に失敗しました: {source}" if source else "presets の指定が不正です"]
     for error in exc.errors():
         location = ".".join(str(part) for part in error["loc"]) or "(root)"
