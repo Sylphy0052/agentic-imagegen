@@ -84,13 +84,13 @@ prompt:
 
 style presetはcheckpointごとに選ぶ。品質タグとサンプラー設定は流用しない。
 SD1.5系は `sd15-<通称>` がcheckpointと1対1で対応し、そのモデルの推奨
-sampler / scheduler / cfg / stepsを持つ (`sd15-meinamix` / `sd15-counterfeit` /
-`sd15-aom3` / `sd15-anylora` / `sd15-cetusmix` / `sd15-darksushi` / `sd15-hassaku` /
-写実寄りの `sd15-chilloutmix`)。SDXL系はfine-tuneの系統で選ぶ
+sampler / scheduler / cfg / stepsを持つ。SDXL系はfine-tuneの系統で選ぶ
 (Illustrious系とAnythingXLは `sdxl-illustrious`、Animagine XL系は `sdxl-animagine`、
 ShiratakiMix XL系は `sdxl-shiratakimix`)。Anima系は `anima-base`。
 checkpointを決めていない段階では汎用の `anime-soft` (steps 20) と
 `anime-detailed` (steps 30、negativeを積んで破綻を抑える) を負荷で使い分ける。
+どのcheckpointにどのpresetを使うかは `ls presets/styles` と
+[配置済みのSD1.5系モデル](../../../docs/prompting-guide.md#配置済みのsd15系モデル)の表で確認する。
 一覧と連結・優先順位の規則は
 [presets](../../../docs/spec-reference.md#presets) を参照。
 

@@ -97,10 +97,9 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
 
 - **軸の責務を混ぜない。** 解像度とseedは再現性に直結するためpresetには書かず、Spec側で指定する
 - **style presetはcheckpointごとに用意する。** 品質タグとサンプラー設定はモデルの
-  学習内容に依存するため流用しない。配置済みのSD1.5系8件には `sd15-<通称>` が1対1で対応し、
+  学習内容に依存するため流用しない。SD1.5系は `sd15-<通称>` がcheckpointと1対1で対応し、
   そのcheckpointの推奨 sampler / scheduler / cfg / steps を持つ。
-  SDXL系は `sdxl-illustrious` / `sdxl-animagine` / `sdxl-shiratakimix` をfine-tuneの
-  系統で選び、DiT系は `anima-base` を使う。
+  SDXL系はfine-tuneの系統で選び、DiT系は `anima-base` を使う。
   checkpointを決めていない段階では汎用の `anime-soft` (steps 20の下描き向け) と
   `anime-detailed` (steps 30・negativeを積んだ仕上げ向け) を負荷で使い分ける
   (一覧は [presets](docs/spec-reference.md#presets))

@@ -120,7 +120,7 @@ generation:
 軸の責務を混ぜない。解像度とseedは再現性に直結するためpresetには書かず、Spec側で指定する。
 品質タグとサンプラー設定はモデルの学習内容に依存するため、style presetを別の系統へ流用しない。
 
-配置済みのcheckpointごとに1つ用意してある。
+SD1.5系は配置済みのcheckpointごとに1つ用意してある。SDXL系はfine-tuneの系統ごと。
 
 | style preset | 対象 | sampler / scheduler | cfg | steps |
 | --- | --- | --- | --- | --- |

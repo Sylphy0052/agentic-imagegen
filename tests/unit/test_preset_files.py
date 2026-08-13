@@ -81,3 +81,63 @@ def test_style_preset_specifies_generation(kind: PresetKind, name: str) -> None:
 
     missing = [field for field in REQUIRED_IN_STYLE if field not in specified]
     assert not missing, f"styles/{name} に {missing} が無い"
+
+
+#: 汎用のアニメ調タグをそのまま共有するSD1.5系のstyle preset。
+#: checkpointごとの差はサンプラー設定にあり、プロンプトは同一でよい。
+SHARED_PROMPT_STYLES = frozenset(
+    {
+        "sd15-aom3",
+        "sd15-cetusmix",
+        "sd15-counterfeit",
+        "sd15-darksushi",
+        "sd15-hassaku",
+        "sd15-meinamix",
+    }
+)
+
+#: プロンプトを共有しない理由があるSD1.5系のstyle preset。
+#: sd15-anylora はLoRAの画風と競合させないため品質タグだけに絞る。
+#: sd15-chilloutmix は写実寄りのモデルのため語彙ごと差し替える。
+DIVERGENT_PROMPT_STYLES = frozenset({"sd15-anylora", "sd15-chilloutmix"})
+
+
+def _sd15_styles() -> set[str]:
+    return {
+        name for kind, name in _presets() if kind is PresetKind.STYLE and name.startswith("sd15-")
+    }
+
+
+def test_sd15_styles_are_classified() -> None:
+    """SD1.5系を足したら、プロンプトを共有するかどうかをここで決める。
+
+    分類から漏れると、下のテストが新しいpresetを素通りしてしまう。
+    """
+    assert _sd15_styles() == SHARED_PROMPT_STYLES | DIVERGENT_PROMPT_STYLES
+
+
+def test_shared_prompt_styles_stay_identical() -> None:
+    """共有側のプロンプトが1つだけ書き換わる事故を防ぐ。
+
+    タグの是正はSD1.5系へ一斉に効かせたい。1件だけ直して他が追従しないと、
+    どれが最新か分からなくなる。
+    """
+    prompts = {
+        name: (
+            _load(PresetKind.STYLE, name).prompt.positive,
+            _load(PresetKind.STYLE, name).prompt.negative,
+        )
+        for name in sorted(SHARED_PROMPT_STYLES)
+    }
+    distinct = set(prompts.values())
+
+    assert len(distinct) == 1, f"共有しているはずのプロンプトが割れている: {prompts}"
+
+
+@pytest.mark.parametrize("name", sorted(DIVERGENT_PROMPT_STYLES))
+def test_divergent_prompt_styles_actually_differ(name: str) -> None:
+    """差分を持つと宣言したpresetが、実際には共有側と同じになっていないこと。"""
+    shared = _load(PresetKind.STYLE, sorted(SHARED_PROMPT_STYLES)[0]).prompt
+    prompt = _load(PresetKind.STYLE, name).prompt
+
+    assert (prompt.positive, prompt.negative) != (shared.positive, shared.negative)
