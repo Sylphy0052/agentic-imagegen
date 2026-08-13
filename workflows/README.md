@@ -138,8 +138,13 @@ txt2img.json  (手書きベース)
 | 50-53 | IPAdapter (LoadImage / IPAdapterModelLoader / CLIPVisionLoader / IPAdapterAdvanced) |
 | 60-62 | DiT系のローダー分割 (UNETLoader / CLIPLoader / VAELoader) |
 
-hires fixとControlNet / IPAdapterの組み合わせは作っていない。両方かけると生成時間が
-現実的でなく、必要になってから足せばよい (Specの検証で同時指定を拒否している)。
+hires fixとControlNetの組み合わせ (`*_hires_controlnet`) は、hiresを重ねてからControlNetを
+かける順で合成している。この順にすると `ControlNetApplyAdvanced` が差し替えるのは1段目の
+KSamplerだけになり、2段目は素の `CLIPTextEncode` を受けたまま残る。構図は1段目で決まるため、
+2段目は拡大後の解像度で描き足すことに徹する。
+
+hires fixとIPAdapterの組み合わせは作っていない (Specの検証で同時指定を拒否している)。
+[Issue #38](https://github.com/Sylphy0052/agentic-imagegen/issues/38) を参照。
 
 `*_ipadapter` は [ComfyUI_IPAdapter_plus](https://github.com/cubiq/ComfyUI_IPAdapter_plus)
 のノードを使う。未導入のComfyUIでは投入が拒否される。

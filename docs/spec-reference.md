@@ -201,6 +201,8 @@ generation:
 - 2段目のseedは1段目と同じ値を使う (変えると元の絵から離れるため)
 - 最初から大きい解像度で生成するより、hires fixの方が構図が破綻しにくい
 - 滑らかさを求める場合は`method: bislerp`を試す
+- `control`と併用できる (`*_hires_controlnet`)。ControlNetが効くのは1段目だけ。
+  `reference`とは併用できない ([組み合わせの可否](#組み合わせの可否))
 
 ## model
 
@@ -327,6 +329,8 @@ control:
   ([Issue #37](https://github.com/Sylphy0052/agentic-imagegen/issues/37))
 - 線が強く出すぎる場合は`low_threshold`を上げて細かい線を捨てるか、`strength`を下げる。
   写真やイラストをそのまま渡すと輪郭を拾いすぎ、元絵のエッジが残ったような絵になりやすい
+- `generation.upscale` (hires fix) と併用できる。ControlNetが効くのは1段目だけで、
+  `start_percent` / `end_percent`は1段目の進行度に対する指定として読む
 
 ## reference (IPAdapter)
 
@@ -518,15 +522,20 @@ outputs/
 | --- | --- | --- | --- | --- | --- | --- |
 | **LoRA** | - | 可 | 可 | 可 | 可 | 可 |
 | **img2img** | 可 | - | 可 | 可 | 可 | 可 |
-| **hires fix** | 可 | 可 | - | **不可** | **不可** | 可 |
-| **ControlNet** | 可 | 可 | **不可** | - | 可 | 可 |
+| **hires fix** | 可 | 可 | - | 可 | **不可** | 可 |
+| **ControlNet** | 可 | 可 | 可 | - | 可 | 可 |
 | **IPAdapter** | 可 | 可 | **不可** | 可 | - | 可 |
 | **DiT系 (unet/clip/vae)** | **不可** | **不可** | **不可** | **不可** | **不可** | 可 |
 
 `text`は生成後の後処理のため、どの構成とも併用できる。
 
+**hires fixとControlNetを併用した場合、ControlNetが効くのは1段目だけになる。**
+構図は1段目で決まるため、2段目は拡大後の解像度で描き足すことに徹する。2段目にも効かせると
+拡大後の解像度でControlNetの推論が追加で走り、得られるものに対して所要時間が伸びすぎる。
+`control.end_percent`は1段目の進行度に対する指定として読む。
+
 不可の組み合わせを指定した場合はSpecの検証時 (exit code 2) に拒否する。理由と着手条件は
-[Issue #38](https://github.com/Sylphy0052/agentic-imagegen/issues/38) (hires fixとの併用) と
+[Issue #38](https://github.com/Sylphy0052/agentic-imagegen/issues/38) (hires fixとIPAdapterの併用) と
 [Issue #39](https://github.com/Sylphy0052/agentic-imagegen/issues/39) (DiT系との併用) にまとめてある。
 
 ## Workflowテンプレートの決まり方
