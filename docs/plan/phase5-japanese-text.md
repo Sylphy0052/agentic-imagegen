@@ -100,9 +100,9 @@ latent は `EmptySD3LatentImage`、サンプリングは cfg 2.5 前後・euler/
 - `workflows/injector.py` に Qwen 用テンプレートを区別して選択する仕組みを足す
   (現状は `unet` 指定があれば無条件に `txt2img_unet` 1本を選ぶため、Anima と Qwen を
   同時に扱うには分岐が要る)
-- `adapters/comfyui/workflow.py` の Node ID と class_type の対応を Qwen向けに追加する
+- `adapters/comfyui/workflow.py` の Node ID と class_type の対応を Qwen 向けに追加する
 
-この節は将来の作業の入口としてのみ残す。Qwen 対応自体はPhase 5の実装対象に含めていない。
+この節は将来の作業の入口としてのみ残す。Qwen 対応自体は Phase 5 の実装対象に含めていない。
 
 ## テキスト合成の設計
 
