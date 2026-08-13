@@ -14,7 +14,7 @@ from typing import Final
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, UnidentifiedImageError
 
 from agentic_imagegen.domain.models import TextAnchor, TextLayer, TextSpec
-from agentic_imagegen.domain.policy import resolve_font
+from agentic_imagegen.domain.policy import display_path, resolve_font
 from agentic_imagegen.errors import TextCompositionError
 
 #: max_width をこの値以下で指定した場合は画像サイズに対する比率として扱う。
@@ -133,50 +133,81 @@ def compose_text(
     fonts_root: Path,
     output: Path,
     max_pixels: int | None = None,
+    project_root: Path | None = None,
 ) -> ComposeResult:
     """画像へテキストを合成し、別ファイルとして書き出す。
 
     入力画像は変更しない。出力先が既にある場合は上書きせずに失敗する。
+
+    project_root はエラーメッセージに出すパスの表示にのみ使う (詳細は resolve_font
+    を参照)。作業ルート配下のパスは相対パスへ丸め、実行環境のディレクトリ構成を
+    露出しないようにする。省略時は従来どおり絶対パスで表示する。
     """
     if output.exists() or output.is_symlink():
         # exists() はdangling symlinkをFalseとして扱う。放置すると _save の書き込みが
         # リンク先へ実体を作ってしまうため、symlinkであること自体も拒否する。
         # 実際の排他性は _save の O_EXCL 書き込みで保証する (ここはメッセージ品質のため)。
-        raise TextCompositionError(f"出力先が既に存在します: {output}")
+        raise TextCompositionError(f"出力先が既に存在します: {display_path(output, project_root)}")
 
     fonts = tuple(
         ResolvedFont(
             name=layer.font,
-            path=resolve_font(layer.font, fonts_root),
+            path=resolve_font(layer.font, fonts_root, project_root=project_root),
             index=layer.font_index,
         )
         for layer in spec.layers
     )
 
-    canvas, source_mode = _open_image(image)
+    canvas, source_mode = _open_image(image, project_root=project_root)
     if max_pixels is not None and canvas.width * canvas.height > max_pixels:
         pixels = canvas.width * canvas.height
         raise TextCompositionError(
-            f"画像が大きすぎます ({pixels} pixels > {max_pixels} pixels): {image}"
+            f"画像が大きすぎます ({pixels} pixels > {max_pixels} pixels): "
+            f"{display_path(image, project_root)}"
         )
 
     for layer, font in zip(spec.layers, fonts, strict=True):
         canvas = Image.alpha_composite(canvas, _render_layer(layer, font, canvas.size))
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    _save(canvas, output, source_mode)
+    _save(canvas, output, source_mode, project_root=project_root)
     return ComposeResult(output=output, fonts=fonts)
 
 
-def _open_image(path: Path) -> tuple[Image.Image, str]:
+def _open_image(path: Path, *, project_root: Path | None = None) -> tuple[Image.Image, str]:
     try:
         with Image.open(path) as opened:
             return opened.convert("RGBA"), opened.mode
     except (UnidentifiedImageError, OSError) as exc:
-        raise TextCompositionError(f"画像を開けません: {path} ({exc})") from exc
+        raise TextCompositionError(
+            f"画像を開けません: {display_path(path, project_root)} "
+            f"({_redact_path_in_exc(exc, path, project_root)})"
+        ) from exc
 
 
-def _save(canvas: Image.Image, output: Path, source_mode: str) -> None:
+def _redact_path_in_exc(exc: Exception, path: Path, project_root: Path | None) -> str:
+    """例外の文字列表現に埋め込まれた絶対パスを表示用パスへ置き換える。
+
+    open() 等のOS例外は引数のパスをそのまま文字列化に含める (例:
+    `[Errno 13] Permission denied: '/abs/path'`)。呼び出し側で prefix を
+    display_path で丸めても、この部分をそのまま連結すると絶対パスが漏れ戻る
+    ため、同じ変換をここでも当てる。
+    """
+    text = str(exc)
+    display = display_path(path, project_root)
+    for candidate in {str(path), str(path.resolve())}:
+        if candidate in text:
+            text = text.replace(candidate, display)
+    return text
+
+
+def _save(
+    canvas: Image.Image,
+    output: Path,
+    source_mode: str,
+    *,
+    project_root: Path | None = None,
+) -> None:
     opaque_output = output.suffix.lower() in _OPAQUE_SUFFIXES
     keep_alpha = not opaque_output and source_mode in {"RGBA", "LA", "P", "RGB"}
     image = canvas if keep_alpha else canvas.convert("RGB")
@@ -191,11 +222,16 @@ def _save(canvas: Image.Image, output: Path, source_mode: str) -> None:
         with output.open("xb") as fh:
             image.save(fh, format=save_format)
     except FileExistsError as exc:
-        raise TextCompositionError(f"出力先が既に存在します: {output}") from exc
+        raise TextCompositionError(
+            f"出力先が既に存在します: {display_path(output, project_root)}"
+        ) from exc
     except (OSError, ValueError) as exc:
         # 書き込み中の失敗で作りかけのファイルを残さない。
         output.unlink(missing_ok=True)
-        raise TextCompositionError(f"画像を書き出せません: {output} ({exc})") from exc
+        raise TextCompositionError(
+            f"画像を書き出せません: {display_path(output, project_root)} "
+            f"({_redact_path_in_exc(exc, output, project_root)})"
+        ) from exc
 
 
 def _load_font(font: ResolvedFont, size: int) -> ImageFont.FreeTypeFont:

@@ -176,6 +176,7 @@ def _compose_text_layers(
                 fonts_root=fonts_root,
                 output=path.with_name(f"{path.stem}{TEXT_SUFFIX}{path.suffix}"),
                 max_pixels=settings.max_pixels,
+                project_root=project_root,
             )
         except TextCompositionError as exc:
             info = _text_compose_info(outputs, fonts, error=str(exc)) if outputs else None
