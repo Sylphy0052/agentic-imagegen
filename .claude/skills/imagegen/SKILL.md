@@ -68,6 +68,9 @@ ControlNet / IPAdapterを使う場合は `~/ComfyUI/models/controlnet/`、
 新しく作るときは軸の責務を混ぜない。解像度とseedは再現性に直結するため
 presetには書かず、Spec側で指定する。
 
+プロンプトの組み立て (ブロックの分け方、Danbooruタグの実在確認、トークン数の詰め方) は
+[prompt-builder skill](../prompt-builder/SKILL.md) の手順に従う。
+
 ```yaml
 # presets/characters/<name>.yaml
 description: 一行でどんなキャラクタか
