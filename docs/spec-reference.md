@@ -289,6 +289,8 @@ generation:
 - **生成時間は倍以上になる。** 2段目は拡大後の解像度で走るため、1stepあたりの時間も伸びる
 - 2段目のseedは1段目と同じ値を使う (変えると元の絵から離れるため)
 - 最初から大きい解像度で生成するより、hires fixの方が構図が破綻しにくい
+- **拡大後の解像度には`IMAGEGEN_MAX_UPSCALED_PIXELS`の上限がかかる** (latent拡大・
+  モデル拡大の両方)。超える指定は生成前に拒否される
 - 滑らかさを求める場合は`method: bislerp`を試す (latent拡大のみ)
 - `control`と併用できる (`*_hires_controlnet` / `*_hires_model_controlnet`)。
   ControlNetが効くのは1段目だけ。`reference`とは併用できない
@@ -302,6 +304,14 @@ generation:
 - `scale`が`model_scale`を超える指定は拒否する (モデルの出力より大きくは引き伸ばさない)
 - **拡大の時点で線が補間されるため、`denoise`はlatent拡大より低めで足りる。** 0.3-0.4が目安。
   latent拡大を同じ`denoise`で使うと、拡大の粗さを2段目が補いきれず絵が崩れることがある
+- **拡大後の解像度にも上限がある。** `IMAGEGEN_MAX_UPSCALED_PIXELS` (既定16777216) と
+  突き合わせるのは最終解像度ではなく途中のピークで、モデル拡大では
+  `width x model_scale` x `height x model_scale` になる
+- **`model_scale`は申告値のため、検証は4.0を下限として見積もる。** 実際の倍率は
+  モデルファイル側で決まっていて`model_scale`とは独立している。小さく申告しても
+  ピークは実モデルの倍率まで広がるため、上限の判定には`max(model_scale, 4.0)`を使う。
+  2xのモデルを使う場合も4倍で見積もられるので、必要なら
+  `IMAGEGEN_MAX_UPSCALED_PIXELS`を上げる
 - pixelへ戻す往復 (VAEDecode / VAEEncode) が挟まるぶん所要時間が伸びる。
   実測は [xpu-setup.md](xpu-setup.md#所要時間とタイムアウトの目安) を参照
 - モデルは`~/ComfyUI/models/upscale_models/`へ置く。配置済みの名前はMCPの`list_upscale_models`で確認する
@@ -696,6 +706,12 @@ hires fixで`upscale.model`まで指定すると`img2img_unet_hires_model`。
 ## 環境変数による上限
 
 このリファレンスに書いた値域はハード制約で、実運用上の上限は環境変数で別途課す。
+解像度の上限はベース解像度 (`IMAGEGEN_MAX_PIXELS`) とhires fixの拡大後
+(`IMAGEGEN_MAX_UPSCALED_PIXELS`) で別に持つ。前者は1段目の生成負荷を抑えるもの、
+後者は拡大時のピークメモリを抑えるもので、目的が違うため同じ値では縛らない。
+拡大後の判定に使うのは最終解像度ではなく途中のピークで、モデル拡大では
+`max(model_scale, 4.0)`倍の解像度を見る
+([アップスケールモデルを使う場合](#アップスケールモデルを使う場合))。
 両方を満たさない指定は拒否される (exit code 2、環境変数の設定値自体が不正なら9)。
 
 変数名・既定値・用途の一覧は [CLAUDE.mdの「環境変数」](../CLAUDE.md#環境変数) を参照。

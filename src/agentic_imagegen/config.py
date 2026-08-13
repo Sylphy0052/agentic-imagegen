@@ -17,6 +17,13 @@ DEFAULT_BASE_URL: Final = "http://127.0.0.1:8188"
 DEFAULT_MAX_WIDTH: Final = 2048
 DEFAULT_MAX_HEIGHT: Final = 2048
 DEFAULT_MAX_PIXELS: Final = 4194304
+
+#: hires fixの拡大後に許す総pixel数 (4096x4096相当)。
+#: ベース解像度の上限 (DEFAULT_MAX_PIXELS) とは目的が違うため別に持つ。
+#: 前者は1段目の生成負荷を抑えるためのもので、こちらは拡大時のピークメモリを
+#: 抑えるためのもの。モデル拡大は一度モデルの固有倍率 (4xなど) まで広げるため、
+#: 同じ値で縛るとベース512x768 + 4xモデルのような実用的な組み合わせが通らない。
+DEFAULT_MAX_UPSCALED_PIXELS: Final = 16777216
 DEFAULT_MAX_BATCH: Final = 4
 DEFAULT_TIMEOUT_SECONDS: Final = 300
 DEFAULT_OUTPUT_ROOT: Final = "outputs"
@@ -78,6 +85,8 @@ class Settings:
     #: presetの探索ルート。既存の呼び出しを壊さないよう既定値を持たせている。
     presets_root: Path = Path(DEFAULT_PRESETS_ROOT)
     max_source_bytes: int = DEFAULT_MAX_SOURCE_BYTES
+    #: hires fixの拡大後に許す総pixel数。既定を持たせて既存の呼び出しを壊さない。
+    max_upscaled_pixels: int = DEFAULT_MAX_UPSCALED_PIXELS
     #: テキスト合成に使うフォントの探索ルート。
     fonts_root: Path = Path(DEFAULT_FONTS_ROOT)
 
@@ -108,6 +117,9 @@ class Settings:
             output_root=Path(output_root),
             presets_root=Path(presets_root),
             max_source_bytes=_positive_int("IMAGEGEN_MAX_SOURCE_BYTES", DEFAULT_MAX_SOURCE_BYTES),
+            max_upscaled_pixels=_positive_int(
+                "IMAGEGEN_MAX_UPSCALED_PIXELS", DEFAULT_MAX_UPSCALED_PIXELS
+            ),
             fonts_root=Path(fonts_root),
         )
 
