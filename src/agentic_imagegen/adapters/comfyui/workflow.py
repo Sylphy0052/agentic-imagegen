@@ -217,6 +217,9 @@ def _with_hires_model_fix(base: WorkflowBinding, *, name: str) -> WorkflowBindin
 
     途中のどれか1つでも元の繋がりが残っていると、拡大が効かないまま生成が
     成功してしまう。VAEの供給元まで含めて結線を検証する。
+
+    VAEの出どころはcheckpointに同梱される場合 (checkpoint系) と単体のVAELoader
+    から来る場合 (DiT系) があり、どちらを見るかで拡大前後の符号化が変わる。
     """
     nodes = dict(base.nodes)
     nodes[UPSCALE_MODEL_DECODE_ROLE] = NodeRef("32", "VAEDecode", ())
@@ -247,6 +250,10 @@ def _with_hires_model_fix(base: WorkflowBinding, *, name: str) -> WorkflowBindin
         ),
         None,
     )
+    if vae_source is None and "checkpoint" in nodes:
+        # checkpoint系はVAEがcheckpointへ同梱されるため、最終段のVAEDecodeに
+        # 供給元のLinkRefが無い。それでも出どころは一意に決まる
+        vae_source = "checkpoint"
     if vae_source is not None:
         links += [
             LinkRef(UPSCALE_MODEL_DECODE_ROLE, "vae", vae_source),

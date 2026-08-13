@@ -293,9 +293,11 @@ class UpscaleSpec(_StrictModel):
     model: str | None = None
     #: モデルの固有倍率。配布元の表記 (4x なら 4.0) をそのまま書く。
     #: モデルの出力サイズはモデル側で決まるため、`scale` へ合わせるにはこの値が要る。
-    model_scale: Annotated[float, Field(ge=MIN_UPSCALE_MODEL_SCALE, le=MAX_UPSCALE_MODEL_SCALE)] = (
-        DEFAULT_UPSCALE_MODEL_SCALE
-    )
+    #: 未指定は None のまま保つ (既定値を埋めるとlatent拡大のSpecをdumpしたときにも
+    #: 値が乗り、metadata.json を読み直せなくなる)。実効値は effective_model_scale。
+    model_scale: (
+        Annotated[float, Field(ge=MIN_UPSCALE_MODEL_SCALE, le=MAX_UPSCALE_MODEL_SCALE)] | None
+    ) = None
 
     @field_validator("model")
     @classmethod
@@ -307,7 +309,7 @@ class UpscaleSpec(_StrictModel):
     @model_validator(mode="after")
     def _check_model_combination(self) -> UpscaleSpec:
         if self.model is None:
-            if "model_scale" in self.model_fields_set:
+            if self.model_scale is not None:
                 raise ValueError(
                     "model_scale はアップスケールモデルの固有倍率です。"
                     "latent拡大では意味を持たないため、model と一緒に指定してください"
@@ -323,10 +325,10 @@ class UpscaleSpec(_StrictModel):
                 f"method {self.method!r} はlatent拡大でのみ指定できます "
                 "(アップスケールモデルを使う場合はpixel側の拡大方法を選んでください)"
             )
-        if self.scale > self.model_scale:
+        if self.scale > self.effective_model_scale:
             raise ValueError(
-                f"scale ({self.scale}) が model_scale ({self.model_scale}) を超えています。"
-                "モデルの出力より大きくは引き伸ばしません"
+                f"scale ({self.scale}) が model_scale ({self.effective_model_scale}) を"
+                "超えています。モデルの出力より大きくは引き伸ばしません"
             )
         return self
 
@@ -334,6 +336,11 @@ class UpscaleSpec(_StrictModel):
     def uses_model(self) -> bool:
         """アップスケールモデルを使う指定かどうか。"""
         return self.model is not None
+
+    @property
+    def effective_model_scale(self) -> float:
+        """実際に使うモデルの固有倍率。未指定ならESRGAN系で最も多い4.0とみなす。"""
+        return self.model_scale if self.model_scale is not None else DEFAULT_UPSCALE_MODEL_SCALE
 
     def effective_steps(self, base_steps: int) -> int:
         """2段目で実際に使うsteps。"""
@@ -347,7 +354,7 @@ class UpscaleSpec(_StrictModel):
         """
         if self.model is None:
             raise ValueError("resize_factor は model を指定した場合にのみ意味を持ちます")
-        return self.scale / self.model_scale
+        return self.scale / self.effective_model_scale
 
 
 class GenerationParams(_StrictModel):

@@ -678,7 +678,7 @@ Specの内容から自動的に決まる。`uv run imagegen validate`の`Workflo
 | --- | --- | --- |
 | 1 | `model.unet`を指定 | `_unet` |
 | 1 | `model.loras`が空でない (`model.unet`が無い場合) | `_lora` |
-| 2 | `generation.upscale`を指定 | `_hires` |
+| 2 | `generation.upscale`を指定 | `_hires` (`upscale.model`を指定した場合は`_hires_model`) |
 | 3 | `control`を指定 | `_controlnet` |
 | 4 | `reference`を指定 | `_ipadapter` |
 
@@ -686,6 +686,7 @@ Specの内容から自動的に決まる。`uv run imagegen validate`の`Workflo
 
 例: `task: txt2img`にLoRAとControlNetを指定すると`txt2img_lora_controlnet`。
 `task: img2img`にDiT系モデルとhires fixを指定すると`img2img_unet_hires`。
+hires fixで`upscale.model`まで指定すると`img2img_unet_hires_model`。
 
 テンプレートの一覧と各構成のノード内訳、作り直しの手順は
 [workflows/README.md](../workflows/README.md) を参照。

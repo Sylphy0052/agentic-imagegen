@@ -266,3 +266,57 @@ class TestSeparateLoaderTemplates:
 
         with pytest.raises(WorkflowValidationError):
             build_workflow(broken, spec, seed=1, binding=binding)
+
+
+class TestCheckpointTemplates:
+    """checkpoint系ではVAEがcheckpointへ同梱される。増やしたVAEノードもそれを見ていること。"""
+
+    @pytest.mark.parametrize(
+        "name",
+        ["txt2img_hires_model", "txt2img_lora_hires_model", "img2img_hires_model"],
+    )
+    def test_added_vae_nodes_read_the_checkpoint(self, name: str) -> None:
+        binding = ALLOWED_WORKFLOWS[name]
+        template = load_workflow_template(name)
+        checkpoint = binding.nodes["checkpoint"].node_id
+
+        for role in (UPSCALE_MODEL_DECODE_ROLE, UPSCALE_MODEL_ENCODE_ROLE):
+            node_id = binding.nodes[role].node_id
+            assert template[node_id]["inputs"]["vae"][0] == checkpoint
+
+    def test_detects_added_vae_node_pointing_elsewhere(self) -> None:
+        """checkpoint系でもVAEの供給元が変わっていれば注入前に落ちる。"""
+        broken: dict[str, Any] = json.loads(
+            json.dumps(load_workflow_template("txt2img_hires_model"))
+        )
+        node_id = TXT2IMG_HIRES_MODEL_BINDING.nodes[UPSCALE_MODEL_ENCODE_ROLE].node_id
+        broken[node_id]["inputs"]["vae"] = [
+            TXT2IMG_HIRES_MODEL_BINDING.nodes[UPSCALE_MODEL_LOADER_ROLE].node_id,
+            0,
+        ]
+
+        with pytest.raises(WorkflowValidationError):
+            build_workflow(
+                broken, _spec(upscale=UPSCALE), seed=1, binding=TXT2IMG_HIRES_MODEL_BINDING
+            )
+
+
+class TestSpecRoundTrip:
+    """metadata.json へ書いたSpecを読み直せること。
+
+    model_scale へ既定値を埋めるとlatent拡大のSpecをdumpしたときにも値が乗り、
+    読み直しで「model と一緒に指定してください」に弾かれる。
+    """
+
+    @pytest.mark.parametrize("upscale", [LATENT_UPSCALE, UPSCALE])
+    def test_dumped_spec_is_loadable(self, upscale: dict[str, Any]) -> None:
+        spec = _spec(upscale=upscale)
+
+        dumped = spec.model_dump(mode="json")
+
+        assert GenerationSpec.model_validate(dumped) == spec
+
+    def test_latent_upscale_does_not_carry_model_scale(self) -> None:
+        dumped = _spec(upscale=LATENT_UPSCALE).model_dump(mode="json")
+
+        assert dumped["generation"]["upscale"]["model_scale"] is None

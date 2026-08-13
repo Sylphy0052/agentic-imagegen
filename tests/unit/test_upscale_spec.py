@@ -109,7 +109,9 @@ def test_accepts_upscale_model() -> None:
     upscale = spec.generation.upscale
     assert upscale is not None
     assert upscale.model == "RealESRGAN_x4plus_anime_6B.pth"
-    assert upscale.model_scale == 4.0
+    # 未指定は None のまま保ち、既定値は effective_model_scale で解決する
+    assert upscale.model_scale is None
+    assert upscale.effective_model_scale == 4.0
     assert upscale.uses_model is True
 
 
