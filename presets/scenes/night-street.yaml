@@ -1,8 +1,12 @@
 # 夜の街路のシーンpreset。
 # 場所・時間帯・構図を書く。人物の外見は character 側の責務とする。
+#
+# 「city street at night」「rain reflection」のような複合表現はDanbooruのタグとして
+# 成立しないため、実在するタグへ分解して並べる。
 
 description: 夜の街路、ネオンの明かり、全身の構図
 
 prompt:
   positive: >
-    city street at night, neon lights, rain reflection, cowboy shot, looking at viewer
+    street, night, neon lights, rain, puddle, reflection,
+    cowboy shot, looking at viewer

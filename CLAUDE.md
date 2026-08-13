@@ -99,7 +99,7 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
   `sdxl-illustrious` / `sdxl-animagine` / `sdxl-shiratakimix` はSDXL向け、
   `anima-base` はAnima向け。品質タグとサンプラー設定はモデルの学習内容に依存するため流用しない。
   SD1.5向けの2つは負荷で使い分ける (`anime-soft` はsteps 20の下描き向け、
-  `anime-detailed` はsteps 30・品質タグ厚めの仕上げ向け)。
+  `anime-detailed` はsteps 30・negativeを積んだ仕上げ向け)。
   SDXL向けの3つはcheckpointのfine-tune系統で選ぶ
   (一覧は [presets](docs/spec-reference.md#presets))
 - **併用できない組み合わせがある。** hires fixとIPAdapter、DiT系モデルと

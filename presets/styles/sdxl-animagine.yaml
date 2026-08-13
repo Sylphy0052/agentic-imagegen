@@ -3,8 +3,12 @@
 # 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
 #
 # 配布元の推奨はcfg 5-6 / steps 25 / euler_ancestral。cfgを7以上にすると線が焼き付く。
-# 品質タグは `high score, great score` 系の語彙を使う。Illustrious系の
-# `ultra-detailed, high res` とは学習語彙が異なるため流用しない。
+# 品質タグは `high score, great score` 系の語彙を使う。これはDanbooruタグではなく
+# Animagine XL 4.0が学習時に付与した品質ラベルのため、post_countでは判定しない。
+# Illustrious系の `masterpiece, best quality` とは学習語彙が異なるため流用しない。
+#
+# extra fingers はDanbooruに実在しないため extra digits へ置き換えている
+# (確認手順は docs/prompting-guide.md)。
 #
 # 対象のcheckpointは ~/ComfyUI/models/checkpoints/ へ未配置。使う前に配置する。
 
@@ -15,7 +19,7 @@ prompt:
     masterpiece, high score, great score, absurdres
 
   negative: >
-    lowres, bad anatomy, bad hands, extra fingers, worst quality, low quality,
+    lowres, bad anatomy, bad hands, extra digits, worst quality, low quality,
     normal quality, blurry, jpeg artifacts, watermark, text, logo, signature,
     speech bubble, 3d, photorealistic, realistic, monochrome, censored,
     multiple views

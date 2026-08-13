@@ -1,14 +1,18 @@
 # 黒パーカーの男性キャラクタpreset。
 # 人物の外見的特徴と表情だけを書く。構図や画風は scene / style 側の責務とする。
+#
+# タグはDanbooruに実在するものだけを使う (確認手順は docs/prompting-guide.md)。
+# bangs は現在のDanbooruでは整理されて post_count 0 だが、SD1.5系checkpointの
+# 学習データには存在したため残している。
 
 description: 黒髪・黒パーカーの物憂げなアニメ調男性キャラクタ
 
 prompt:
   positive: >
-    1boy, solo, 20years, black hair, short hair, straight hair, hair over one eye,
-    covered eyes, bangs, shadow face, dark persona, hands in pockets,
-    black hoodie, hood up, hooded, oversized, hoodie, long sleeves,
-    pale skin, slight smile, mysterious, melancholic, male focus
+    1boy, solo, male focus, mature male,
+    black hair, short hair, straight hair, hair over one eye, bangs, pale skin,
+    black hoodie, hood up, oversized clothes, long sleeves,
+    hands in pockets, shaded face, dark persona, light smile
 
   negative: >
     bad anatomy, bad hands, extra digits

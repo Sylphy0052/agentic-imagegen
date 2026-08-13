@@ -1,6 +1,13 @@
 # SDXL / Illustrious系 (novaAnimeXL_ilV190、hassakuXL、waiNSFWIllustriousなど) 向けの画風preset。
-# 実運用で使っている品質タグとネガティブプロンプトをそのまま持ち込む構成。
+# 実運用で使っている品質タグとネガティブプロンプトを持ち込む構成。
 # 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
+#
+# タグはDanbooruに実在するものだけを使う (確認手順は docs/prompting-guide.md)。
+# ultra-detailed / harsh lighting は実在しないため落とし、high res はDanbooruの表記
+# highres へ、super deformed は chibi へ、extra fingers は extra digits へ置き換えている。
+#
+# negativeが23語あるのは実運用の設定をそのまま持ち込んでいるため。
+# 色が抜けて眠い絵になる場合は後方から削る。
 #
 # negativeXL_D のようなTextual Inversion embeddingはまだ扱えないため、
 # 相当する内容を素のタグへ展開している (Issue #59)。
@@ -12,12 +19,12 @@ description: Illustrious系SDXLの実運用設定。品質タグと定型ネガ�
 
 prompt:
   positive: >
-    masterpiece, best quality, ultra-detailed, high res
+    masterpiece, best quality, absurdres, highres
 
   negative: >
-    super deformed, bad anatomy, bad hands, extra fingers, worst quality,
+    chibi, bad anatomy, bad hands, extra digits, worst quality,
     low quality, normal quality, lowres, blurry, jpeg artifacts, watermark, text,
-    logo, signature, speech bubble, 3d, photorealistic, harsh lighting, lens flare,
+    logo, signature, speech bubble, 3d, photorealistic, lens flare,
     film grain, realistic, monochrome, censored, multiple views
 
 generation:

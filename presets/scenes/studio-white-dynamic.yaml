@@ -2,12 +2,12 @@
 # 構図と背景を書く。人物の外見は character 側の責務とする。
 # 立ち姿を確認するだけなら studio-white-fullbody、動きを付けたい場合はこちらを使う。
 #
-# `no background` はDanbooruに実在しないタグのため入れていない。
+# `no background` / `energetic` / `centered` はDanbooruに実在しないタグのため入れていない。
 # 背景を消す指定は `white background, simple background` で足りる。
 
 description: 白背景、動きのある全身の構図
 
 prompt:
   positive: >
-    dynamic pose, energetic, looking at viewer, standing, full body, centered,
+    dynamic pose, looking at viewer, standing, full body,
     white background, simple background

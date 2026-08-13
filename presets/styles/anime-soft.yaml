@@ -1,15 +1,17 @@
-# 画風presetの例。
+# SD1.5系向けの画風preset (下描き向け)。
 # 画風と品質タグ、それに合うサンプラー設定を書く。
 # 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
+#
+# 照明はシーンの一部としてscene側で指定する。styleへ書くと夜のシーンなどと競合する。
 
-description: 柔らかい光のアニメ調。SD1.5想定
+description: アニメ調の下描き向け。SD1.5想定 (steps 20の軽い設定)
 
 prompt:
   positive: >
-    anime illustration, soft lighting, masterpiece, best quality
+    anime coloring, masterpiece, best quality
 
   negative: >
-    low quality, worst quality, blurry, text, watermark, signature
+    worst quality, low quality, lowres, blurry, text, watermark, signature
 
 generation:
   sampler: dpmpp_2m
