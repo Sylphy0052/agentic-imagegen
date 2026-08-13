@@ -82,13 +82,16 @@ prompt:
     bad anatomy, ...
 ```
 
-style presetはモデル系統ごとに選ぶ。`anime-soft` / `anime-detailed` はSD1.5向け、
-`sdxl-illustrious` / `sdxl-animagine` / `sdxl-shiratakimix` はSDXL向け、
-`anima-base` はAnima向けで、品質タグとサンプラー設定は流用しない。
-SD1.5向けの2つは負荷で使い分ける (`anime-soft` はsteps 20、`anime-detailed` はsteps 30で
-negativeを積んで破綻を抑える)。SDXL向けの3つはcheckpointのfine-tune系統で選ぶ
+style presetはcheckpointごとに選ぶ。品質タグとサンプラー設定は流用しない。
+SD1.5系は `sd15-<通称>` がcheckpointと1対1で対応し、そのモデルの推奨
+sampler / scheduler / cfg / stepsを持つ (`sd15-meinamix` / `sd15-counterfeit` /
+`sd15-aom3` / `sd15-anylora` / `sd15-cetusmix` / `sd15-darksushi` / `sd15-hassaku` /
+写実寄りの `sd15-chilloutmix`)。SDXL系はfine-tuneの系統で選ぶ
 (Illustrious系とAnythingXLは `sdxl-illustrious`、Animagine XL系は `sdxl-animagine`、
-ShiratakiMix XL系は `sdxl-shiratakimix`)。一覧と連結・優先順位の規則は
+ShiratakiMix XL系は `sdxl-shiratakimix`)。Anima系は `anima-base`。
+checkpointを決めていない段階では汎用の `anime-soft` (steps 20) と
+`anime-detailed` (steps 30、negativeを積んで破綻を抑える) を負荷で使い分ける。
+一覧と連結・優先順位の規則は
 [presets](../../../docs/spec-reference.md#presets) を参照。
 
 同じキャラクタで別の構図を求められた場合は、character presetを再利用して

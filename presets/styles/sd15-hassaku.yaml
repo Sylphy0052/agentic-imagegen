@@ -1,0 +1,28 @@
+# hassakuSD15_v13.safetensors 向けの画風preset。
+# 画風と品質タグ、それに合うサンプラー設定を書く。
+# 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
+# 照明はシーンの一部としてscene側で指定する。
+#
+# 推奨は steps 20 / cfg 8 / ddim + normal
+# (一覧は docs/prompting-guide.md の「配置済みのSD1.5系モデル」)。
+# 配置済みのSD1.5系で唯一 dpmpp 系ではないため、汎用presetからは設定を流用できない。
+# 明るくコントラストが強く出る。
+#
+# 同名のDiT系モデル (hassakuAnima_v13_int8) とは別物。あちらは anima-base を使う。
+
+description: Hassaku (SD1.5)向け。明るくコントラストの強いアニメ調
+
+prompt:
+  positive: >
+    masterpiece, best quality, absurdres, highres, anime coloring
+
+  negative: >
+    worst quality, low quality, lowres, bad anatomy, bad hands, extra digits,
+    blurry, jpeg artifacts, text, watermark, signature, monochrome, sketch, 3d,
+    multiple views
+
+generation:
+  sampler: ddim
+  scheduler: normal
+  cfg: 8.0
+  steps: 20

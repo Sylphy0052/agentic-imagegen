@@ -1,0 +1,28 @@
+# abyssorangemix3AOM3_aom3a1b.safetensors 向けの画風preset。
+# 画風と品質タグ、それに合うサンプラー設定を書く。
+# 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
+# 照明はシーンの一部としてscene側で指定する。
+#
+# 推奨は steps 20-30 / cfg 6以上 / dpmpp_sde + karras
+# (一覧は docs/prompting-guide.md の「配置済みのSD1.5系モデル」)。
+# 汎用の anime-soft / anime-detailed は dpmpp_2m のためsamplerの系統が違う。
+#
+# SDE系のサンプラーはstepsを削ると収束しない。動作確認で負荷を落とす場合は
+# stepsを下げずに解像度を落とす。
+
+description: AbyssOrangeMix3向けのアニメ調。イラスト寄りの厚い塗り
+
+prompt:
+  positive: >
+    masterpiece, best quality, absurdres, highres, anime coloring
+
+  negative: >
+    worst quality, low quality, lowres, bad anatomy, bad hands, extra digits,
+    blurry, jpeg artifacts, text, watermark, signature, monochrome, sketch, 3d,
+    multiple views
+
+generation:
+  sampler: dpmpp_sde
+  scheduler: karras
+  cfg: 7.0
+  steps: 25

@@ -1,0 +1,28 @@
+# anyloraCheckpoint_bakedvaeBlessedFp16.safetensors 向けの画風preset。
+# 画風と品質タグ、それに合うサンプラー設定を書く。
+# 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
+# 照明はシーンの一部としてscene側で指定する。
+#
+# 推奨は steps 20-30 / cfg 7前後 / dpmpp_2m + karras
+# (一覧は docs/prompting-guide.md の「配置済みのSD1.5系モデル」)。
+#
+# このcheckpointはLoRAを載せる土台としてニュートラルに作られている。
+# style側で画風を寄せるとLoRAの画風と競合するため、他のSD1.5系presetにある
+# anime coloring は入れず、品質タグだけに絞っている。
+# 単体で使うより model.loras と組み合わせる方が本来の用途。
+
+description: AnyLoRA向け。LoRAの画風を邪魔しない品質タグだけの構成
+
+prompt:
+  positive: >
+    masterpiece, best quality, absurdres, highres
+
+  negative: >
+    worst quality, low quality, lowres, bad anatomy, bad hands, extra digits,
+    blurry, jpeg artifacts, text, watermark, signature, multiple views
+
+generation:
+  sampler: dpmpp_2m
+  scheduler: karras
+  cfg: 7.0
+  steps: 25

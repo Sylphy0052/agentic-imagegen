@@ -1,0 +1,26 @@
+# cetusMix_Whalefall2.safetensors 向けの画風preset。
+# 画風と品質タグ、それに合うサンプラー設定を書く。
+# 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
+# 照明はシーンの一部としてscene側で指定する。
+#
+# 推奨は steps 20以上 / cfg 4-8 / dpmpp_2m + karras
+# (一覧は docs/prompting-guide.md の「配置済みのSD1.5系モデル」)。
+# cfgの実用域が低めのため、汎用の anime-detailed (cfg 7.0) より下げた 6.0 を既定にした。
+# 人物と背景の分離が良く、フラットな塗りに寄る。
+
+description: Cetus-Mix向けのアニメ調。澄んだ発色とフラットな塗り
+
+prompt:
+  positive: >
+    masterpiece, best quality, absurdres, highres, anime coloring
+
+  negative: >
+    worst quality, low quality, lowres, bad anatomy, bad hands, extra digits,
+    blurry, jpeg artifacts, text, watermark, signature, monochrome, sketch, 3d,
+    multiple views
+
+generation:
+  sampler: dpmpp_2m
+  scheduler: karras
+  cfg: 6.0
+  steps: 24

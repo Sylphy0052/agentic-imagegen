@@ -96,12 +96,13 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
 判断が要る箇所だけをここに書く。
 
 - **軸の責務を混ぜない。** 解像度とseedは再現性に直結するためpresetには書かず、Spec側で指定する
-- **style presetはモデル系統ごとに用意する。** `anime-soft` / `anime-detailed` はSD1.5向け、
-  `sdxl-illustrious` / `sdxl-animagine` / `sdxl-shiratakimix` はSDXL向け、
-  `anima-base` はAnima向け。品質タグとサンプラー設定はモデルの学習内容に依存するため流用しない。
-  SD1.5向けの2つは負荷で使い分ける (`anime-soft` はsteps 20の下描き向け、
-  `anime-detailed` はsteps 30・negativeを積んだ仕上げ向け)。
-  SDXL向けの3つはcheckpointのfine-tune系統で選ぶ
+- **style presetはcheckpointごとに用意する。** 品質タグとサンプラー設定はモデルの
+  学習内容に依存するため流用しない。配置済みのSD1.5系8件には `sd15-<通称>` が1対1で対応し、
+  そのcheckpointの推奨 sampler / scheduler / cfg / steps を持つ。
+  SDXL系は `sdxl-illustrious` / `sdxl-animagine` / `sdxl-shiratakimix` をfine-tuneの
+  系統で選び、DiT系は `anima-base` を使う。
+  checkpointを決めていない段階では汎用の `anime-soft` (steps 20の下描き向け) と
+  `anime-detailed` (steps 30・negativeを積んだ仕上げ向け) を負荷で使い分ける
   (一覧は [presets](docs/spec-reference.md#presets))
 - **併用できない組み合わせがある。** hires fixとIPAdapter、DiT系モデルと
   LoRA / ControlNet / IPAdapterは指定するとその場で拒否される。
