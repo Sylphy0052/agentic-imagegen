@@ -10,11 +10,10 @@ AIコーディングエージェントから、ComfyUI経由でStable Diffusion�
 Claude Code -> GenerationSpec -> Python CLI (imagegen) -> ComfyUI API -> 画像生成
 ```
 
-Phase 1 (txt2img) から Phase 3 (MCP Server) までは完了。現在はPhase 4
-(ControlNet / IPAdapter / batch / hires fix) を実装中。
-Phase 1の設計は [docs/plan/phase1.md](docs/plan/phase1.md)、
-進捗は [Issue #1](https://github.com/Sylphy0052/agentic-imagegen/issues/1) と
-[Issue #5](https://github.com/Sylphy0052/agentic-imagegen/issues/5) を参照。
+txt2img / preset / LoRA / img2img / MCP Server / ControlNet / IPAdapter / hires fix / batch /
+日本語テキスト合成 / DiT系モデル (Anima) 対応まで実装済み。
+進捗の一次情報は [Issue #1](https://github.com/Sylphy0052/agentic-imagegen/issues/1) (Roadmap)
+を参照。最初の設計は [docs/plan/phase1.md](docs/plan/phase1.md) を参照。
 
 ## 画像生成要求を受けたときの手順
 
@@ -45,9 +44,15 @@ Phase 1の設計は [docs/plan/phase1.md](docs/plan/phase1.md)、
 ComfyUIが起動していない場合は `uv run imagegen health` で状態を確認し、
 [docs/comfyui-setup.md](docs/comfyui-setup.md) の手順を案内する。
 
-Specの書き方は [specs/examples/txt2img.yaml](specs/examples/txt2img.yaml)、
-preset・LoRAを使う場合は
-[specs/examples/txt2img_preset_lora.yaml](specs/examples/txt2img_preset_lora.yaml) を参照。
+Specの書き方はサンプルを参照する (`specs/examples/`)。
+
+| ファイル | 内容 |
+| --- | --- |
+| [txt2img.yaml](specs/examples/txt2img.yaml) | 最小構成のtxt2img |
+| [txt2img_preset_lora.yaml](specs/examples/txt2img_preset_lora.yaml) | preset・LoRAを使う場合 |
+| [img2img.yaml](specs/examples/img2img.yaml) | 既存画像を入力にするimg2img |
+| [txt2img_anima.yaml](specs/examples/txt2img_anima.yaml) | DiT系モデル (Anima) を使う場合 |
+| [text_overlay.yaml](specs/examples/text_overlay.yaml) | 生成後に日本語テキストを合成する場合 |
 
 ## Presetを使う
 
@@ -196,12 +201,15 @@ generation:
     scale: 1.5        # 1.0より大きく4.0以下
     denoise: 0.45     # 低いほど元の絵を保つ。0.3-0.5が扱いやすい
     steps: 8          # 省略時は1段目と同じ
+    method: nearest-exact  # latentの拡大方式。既定nearest-exact
 ```
 
 - 指定するとテンプレートが `*_hires` へ自動的に切り替わる
 - **生成時間は倍以上になる。** 2段目は拡大後の解像度で走るため、1stepあたりの時間も伸びる
 - 2段目のseedは1段目と同じ値を使う (変えると元の絵から離れる)
 - 最初から大きい解像度で生成するより、hires fix の方が構図が破綻しにくい
+- `method` はlatentの拡大方式。`nearest-exact` / `bilinear` / `area` / `bicubic` / `bislerp`
+  から選べる (既定 `nearest-exact`)。滑らかさを求める場合は `bislerp` を試す
 
 ## 画像へ日本語を入れる
 
@@ -213,6 +221,7 @@ text:
   layers:
     - content: 夜の街          # 改行を含められる。1レイヤ500文字まで
       font: NotoSansJP-Bold.ttf  # fonts/ 配下のファイル名
+      font_index: 0            # .ttc (コレクション) 内の書体を選ぶ。既定0
       size: 72
       color: "#ffffff"        # #rgb / #rrggbb / #rrggbbaa
       anchor: top-center      # 9分割の基準位置
@@ -240,6 +249,7 @@ text:
 - レイヤは指定順に描画し、後のものが上へ重なる。最大10件
 - 生成そのままの画像は残り、合成結果は `image_0001_text.png` として別に出力される
 - フォントは `fonts/` へ置く (git管理外)。置き方は [docs/fonts-setup.md](docs/fonts-setup.md)
+- `.ttc` (フォントコレクション) はコレクション内の書体を `font_index` で選べる (既定0)
 - **見つからないフォントは別の書体へ代替せず失敗する** (exit code 10)。
   意図しない書体で出力されるより、その場で止める方が扱いやすいため
 - **ルビ・縦中横・縦書き時の句読点の位置補正は未対応**
@@ -421,7 +431,7 @@ uv run mypy src
 | `IMAGEGEN_MAX_WIDTH` | 2048 | 幅の上限 |
 | `IMAGEGEN_MAX_HEIGHT` | 2048 | 高さの上限 |
 | `IMAGEGEN_MAX_PIXELS` | 4194304 | 総pixel数の上限 (batch込み) |
-| `IMAGEGEN_MAX_BATCH` | 4 | batch_sizeの上限 |
+| `IMAGEGEN_MAX_BATCH` | 4 | batch_sizeの上限 (4が上限。超える値を設定すると起動時にエラーになる) |
 | `IMAGEGEN_TIMEOUT` | 300 | 生成のタイムアウト秒 |
 | `IMAGEGEN_OUTPUT_ROOT` | `outputs` | 出力ルート |
 | `IMAGEGEN_PRESETS_ROOT` | `presets` | presetの探索ルート |

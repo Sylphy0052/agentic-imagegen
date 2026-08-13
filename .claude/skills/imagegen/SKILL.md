@@ -172,10 +172,13 @@ generation:
   upscale:
     scale: 1.5      # 1.0より大きく4.0以下
     denoise: 0.45   # 低いほど元の絵を保つ。0.3-0.5が扱いやすい
+    method: nearest-exact  # latentの拡大方式。既定nearest-exact
 ```
 
 **生成時間は倍以上になる。** 2段目は拡大後の解像度で走る。
 ControlNet / IPAdapter との同時指定は拒否される。
+`method` は `nearest-exact` / `bilinear` / `area` / `bicubic` / `bislerp` から選べる
+(既定 `nearest-exact`)。
 
 パラメータの目安 (CPU推論では時間が跳ね返るため控えめにする):
 
@@ -219,6 +222,7 @@ text:
   layers:
     - content: 夜の街
       font: NotoSansJP-Bold.ttf   # fonts/ 配下のファイル名
+      font_index: 0               # .ttc (コレクション) 内の書体を選ぶ。既定0
       size: 72
       color: "#ffffff"
       anchor: top-center          # top/middle/bottom - left/center/right
@@ -294,11 +298,16 @@ exit codeで原因を切り分ける。詳細と対処は
 
 | code | 意味 |
 | --- | --- |
+| 0 | 成功 |
+| 1 | 想定外の内部エラー |
 | 2 | Specが不正 |
 | 3 | ComfyUIへ到達できない |
 | 4 | Workflowテンプレートが不正 |
+| 5 | Workflowの投入が拒否された (ControlNet / IPAdapterのカスタムノード未導入など) |
 | 6 | 生成がタイムアウトした |
 | 7 | ComfyUI側で実行が失敗した |
+| 8 | 出力画像が見つからない |
+| 9 | 環境変数の設定値が不正 |
 | 10 | テキスト合成に失敗した (フォントが見つからない等) |
 
 ## してはいけないこと

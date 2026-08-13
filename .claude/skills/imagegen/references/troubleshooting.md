@@ -94,7 +94,7 @@ ComfyUIの起動ログを見る。よくある原因:
 
 `IMAGEGEN_MAX_*` は1以上の整数、`IMAGEGEN_MAX_BATCH` は4以下、
 `COMFYUI_BASE_URL` は `http://` または `https://` 始まり。
-`IMAGEGEN_OUTPUT_ROOT` / `IMAGEGEN_PRESETS_ROOT` に空文字は指定できない。
+`IMAGEGEN_OUTPUT_ROOT` / `IMAGEGEN_PRESETS_ROOT` / `IMAGEGEN_FONTS_ROOT` に空文字は指定できない。
 
 ## code 10: テキスト合成に失敗した
 
@@ -110,8 +110,9 @@ ComfyUIの起動ログを見る。よくある原因:
 - 出力先が作業ルートの外を指している場合も失敗する (`--output/-o` は作業ルート配下のみ)
 - 画像が大きすぎる場合は `IMAGEGEN_MAX_PIXELS` の上限に収まるよう縮小するか、
   上限自体を緩める
-- `batch_size` > 1 の生成では、途中の1件が失敗しても後続は続けない。
-  `metadata.json` の `text.outputs` でどこまで合成できたかを確認できる
+- `batch_size` > 1 の生成では、失敗した時点で後続は処理しない。
+  それまでに成功した分は `metadata.json` の `text.outputs` に残る
+  (スキーマの詳細は [CLAUDE.md](../../../../CLAUDE.md) の metadata.json節を参照)
 
 ## 画像は出たが意図と違う
 

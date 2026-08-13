@@ -177,7 +177,7 @@ uv run pytest -m integration
 - ComfyUIが起動していない場合は失敗ではなくskipし、理由を表示する
 - checkpointはComfyUIが実際に持っているものから選ぶ。SD1.5系を優先する
 - 特定のcheckpointで実行したい場合は `IMAGEGEN_TEST_CHECKPOINT` を指定する
-- 待ち時間は `IMAGEGEN_TIMEOUT` で調整できる (既定180秒)
+- 待ち時間は `IMAGEGEN_TIMEOUT` で調整できる (既定300秒)
 
 ```bash
 IMAGEGEN_TEST_CHECKPOINT=meinamix_v12Final.safetensors \

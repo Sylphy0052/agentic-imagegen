@@ -13,16 +13,21 @@ Claude Code -> GenerationSpec -> Python CLI (imagegen) -> ComfyUI API -> 画像�
 
 ## ステータス
 
-Phase 1 (txt2img) から Phase 3 (MCP Server) までは完了。現在はPhase 4 を実装中。
+txt2img から始め、preset / LoRA / img2img、MCP Server、ControlNet / IPAdapter / hires fix /
+batch、日本語テキスト合成、DiT系モデル (Anima) 対応まで一通り実装済み。
 
-| フェーズ | 内容 | 状態 |
-| --- | --- | --- |
-| Phase 1 | txt2img、CLI、ComfyUI連携 | 完了 ([#1](https://github.com/Sylphy0052/agentic-imagegen/issues/1)) |
-| Phase 2 | Preset / LoRA / img2img / Claude Code Skill | 完了 ([#3](https://github.com/Sylphy0052/agentic-imagegen/issues/3)) |
-| Phase 3 | MCP Server (Claude Code / Codex 双方対応) | 完了 ([#4](https://github.com/Sylphy0052/agentic-imagegen/issues/4)) |
-| Phase 4 | ControlNet / IPAdapter / Character consistency / Batch / Upscaling | 進行中 ([#5](https://github.com/Sylphy0052/agentic-imagegen/issues/5)) |
+| 機能 | 内容 |
+| --- | --- |
+| txt2img / img2img | CLI、ComfyUI連携、preset (character / scene / style) |
+| LoRA | 同時3件まで指定可能 |
+| MCP Server | Claude Code / Codex 双方対応 |
+| ControlNet / IPAdapter | 構図・特徴の引き継ぎ、Character consistency |
+| hires fix / batch | latentアップスケール、複数枚一括生成 |
+| 日本語テキスト合成 | 生成後にPillowで合成 (`text` / `compose`) |
+| DiT系モデル (Anima) | UNet / CLIP / VAEを個別指定するローダに対応 |
 
-設計は [docs/plan/phase1.md](docs/plan/phase1.md) を参照。
+進捗の詳細は [Issue #1](https://github.com/Sylphy0052/agentic-imagegen/issues/1) (Roadmap) を
+参照。最初の設計は [docs/plan/phase1.md](docs/plan/phase1.md) を参照。
 
 ## 必要環境
 
@@ -63,17 +68,21 @@ cd ~/ComfyUI
 
 ## Workflowの準備
 
-同梱テンプレート:
+同梱テンプレートは `workflows/` に21種類あり、通常は差し替え不要。実際に使うテンプレートは
+Specの内容から自動的に決まる。
 
-| ファイル | 用途 |
+| 分岐要素 | 変わる内容 |
 | --- | --- |
-| `workflows/txt2img.json` | text-to-image |
-| `workflows/txt2img_lora.json` | LoRA付き text-to-image (`LoraLoader` 3段) |
-| `workflows/img2img.json` | image-to-image (`LoadImage` + `VAEEncode`) |
+| `task` | `txt2img` / `img2img` |
+| `model.loras` | 指定すると `_lora` が付く |
+| `generation.upscale` | 指定すると `_hires` が付く (hires fix) |
+| `control` | 指定すると `_controlnet` が付く |
+| `reference` | 指定すると `_ipadapter` が付く |
+| `model.uses_separate_loaders` (`unet`/`clip`/`vae`指定) | `<task>_unet` へ切り替わる (他の分岐とは併用不可) |
 
-どれを使うかは `task` と `model.loras` の有無で自動的に決まる。通常は差し替え不要。
-自環境に合わせて作り直す場合は [workflows/README.md](workflows/README.md) の手順
-(API形式での書き出し) に従う。
+例えば `task: txt2img` に LoRA と ControlNet を指定すると `txt2img_lora_controlnet` が選ばれる。
+テンプレート一覧と各構成のノード内訳は [workflows/README.md](workflows/README.md) を参照。
+自環境に合わせて作り直す場合も同ファイルの手順 (API形式での書き出し) に従う。
 
 読み込み時にノードID・class_type・必要な入力キー・ノード間の接続を検証し、
 1つでも想定と違えば注入せずに失敗する。
@@ -317,11 +326,13 @@ generation:
     scale: 1.5        # 1.0より大きく4.0以下
     denoise: 0.45     # 低いほど元の絵を保つ
     steps: 6          # 省略時は1段目と同じ
-    method: nearest-exact
+    method: nearest-exact  # latentの拡大方式。既定nearest-exact
 ```
 
 指定するとテンプレートが `*_hires` へ自動的に切り替わる。
 2段目のseedは1段目と同じ値を使う (変えると元の絵から離れるため)。
+`method` は `nearest-exact` / `bilinear` / `area` / `bicubic` / `bislerp` から選べる
+(既定 `nearest-exact`)。滑らかさを求める場合は `bislerp` を試す。
 
 実測 (Intel XPU / SD1.5 / 512x512 -> 768x768): 43.7秒。
 **生成時間は倍以上になる。** 2段目は拡大後の解像度で走る。
@@ -336,6 +347,7 @@ text:
   layers:
     - content: 夜の街
       font: NotoSansJP-Bold.ttf   # fonts/ 配下のファイル名
+      font_index: 0               # .ttc (コレクション) 内の書体を選ぶ。既定0
       size: 72
       color: "#ffffff"
       anchor: top-center          # 9分割の基準位置
@@ -362,6 +374,7 @@ text:
 合成結果は `image_0001_text.png` として別に出力される。
 
 フォントは `fonts/` へ置く (git管理外)。置き方は [docs/fonts-setup.md](docs/fonts-setup.md)。
+`.ttc` はコレクション内の書体を `font_index` で選べる (既定0)。
 見つからないフォントは別の書体へ代替せず exit code 10 で失敗する。
 
 生成済みの画像へ後から合成する場合は `compose` を使う。入力画像は変更しない。
@@ -374,6 +387,38 @@ uv run imagegen compose inputs/base.png specs/generated/caption.yaml -o outputs/
 日本語を直接描けるモデル (Qwen-Image) の評価と導入条件は
 [docs/plan/phase5-japanese-text.md](docs/plan/phase5-japanese-text.md) を参照。
 現在の実行環境ではメモリが足りず動かせないため、合成方式を既定とする。
+
+## DiT系モデル (Anima) を使う
+
+Anima などのDiT系モデルは、UNet単体で配布されtext encoderとVAEを同梱しない。
+その場合は `checkpoint` の代わりに `model.unet` / `model.clip` / `model.vae` を
+別々に指定する。
+
+```yaml
+generation:
+  width: 832        # Animaは1024x1024前後が前提。832x1216が扱いやすい
+  height: 1216
+  steps: 28
+  cfg: 4.0          # SD1.5系より低め。5を超えると崩れやすい
+  sampler: er_sde
+  scheduler: simple
+
+model:
+  unet: hassakuAnima_v13_int8.safetensors   # ~/ComfyUI/models/diffusion_models/
+  clip: qwen_3_06b_base.safetensors         # ~/ComfyUI/models/text_encoders/
+  vae: qwen_image_vae.safetensors           # ~/ComfyUI/models/vae/
+```
+
+- 指定するとテンプレートが `txt2img_unet` へ切り替わる
+- **`checkpoint` とは排他。** 両方書くと拒否される。`unet` / `clip` / `vae` は3つ揃えて指定する
+- **`task` は現在 `txt2img` のみ対応。** `img2img` は拒否される
+- **LoRA / hires fix (`generation.upscale`) / ControlNet (`control`) / IPAdapter (`reference`)
+  とは併用できない。** テンプレートを用意していないため、指定するとその場で拒否される
+- モデル名は `list_diffusion_models` / `list_text_encoders` / `list_vaes` (MCP) で確認する
+- text encoderとVAEはUNetと対応関係がある。Animaなら Qwen3-0.6B と Qwen-Image VAE
+
+入手手順は [docs/comfyui-setup.md](docs/comfyui-setup.md)、サンプルは
+[specs/examples/txt2img_anima.yaml](specs/examples/txt2img_anima.yaml) を参照。
 
 ## img2img
 
@@ -440,7 +485,7 @@ outputs/
 | `IMAGEGEN_MAX_WIDTH` | 2048 | 幅の上限 |
 | `IMAGEGEN_MAX_HEIGHT` | 2048 | 高さの上限 |
 | `IMAGEGEN_MAX_PIXELS` | 4194304 | 総pixel数の上限 (batch込み) |
-| `IMAGEGEN_MAX_BATCH` | 4 | batch_sizeの上限 |
+| `IMAGEGEN_MAX_BATCH` | 4 | batch_sizeの上限 (4が上限。超える値を設定すると起動時にエラーになる) |
 | `IMAGEGEN_TIMEOUT` | 300 | 生成のタイムアウト秒 |
 | `IMAGEGEN_OUTPUT_ROOT` | `outputs` | 出力ルート |
 | `IMAGEGEN_PRESETS_ROOT` | `presets` | presetの探索ルート |
@@ -504,25 +549,10 @@ Claude Code / Codex の双方から同じ基盤を使える。手順は
 uv run imagegen-mcp   # stdioで待ち受ける (通常はクライアントが子プロセスとして起動する)
 ```
 
-| tool | 用途 |
-| --- | --- |
-| `validate_generation` | GenerationSpecを検証する (生成はしない) |
-| `generate_image` | 生成を開始し `job_id` を返す (完了は待たない) |
-| `get_generation_status` | 生成の状態と結果 (出力パス / seed / exit_code) を返す |
-| `generate_batch` | 複数のSpecをまとめて生成し `job_id` を返す (seed掃引にも対応) |
-| `get_batch_status` | 一括生成の状態と1件ごとの結果を返す |
-| `list_models` | 利用可能なcheckpoint名 |
-| `list_loras` | 利用可能なLoRA名 |
-| `list_controlnets` | 利用可能なControlNetモデル名 |
-| `list_ipadapters` | 利用可能なIPAdapterモデル名 (カスタムノード未導入なら空) |
-| `list_clip_visions` | 利用可能なCLIP Visionモデル名 |
-| `list_diffusion_models` | 利用可能なUNet単体のモデル名 (DiT系) |
-| `list_text_encoders` | 利用可能なtext encoder名 (DiT系) |
-| `list_vaes` | 利用可能なVAE名 (DiT系) |
-| `list_workflows` | 実行を許可しているWorkflowテンプレート名 |
-
-生成は数十秒から数分かかるため、`generate_image` は完了を待たずに `job_id` を返し、
-`get_generation_status` で結果を受け取る。失敗時はCLIと同じ exit code を返す。
+利用できるtoolの一覧は [docs/mcp-setup.md](docs/mcp-setup.md) を参照 (一次情報はそちら)。
+生成系・確認系・一覧系あわせて14個あり、生成は数十秒から数分かかるため、`generate_image` は
+完了を待たずに `job_id` を返し、`get_generation_status` で結果を受け取る。
+失敗時はCLIと同じ exit code を返す。
 
 ControlNet・IPAdapter・hires fix・LoRA・img2imgはいずれもSpecの内容で決まるため、MCP側に専用の
 パラメータは無い。CLIで書けるSpecはそのままMCPでも使える。
