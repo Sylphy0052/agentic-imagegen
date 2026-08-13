@@ -10,7 +10,12 @@ from pathlib import Path
 from typing import Final
 
 from agentic_imagegen.config import Settings
-from agentic_imagegen.domain.models import ALLOWED_FONT_SUFFIXES, GenerationSpec
+from agentic_imagegen.domain.models import (
+    ALLOWED_FONT_SUFFIXES,
+    DEFAULT_UPSCALE_MODEL_SCALE,
+    GenerationSpec,
+    UpscaleSpec,
+)
 from agentic_imagegen.errors import InvalidGenerationSpec, TextCompositionError
 
 #: フォントが見つからないときに列挙する候補の件数。多すぎると読めない。
@@ -60,7 +65,7 @@ def _validate_upscaled_pixels(spec: GenerationSpec, settings: Settings) -> None:
         return
 
     params = spec.generation
-    peak_scale = upscale.effective_model_scale if upscale.uses_model else upscale.scale
+    peak_scale = _peak_scale(upscale)
     peak_width = int(params.width * peak_scale)
     peak_height = int(params.height * peak_scale)
     peak_pixels = peak_width * peak_height * params.batch_size
@@ -72,6 +77,20 @@ def _validate_upscaled_pixels(spec: GenerationSpec, settings: Settings) -> None:
             f"{peak_width}x{peak_height}x{params.batch_size} = {peak_pixels} "
             f"> {settings.max_upscaled_pixels})"
         )
+
+
+def _peak_scale(upscale: UpscaleSpec) -> float:
+    """拡大の途中でいちばん大きくなる倍率。
+
+    latent拡大は要求された倍率がそのままピークになる。
+    モデル拡大は実際の倍率がモデルファイル側で決まっており、`model_scale` は
+    Spec作成者の申告値でしかない。小さく申告してもピークは実モデルの倍率まで
+    広がるため、検証は申告値を鵜呑みにせずESRGAN系の主流である4.0を下限として
+    見積もる。申告値がそれより大きければ (8xモデルなど) そちらを使う。
+    """
+    if not upscale.uses_model:
+        return upscale.scale
+    return max(upscale.effective_model_scale, DEFAULT_UPSCALE_MODEL_SCALE)
 
 
 def resolve_output_directory(directory: str, root: Path) -> Path:
