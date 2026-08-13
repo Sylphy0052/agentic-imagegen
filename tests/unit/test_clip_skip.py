@@ -81,10 +81,27 @@ def test_clip_skip_rejects_out_of_range(value: int) -> None:
 
 def test_clip_skip_rejected_with_separate_loaders() -> None:
     """DiT系 (unet/clip/vae) とclip_skipの併用はtext encoderの構造が異なるため拒否する。"""
-    payload = _spec_dict(model={**SEPARATE_MODEL, "clip_skip": 2})
+    payload = _spec_dict(model={**SEPARATE_MODEL, "checkpoint": None, "clip_skip": 2})
 
     with pytest.raises(ValidationError, match="clip_skip"):
         GenerationSpec.model_validate(payload)
+
+
+def test_clip_skip_and_loras_both_reported_with_separate_loaders() -> None:
+    """LoRAとclip_skipを同時指定した場合、両方の非対応理由が1回のエラーで分かる。"""
+    payload = _spec_dict(
+        model={
+            **SEPARATE_MODEL,
+            "checkpoint": None,
+            "clip_skip": 2,
+            "loras": [{"name": "add_detail.safetensors"}],
+        }
+    )
+
+    with pytest.raises(ValidationError, match="LoRA") as excinfo:
+        GenerationSpec.model_validate(payload)
+
+    assert "clip_skip" in str(excinfo.value)
 
 
 # --- adapter: build_workflowでの注入 -----------------------------------------

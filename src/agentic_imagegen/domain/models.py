@@ -365,11 +365,16 @@ class ModelSpec(_StrictModel):
                 )
             )
 
+        unsupported = []
         if self.loras:
-            raise ValueError("unet / clip / vae の指定とLoRAの併用は未対応です")
-
+            unsupported.append("LoRA")
         if self.clip_skip is not None:
-            raise ValueError("unet / clip / vae の指定と clip_skip の併用は未対応です")
+            unsupported.append("clip_skip")
+
+        if unsupported:
+            raise ValueError(
+                "unet / clip / vae の指定と{}の併用は未対応です".format(" / ".join(unsupported))
+            )
 
         return self
 
