@@ -1,0 +1,26 @@
+# counterfeitV30_v30.safetensors 向けの画風preset。
+# 画風と品質タグ、それに合うサンプラー設定を書く。
+# 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
+# 照明はシーンの一部としてscene側で指定する。
+#
+# 推奨は steps 20-30 / cfg 8-10 / dpmpp_2m + karras
+# (一覧は docs/prompting-guide.md の「配置済みのSD1.5系モデル」)。
+# 汎用の anime-detailed は cfg 7.0 のため、このモデルの推奨下限を下回る。
+# 背景と色彩の描き込みが厚く、cfgを上げても破綻しにくい。
+
+description: Counterfeit-V3.0向けのアニメ調。背景と色彩の描き込みが厚い
+
+prompt:
+  positive: >
+    masterpiece, best quality, absurdres, highres, anime coloring
+
+  negative: >
+    worst quality, low quality, lowres, bad anatomy, bad hands, extra digits,
+    blurry, jpeg artifacts, text, watermark, signature, monochrome, sketch, 3d,
+    multiple views
+
+generation:
+  sampler: dpmpp_2m
+  scheduler: karras
+  cfg: 9.0
+  steps: 25

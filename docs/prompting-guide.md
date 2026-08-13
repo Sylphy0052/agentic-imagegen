@@ -57,23 +57,29 @@ Specの書き方そのものは [spec-reference.md](spec-reference.md)、失敗�
 推奨設定。Specでは `model.checkpoint` にファイル名をそのまま書く。
 どれもdanbooruタグ主体で書く点は共通で、差が出るのはcfgの実用域と塗りの傾向。
 
-| checkpoint | 傾向 | sampler / scheduler | steps | cfg |
-| --- | --- | --- | --- | --- |
-| `meinamix_v12Final.safetensors` | アニメ調。プロンプトが短くてもまとまる | `dpmpp_2m` / `karras` | 20-60 | 4-9 |
-| `counterfeitV30_v30.safetensors` | アニメ調。背景と色彩の描き込みが厚い | `dpmpp_2m` / `karras` | 20-30 | 8-10 |
-| `abyssorangemix3AOM3_aom3a1b.safetensors` | アニメ調。イラスト寄りの塗り | `dpmpp_sde` / `karras` | 20-30 | 6以上 |
-| `anyloraCheckpoint_bakedvaeBlessedFp16.safetensors` | ニュートラルなアニメ調。LoRAの土台向け | `dpmpp_2m` / `karras` | 20-30 | 7前後 |
-| `cetusMix_Whalefall2.safetensors` | フラットなアニメ調。人物と背景の分離が良い | `dpmpp_2m` / `karras` | 20以上 | 4-8 |
-| `darkSushiMixMix_225D.safetensors` | 2.25D (2Dと2.5Dの中間) | `dpmpp_sde` / `karras` | 20-60 | 7.5 |
-| `hassakuSD15_v13.safetensors` | 明るくコントラストの強いアニメ調 | `ddim` / `normal` | 20 | 8 |
-| `chilloutmix_NiPrunedFp16Fix.safetensors` | 写実寄り。人物の肌と質感に振れる | `dpmpp_sde` / `karras` | 20前後 | 7前後 |
+| checkpoint | 傾向 | sampler / scheduler | steps | cfg | style preset |
+| --- | --- | --- | --- | --- | --- |
+| `meinamix_v12Final.safetensors` | アニメ調。プロンプトが短くてもまとまる | `dpmpp_2m` / `karras` | 20-60 | 4-9 | `sd15-meinamix` |
+| `counterfeitV30_v30.safetensors` | アニメ調。背景と色彩の描き込みが厚い | `dpmpp_2m` / `karras` | 20-30 | 8-10 | `sd15-counterfeit` |
+| `abyssorangemix3AOM3_aom3a1b.safetensors` | アニメ調。イラスト寄りの塗り | `dpmpp_sde` / `karras` | 20-30 | 6以上 | `sd15-aom3` |
+| `anyloraCheckpoint_bakedvaeBlessedFp16.safetensors` | ニュートラルなアニメ調。LoRAの土台向け | `dpmpp_2m` / `karras` | 20-30 | 7前後 | `sd15-anylora` |
+| `cetusMix_Whalefall2.safetensors` | フラットなアニメ調。人物と背景の分離が良い | `dpmpp_2m` / `karras` | 20以上 | 4-8 | `sd15-cetusmix` |
+| `darkSushiMixMix_225D.safetensors` | 2.25D (2Dと2.5Dの中間) | `dpmpp_sde` / `karras` | 20-60 | 7.5 | `sd15-darksushi` |
+| `hassakuSD15_v13.safetensors` | 明るくコントラストの強いアニメ調 | `ddim` / `normal` | 20 | 8 | `sd15-hassaku` |
+| `chilloutmix_NiPrunedFp16Fix.safetensors` | 写実寄り。人物の肌と質感に振れる | `dpmpp_sde` / `karras` | 20前後 | 7前後 | `sd15-chilloutmix` |
+
+style presetはこの表の値を持っているため、checkpointに合うものを選べば
+sampler / scheduler / cfg / stepsをSpec側で書き直す必要はない。
 
 - **cfgの実用域はモデルごとに違う。** `counterfeitV30` の8-10と `cetusMix` の4-8では、
-  同じ7でも意味が変わる。style presetを流用するときはcfgとstepsだけ見直す
-- **`chilloutmix` だけ写実寄り。** アニメ調のstyle preset (`anime-soft` / `anime-detailed`) を
-  当てると打ち消し合う。使うなら品質タグを写実側の語彙へ差し替える
+  同じ7でも意味が変わる。別のcheckpointのstyle presetを流用するときはcfgとstepsを見直す
+- **`chilloutmix` だけ写実寄り。** アニメ調のstyle preset (`anime-soft` / `anime-detailed` /
+  他の `sd15-*`) を当てると品質タグが打ち消し合う。`sd15-chilloutmix` を使う
 - **`anylora` はLoRAを載せる土台としてニュートラルに作られている。** 単体で使うより
-  `model.loras` と組み合わせる方が本来の用途
+  `model.loras` と組み合わせる方が本来の用途。`sd15-anylora` はLoRAの画風と競合しないよう
+  `anime coloring` を入れていない
+- **checkpointを決めていない段階では `anime-soft` / `anime-detailed` を使う。**
+  負荷で選ぶ汎用preset (`anime-soft` が下描き、`anime-detailed` が仕上げ) として残してある
 - **`AnythingXL_xl.safetensors` はSDXL系。** 同じ `checkpoints/` に置かれているが、
   SD1.5向けのstyle presetと設定を流用しない。目安は後述の
   [SDXL / Illustrious系](#sdxl--illustrious系-novaanimexl_ilv190など)を参照

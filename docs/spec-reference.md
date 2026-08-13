@@ -152,21 +152,38 @@ generation:
 - 適用したpreset名は解決後のSpecに残り、`metadata.json`にも記録される
 
 軸の責務を混ぜない。解像度とseedは再現性に直結するためpresetには書かず、Spec側で指定する。
-style presetはモデル系統ごとに用意する。品質タグとサンプラー設定はモデルの学習内容に
-依存するため流用しない。
+品質タグとサンプラー設定はモデルの学習内容に依存するため、style presetを別の系統へ流用しない。
+
+SD1.5系は配置済みのcheckpointごとに1つ用意してある。SDXL系はfine-tuneの系統ごと。
 
 | style preset | 対象 | sampler / scheduler | cfg | steps |
 | --- | --- | --- | --- | --- |
-| `anime-soft` | SD1.5 | `dpmpp_2m` / `karras` | 5.5 | 20 |
-| `anime-detailed` | SD1.5 | `dpmpp_2m` / `karras` | 7.0 | 30 |
+| `sd15-meinamix` | `meinamix_v12Final` | `dpmpp_2m` / `karras` | 6.5 | 30 |
+| `sd15-counterfeit` | `counterfeitV30_v30` | `dpmpp_2m` / `karras` | 9.0 | 25 |
+| `sd15-aom3` | `abyssorangemix3AOM3_aom3a1b` | `dpmpp_sde` / `karras` | 7.0 | 25 |
+| `sd15-anylora` | `anyloraCheckpoint_bakedvaeBlessedFp16` | `dpmpp_2m` / `karras` | 7.0 | 25 |
+| `sd15-cetusmix` | `cetusMix_Whalefall2` | `dpmpp_2m` / `karras` | 6.0 | 24 |
+| `sd15-darksushi` | `darkSushiMixMix_225D` | `dpmpp_sde` / `karras` | 7.5 | 30 |
+| `sd15-hassaku` | `hassakuSD15_v13` | `ddim` / `normal` | 8.0 | 20 |
+| `sd15-chilloutmix` | `chilloutmix_NiPrunedFp16Fix` (写実寄り) | `dpmpp_sde` / `karras` | 7.0 | 20 |
 | `sdxl-illustrious` | SDXL (Illustrious系 / AnythingXL) | `euler_ancestral` / `normal` | 7.0 | 30 |
 | `sdxl-animagine` | SDXL (Animagine XL系) | `euler_ancestral` / `normal` | 6.0 | 25 |
 | `sdxl-shiratakimix` | SDXL (ShiratakiMix XL系) | `dpmpp_3m_sde` / `karras` | 7.5 | 28 |
 | `anima-base` | DiT系 (Anima) | `er_sde` / `simple` | 4.5 | 32 |
+| `anime-soft` | SD1.5汎用 (下描き) | `dpmpp_2m` / `karras` | 5.5 | 20 |
+| `anime-detailed` | SD1.5汎用 (仕上げ) | `dpmpp_2m` / `karras` | 7.0 | 30 |
 
-SD1.5向けの2つは負荷で選ぶ (`anime-soft`が下描き、`anime-detailed`が仕上げ)。
+`sd15-*` はcheckpointと1対1で対応する。checkpointを決めていれば、それに合うものを選べば
+sampler / scheduler / cfg / stepsをSpec側で書き直す必要はない。
+値の根拠と各モデルの傾向は
+[prompting-guide.md](prompting-guide.md#配置済みのsd15系モデル) を参照。
+
+`anime-soft` / `anime-detailed` はcheckpointを決めていない段階の汎用preset。
+負荷で選ぶ (`anime-soft`が下描き、`anime-detailed`が仕上げ)。
+
 SDXL向けの3つはcheckpointのfine-tune系統で選ぶ。系統ごとの違いは
 [prompting-guide.md](prompting-guide.md#モデルごとの推奨設定) を参照。
+`sdxl-animagine` / `sdxl-shiratakimix` に対応するcheckpointは未配置。
 
 ## generation
 
