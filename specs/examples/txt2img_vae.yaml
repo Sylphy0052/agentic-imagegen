@@ -1,0 +1,46 @@
+# GenerationSpec のサンプル (checkpoint + 外部VAE)
+#
+# 検証:  uv run imagegen validate specs/examples/txt2img_vae.yaml
+# 生成:  uv run imagegen generate specs/examples/txt2img_vae.yaml
+#
+# checkpoint 同梱のVAEではなく、model.vae で外部VAEへ差し替える構成。
+# 色褪せ・彩度低下・眠い線を避けるために使うのが通例 (Issue #57)。
+# vae 未指定の txt2img.yaml と同じ prompt / generation で出力を見比べると、
+# 差し替えの効果を確認しやすい。
+#
+# vae は ComfyUI の models/vae 配下に置いたファイル名を指定する。
+# 利用可能な名前は `uv run imagegen health` でComfyUIへ到達できる状態にしてから確認する。
+
+version: "1"
+task: txt2img
+
+prompt:
+  positive: >
+    1girl, blue hair, blue eyes,
+    anime illustration, full body
+
+  negative: >
+    low quality, blurry, bad anatomy
+
+generation:
+  width: 512
+  height: 768
+
+  steps: 20
+  cfg: 5.5
+
+  # -1 は実行時にランダムなseedへ解決し、結果を metadata.json に記録する
+  seed: -1
+  batch_size: 1
+
+  sampler: euler
+  scheduler: normal
+
+model:
+  checkpoint: meinamix_v12Final.safetensors
+  # アニメ系の配色に寄せる外部VAE。SD1.5汎用なら vae-ft-mse-840000-ema-pruned.safetensors。
+  vae: kl-f8-anime2.ckpt
+
+output:
+  directory: outputs
+  prefix: blue_hair_vae

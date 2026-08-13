@@ -7,6 +7,8 @@ img2img / LoRA / hires fix の組み合わせを生成する。
       ├─ img2img            EmptyLatentImage -> LoadImage + VAEEncode
       ├─ *_lora             CheckpointLoader の後に LoraLoader を3段
       ├─ *_hires            KSampler の後に LatentUpscaleBy + 2段目 KSampler
+      ├─ *_vae              CheckpointLoaderのVAE出力 (2番) を参照する全ノードを
+      │                     VAELoader へ差し替え (checkpoint系のみ、DiT系は対象外)
       └─ txt2img_unet       CheckpointLoader -> UNETLoader + CLIPLoader + VAELoader
 
 組み合わせが増えても手で書かないのは、ノード参照を間違えても
@@ -64,6 +66,7 @@ UNET_LOADER = "60"
 UNET_CLIP_LOADER = "61"
 UNET_VAE_LOADER = "62"
 CLIP_SKIP = "70"
+EXTERNAL_VAE_LOADER = "80"
 
 DEFAULT_LORA = "add_detail.safetensors"
 DEFAULT_SOURCE_IMAGE = "example.png"
@@ -74,6 +77,8 @@ DEFAULT_UPSCALE_MODEL = "RealESRGAN_x4plus_anime_6B.pth"
 DEFAULT_UNET = "hassakuAnima_v13_int8.safetensors"
 DEFAULT_TEXT_ENCODER = "qwen_3_06b_base.safetensors"
 DEFAULT_VAE = "qwen_image_vae.safetensors"
+#: checkpoint系で外部VAEへ差し替える際の既定値。SD1.5汎用のVAEを使う。
+DEFAULT_EXTERNAL_VAE = "vae-ft-mse-840000-ema-pruned.safetensors"
 
 #: 出力スロット数。範囲外の参照を検出するために使う
 OUTPUT_COUNTS = {
@@ -407,23 +412,57 @@ def with_ipadapter(graph: Graph) -> Graph:
     return graph
 
 
+def with_external_vae(graph: Graph) -> Graph:
+    """CheckpointLoaderSimple の VAE 出力を参照している全ノードを VAELoader へ差し替える。
+
+    checkpoint同梱のVAEではなく、色褪せ・眠い線を避けるために使う外部VAE
+    (vae-ft-mse-840000 / klF8Anime2VAE など) を使う版を作る。
+
+    差し替え対象を `VAEDecode` / `VAEEncode` と決め打ちせず、`[CHECKPOINT, 2]`
+    (CheckpointLoaderSimpleのVAE出力) を参照している入力を機械的に走査するのは、
+    `with_hires_model_fix` を先にかけたグラフでは増えたVAEDecode / VAEEncodeも
+    同じ参照を持っており、決め打ちだと拾い漏れるため。
+
+    DiT系 (`to_separate_loaders` 済みのグラフ) は CheckpointLoaderSimple 自体が
+    存在せず、この関数の対象外 (既に独自のVAELoaderルートを持つ)。
+    """
+    graph = copy.deepcopy(graph)
+    if EXTERNAL_VAE_LOADER in graph:
+        raise ValueError(f"外部VAE用のノードID {EXTERNAL_VAE_LOADER} が既に使われている")
+    if CHECKPOINT not in graph:
+        raise ValueError("with_external_vae は CheckpointLoaderSimple を持つグラフにのみ適用できる")
+
+    graph[EXTERNAL_VAE_LOADER] = {
+        "class_type": "VAELoader",
+        "inputs": {"vae_name": DEFAULT_EXTERNAL_VAE},
+    }
+    for node in graph.values():
+        for key, value in node["inputs"].items():
+            if value == [CHECKPOINT, 2]:
+                node["inputs"][key] = [EXTERNAL_VAE_LOADER, 0]
+    return graph
+
+
+def _insert_vae_suffix(name: str) -> str:
+    """テンプレート名の先頭 (taskの直後) へ `_vae` を挿す。
+
+    `_vae` は `_unet` と同じ位置 (LoRAより手前) に入れる。VAELoaderもグラフ上流の
+    ローダー段であるため。例: `txt2img_lora_hires` -> `txt2img_vae_lora_hires`。
+    """
+    task, sep, rest = name.partition("_")
+    if not sep:
+        return f"{task}_vae"
+    return f"{task}_vae_{rest}"
+
+
 def build_all(base: Graph) -> dict[str, Graph]:
     """ベースから全テンプレートを組み立てる。"""
     txt2img = copy.deepcopy(base)
     img2img = to_img2img(base)
 
-    # txt2img自身は手書きのベースなので生成対象に含めない
-    return {
+    # checkpoint系。txt2img自身は手書きのベースなので生成対象に含めない
+    checkpoint_templates: dict[str, Graph] = {
         "txt2img_lora": with_lora_chain(txt2img, LORA_IDS),
-        # DiT系はローダーを分けてから他の派生をかける。逆順にすると、後から足した
-        # 2段目のKSamplerがCheckpointLoaderを見たまま残る
-        # (LoRA / ControlNet / IPAdapter との組み合わせはSpecの検証で拒否している)
-        "txt2img_unet": to_separate_loaders(txt2img),
-        "txt2img_unet_hires": with_hires_fix(to_separate_loaders(txt2img)),
-        "txt2img_unet_hires_model": with_hires_model_fix(to_separate_loaders(txt2img)),
-        "img2img_unet": to_separate_loaders(img2img),
-        "img2img_unet_hires": with_hires_fix(to_separate_loaders(img2img)),
-        "img2img_unet_hires_model": with_hires_model_fix(to_separate_loaders(img2img)),
         "txt2img_hires": with_hires_fix(txt2img),
         "txt2img_lora_hires": with_hires_fix(with_lora_chain(txt2img, LORA_IDS)),
         # アップスケールモデルを使う版。latent拡大の派生と同じ形で並べる
@@ -477,6 +516,32 @@ def build_all(base: Graph) -> dict[str, Graph]:
             with_controlnet(with_lora_chain(img2img, IMG2IMG_LORA_IDS))
         ),
     }
+
+    # DiT系。ローダーを分けてから他の派生をかける。逆順にすると、後から足した
+    # 2段目のKSamplerがCheckpointLoaderを見たまま残る
+    # (LoRA / ControlNet / IPAdapter との組み合わせはSpecの検証で拒否している)
+    unet_templates: dict[str, Graph] = {
+        "txt2img_unet": to_separate_loaders(txt2img),
+        "txt2img_unet_hires": with_hires_fix(to_separate_loaders(txt2img)),
+        "txt2img_unet_hires_model": with_hires_model_fix(to_separate_loaders(txt2img)),
+        "img2img_unet": to_separate_loaders(img2img),
+        "img2img_unet_hires": with_hires_fix(to_separate_loaders(img2img)),
+        "img2img_unet_hires_model": with_hires_model_fix(to_separate_loaders(img2img)),
+    }
+
+    # 外部VAE版。checkpoint系だけが対象で、DiT系は既に独自のVAELoaderルートを
+    # 持つため対象にしない。ローダー段の合成のため、他の合成をかけた後に適用する。
+    # これにより with_hires_model_fix が増やしたVAEDecode / VAEEncodeのVAE参照も
+    # 一緒に拾える (with_external_vae がグラフを機械的に走査するため)
+    vae_templates: dict[str, Graph] = {
+        "txt2img_vae": with_external_vae(txt2img),
+        **{
+            _insert_vae_suffix(name): with_external_vae(graph)
+            for name, graph in checkpoint_templates.items()
+        },
+    }
+
+    return {**checkpoint_templates, **unet_templates, **vae_templates}
 
 
 def verify(name: str, base: Graph, graph: Graph) -> None:
