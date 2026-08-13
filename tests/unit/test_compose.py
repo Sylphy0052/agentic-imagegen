@@ -687,6 +687,181 @@ class TestComposeTextAlign:
         assert boxes["left"][1] < boxes["center"][1] < boxes["right"][1]
 
 
+class TestComposeTextVerticalTypography:
+    """Issue #40 第1段: 縦書きの句読点・小書き文字の位置補正と約物の回転。
+
+    どちらも常時ON (GenerationSpec側にフラグはない)。フォントは全文字が同じ
+    塗り潰し矩形として描かれる (tests/synthetic_font.py) ため、文字ごとの
+    グリフの見た目差ではなく、位置とbounding boxの縦横比で検証する。
+    """
+
+    SIZE = 64
+
+    def _single_char_box(
+        self,
+        base_image: Path,
+        fonts_root: Path,
+        output: Path,
+        *,
+        content: str,
+        direction: str = "vertical",
+    ) -> tuple[int, int, int, int] | None:
+        compose_text(
+            image=base_image,
+            spec=_spec(content=content, anchor="top-left", direction=direction, size=self.SIZE),
+            fonts_root=fonts_root,
+            output=output,
+        )
+        return _bounding_box(output)
+
+    def test_punctuation_moves_up_and_right(self, base_image: Path, fonts_root: Path) -> None:
+        baseline = self._single_char_box(
+            base_image, fonts_root, base_image.parent / "baseline.png", content="あ"
+        )
+        punctuation = self._single_char_box(
+            base_image, fonts_root, base_image.parent / "punct.png", content="。"
+        )
+
+        assert baseline is not None
+        assert punctuation is not None
+        # 右上へ寄る: 左端 (x) は右へ、上端 (y) は上へ動く
+        assert punctuation[0] > baseline[0]
+        assert punctuation[1] < baseline[1]
+
+    def test_small_kana_moves_up_and_right_less_than_punctuation(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        baseline = self._single_char_box(
+            base_image, fonts_root, base_image.parent / "baseline.png", content="あ"
+        )
+        small_kana = self._single_char_box(
+            base_image, fonts_root, base_image.parent / "small.png", content="っ"
+        )
+        punctuation = self._single_char_box(
+            base_image, fonts_root, base_image.parent / "punct.png", content="。"
+        )
+
+        assert baseline is not None
+        assert small_kana is not None
+        assert punctuation is not None
+        assert small_kana[0] > baseline[0]
+        assert small_kana[1] < baseline[1]
+        # 移動量 (px) は句読点より小さい
+        assert (small_kana[0] - baseline[0]) < (punctuation[0] - baseline[0])
+        assert (baseline[1] - small_kana[1]) < (baseline[1] - punctuation[1])
+
+    def test_plain_characters_are_not_shifted(self, base_image: Path, fonts_root: Path) -> None:
+        # 「あ」「い」はどちらも位置補正・回転どちらの対象でもない。
+        # 同じグリフ (synthetic font) を使う以上、補正が誤って効けば位置がずれて
+        # 一致しなくなる
+        first = self._single_char_box(
+            base_image, fonts_root, base_image.parent / "first.png", content="あ"
+        )
+        second = self._single_char_box(
+            base_image, fonts_root, base_image.parent / "second.png", content="い"
+        )
+
+        assert first is not None
+        assert second is not None
+        assert first == second
+
+    def test_dash_rotates_ninety_degrees_clockwise(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        horizontal = self._single_char_box(
+            base_image,
+            fonts_root,
+            base_image.parent / "h.png",
+            content="ー",
+            direction="horizontal",
+        )
+        vertical = self._single_char_box(
+            base_image, fonts_root, base_image.parent / "v.png", content="ー", direction="vertical"
+        )
+
+        assert horizontal is not None
+        assert vertical is not None
+        h_width, h_height = horizontal[2] - horizontal[0], horizontal[3] - horizontal[1]
+        v_width, v_height = vertical[2] - vertical[0], vertical[3] - vertical[1]
+        # synthetic fontのグリフは横書きだと縦長 (height > width)。90度回転すると
+        # 横長 (width > height) へ入れ替わる
+        assert h_height > h_width
+        assert v_width > v_height
+
+    def test_non_rotated_character_keeps_its_aspect_ratio(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        horizontal = self._single_char_box(
+            base_image,
+            fonts_root,
+            base_image.parent / "h.png",
+            content="あ",
+            direction="horizontal",
+        )
+        vertical = self._single_char_box(
+            base_image, fonts_root, base_image.parent / "v.png", content="あ", direction="vertical"
+        )
+
+        assert horizontal is not None
+        assert vertical is not None
+        h_width, h_height = horizontal[2] - horizontal[0], horizontal[3] - horizontal[1]
+        v_width, v_height = vertical[2] - vertical[0], vertical[3] - vertical[1]
+        # 回転対象外の文字は縦横比が入れ替わらない
+        assert h_height > h_width
+        assert v_height > v_width
+
+    def test_stroke_is_included_before_rotating(self, base_image: Path, fonts_root: Path) -> None:
+        plain = base_image.parent / "plain.png"
+        stroked = base_image.parent / "stroked.png"
+
+        compose_text(
+            image=base_image,
+            spec=_spec(content="ー", direction="vertical", anchor="top-left", size=self.SIZE),
+            fonts_root=fonts_root,
+            output=plain,
+        )
+        compose_text(
+            image=base_image,
+            spec=_spec(
+                content="ー",
+                direction="vertical",
+                anchor="top-left",
+                size=self.SIZE,
+                stroke={"width": 6, "color": "#00ff00"},
+            ),
+            fonts_root=fonts_root,
+            output=stroked,
+        )
+
+        # 縁取りをタイルに描かず回転後に足す実装だと、この文字は縁取りなしのまま
+        # 描かれてしまい面積が変わらない
+        assert _opaque_pixels(stroked) > _opaque_pixels(plain)
+
+    def test_shadow_rotates_with_the_character(self, base_image: Path, fonts_root: Path) -> None:
+        output = base_image.parent / "shadow.png"
+
+        compose_text(
+            image=base_image,
+            spec=_spec(
+                content="ー",
+                direction="vertical",
+                anchor="top-left",
+                size=self.SIZE,
+                shadow={"offset": [150, 0], "blur": 0.0, "color": "#0000ff", "opacity": 1.0},
+            ),
+            fonts_root=fonts_root,
+            output=output,
+        )
+
+        # shadow.offsetでx方向へ150pxずらしているため、本体 (x=0付近) とは
+        # 重ならない帯を切り出せば影だけを見られる
+        shadow_box = _column_bounding_box(output, 150, 150 + self.SIZE * 2)
+        assert shadow_box is not None
+        width = shadow_box[2] - shadow_box[0]
+        height = shadow_box[3] - shadow_box[1]
+        assert width > height
+
+
 class TestComposeTextVerticalWrap:
     def test_max_width_wraps_vertical_columns(self, base_image: Path, fonts_root: Path) -> None:
         content = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"

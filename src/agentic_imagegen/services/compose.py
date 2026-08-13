@@ -35,6 +35,24 @@ _VERTICAL_ANCHORS: Final = {
     "bottom": 1.0,
 }
 
+#: 縦書きで右上へ寄せる句読点。全角枠の左下に寄っている横書き用の字形を補正する。
+_VERTICAL_PUNCTUATION_CHARS: Final = frozenset("、。，．")
+
+#: 縦書きで右上へ寄せる小書き文字 (捨て仮名)。句読点より補正量は小さい。
+_VERTICAL_SMALL_KANA_CHARS: Final = frozenset("ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶ")
+
+#: 句読点の移動量 (dx, dy)。em (layer.size) に対する比率。
+_VERTICAL_PUNCTUATION_OFFSET: Final = (0.5, -0.5)
+
+#: 小書き文字の移動量 (dx, dy)。em (layer.size) に対する比率。
+_VERTICAL_SMALL_KANA_OFFSET: Final = (0.08, -0.08)
+
+#: 縦書きで時計回りに90度回転させる約物。長音・ダッシュ類、括弧類、
+#: 三点/二点リーダ、コロン・セミコロンをまとめる。
+_VERTICAL_ROTATED_CHARS: Final = frozenset(
+    "ー〜～−—―‐-（）()「」『』【】〔〕〈〉《》［］[]｛｝{}…‥：；"
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ResolvedFont:
@@ -391,7 +409,9 @@ def _draw_text(
     stroke_fill = parse_color(layer.stroke.color) if stroke and layer.stroke is not None else None
 
     if layer.direction == "vertical":
-        _draw_vertical(draw, layer, font, lines, origin, block, fill, stroke_width, stroke_fill)
+        _draw_vertical(
+            canvas, draw, layer, font, lines, origin, block, fill, stroke_width, stroke_fill
+        )
         return
     _draw_horizontal(draw, layer, font, lines, origin, block, fill, stroke_width, stroke_fill)
 
@@ -421,6 +441,7 @@ def _draw_horizontal(
 
 
 def _draw_vertical(
+    canvas: Image.Image,
     draw: ImageDraw.ImageDraw,
     layer: TextLayer,
     font: ImageFont.FreeTypeFont,
@@ -434,7 +455,8 @@ def _draw_vertical(
     """縦書きを1文字ずつ配置して描く。
 
     Pillow は縦書きを持たないため自前で並べる。列は右から左へ進める。
-    ルビ、縦中横、句読点の位置補正は対象外。
+    句読点・小書き文字は右上へ寄せ、長音や括弧などの約物は時計回りに90度回転させる
+    (常時適用、GenerationSpec 側にON/OFFの指定はない)。ルビ・縦中横は対象外。
     """
     column_width = _line_height(layer)
     advance = _vertical_advance(layer)
@@ -442,15 +464,76 @@ def _draw_vertical(
         x = origin[0] + block[0] - (column + 1) * column_width
         column_offset = _align_offset(layer.align, block[1], advance * len(line))
         for index, char in enumerate(line):
+            y = origin[1] + column_offset + index * advance
+            if char in _VERTICAL_ROTATED_CHARS:
+                cell_center = (x + column_width / 2, y + advance / 2)
+                _draw_rotated_vertical_char(
+                    canvas, layer, font, char, cell_center, advance, fill, stroke_width, stroke_fill
+                )
+                continue
             centered = (column_width - font.getlength(char)) / 2
+            dx, dy = _vertical_glyph_offset(char, layer.size)
             draw.text(
-                (x + centered, origin[1] + column_offset + index * advance),
+                (x + centered + dx, y + dy),
                 char,
                 font=font,
                 fill=fill,
                 stroke_width=stroke_width,
                 stroke_fill=stroke_fill,
             )
+
+
+def _vertical_glyph_offset(char: str, size: int) -> tuple[float, float]:
+    """縦書きで右上へ寄せる補正量 (px)。対象外の文字は (0, 0)。
+
+    横書き用の字形は全角枠の左下に寄っているため、句読点・小書き文字を
+    右上へずらして縦中の見た目を整える。移動量は em (size) に対する固定比率で、
+    フォント実測 (font.getbbox()) は使わない。
+    """
+    if char in _VERTICAL_PUNCTUATION_CHARS:
+        dx, dy = _VERTICAL_PUNCTUATION_OFFSET
+    elif char in _VERTICAL_SMALL_KANA_CHARS:
+        dx, dy = _VERTICAL_SMALL_KANA_OFFSET
+    else:
+        return 0.0, 0.0
+    return dx * size, dy * size
+
+
+def _draw_rotated_vertical_char(
+    canvas: Image.Image,
+    layer: TextLayer,
+    font: ImageFont.FreeTypeFont,
+    char: str,
+    cell_center: tuple[float, float],
+    advance: int,
+    fill: tuple[int, int, int, int],
+    stroke_width: int,
+    stroke_fill: tuple[int, int, int, int] | None,
+) -> None:
+    """約物を時計回りに90度回転させて描く。
+
+    1文字ぶんの正方形タイルへ文字を (stroke込みで) 描き、タイルごと回転してから
+    親キャンバスへ合成する。stroke_width / stroke_fill をタイルへ描く段階で
+    渡さないと、縁取りだけ回転せず残ってしまう。
+    """
+    tile_side = layer.size * 2 + stroke_width * 2
+    tile = Image.new("RGBA", (tile_side, tile_side), (0, 0, 0, 0))
+    tile_draw = ImageDraw.Draw(tile)
+    tile_draw.text(
+        (tile_side / 2 - font.getlength(char) / 2, tile_side / 2 - advance / 2),
+        char,
+        font=font,
+        fill=fill,
+        stroke_width=stroke_width,
+        stroke_fill=stroke_fill,
+    )
+
+    # Pillow の rotate は反時計回りが正のため、時計回り90度は -90 を渡す。
+    rotated = tile.rotate(
+        -90, resample=Image.Resampling.BICUBIC, center=(tile_side / 2, tile_side / 2)
+    )
+    dest = (round(cell_center[0] - tile_side / 2), round(cell_center[1] - tile_side / 2))
+    canvas.alpha_composite(rotated, dest=dest)
 
 
 def _align_offset(align: str, block_size: float, line_size: float) -> float:
