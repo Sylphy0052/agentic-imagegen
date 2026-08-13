@@ -95,9 +95,10 @@ latentは `EmptySD3LatentImage`、サンプリングはcfg 2.5前後・euler/sim
 **追記 (Anima対応後):** 上記のうち `ModelSpec` の拡張とWorkflowテンプレートの仕組みは、
 後続のDiT系モデル (Anima) 対応で実装済みになった。ただし当初の想定と異なり、フィールド名は
 `diffusion_model` / `text_encoder` ではなく `unet` / `clip` / `vae` になっている
-(`src/agentic_imagegen/domain/models.py` の `ModelSpec`)。テンプレートは `txt2img_unet` として
-1本追加され、`workflows/injector.py` の `resolve_workflow_name` が `model.uses_separate_loaders`
-(= `unet` 指定の有無) で自動的に切り替える。
+(`src/agentic_imagegen/domain/models.py` の `ModelSpec`)。`workflows/injector.py` の
+`resolve_workflow_name` が `model.uses_separate_loaders` (= `unet` 指定の有無) を見て
+`_unet` 接尾辞へ切り替える。テンプレートはimg2img / hires fixとの組み合わせを含め4本ある
+(#39、`workflows/README.md` の一覧を参照)。
 
 ただしこれはAnima向けに配線したものであり、そのままQwen-Imageへ転用はできない。
 `workflows/txt2img_unet.json` の `CLIPLoader` は `type: stable_diffusion` 固定、latentノードも
@@ -107,8 +108,8 @@ latentは `EmptySD3LatentImage`、サンプリングはcfg 2.5前後・euler/sim
 - Qwen用のWorkflowテンプレートを別途用意する (`CLIPLoader type=qwen_image` /
   `EmptySD3LatentImage` を含む構成)
 - `workflows/injector.py` にQwen用テンプレートを区別して選択する仕組みを足す
-  (現状は `unet` 指定があれば無条件に `txt2img_unet` 1本を選ぶため、AnimaとQwenを
-  同時に扱うには分岐が要る)
+  (現状は `unet` 指定の有無しか見ておらず、どのDiT系モデルかで分岐しないため、
+  AnimaとQwenを同時に扱うにはモデル系統の軸が要る)
 - `adapters/comfyui/workflow.py` のNode IDとclass_typeの対応をQwen向けに追加する
 
 この節は将来の作業の入口としてのみ残す。Qwen対応自体はPhase 5の実装対象に含めていない。
