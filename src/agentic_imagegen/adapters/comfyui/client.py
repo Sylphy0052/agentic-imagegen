@@ -47,6 +47,9 @@ _TEXT_ENCODER_LOADER: Final = "CLIPLoader"
 _VAE_LOADER: Final = "VAELoader"
 _UPSCALE_MODEL_LOADER: Final = "UpscaleModelLoader"
 
+#: 新しいノード定義APIが選択肢の型として返すマーカー。
+_COMBO_TYPE: Final = "COMBO"
+
 #: embeddingはobject_info経由のノード選択肢ではなく専用エンドポイントで取得する。
 #: CLIPTextEncodeはテキスト中の `embedding:<name>` を実行時に解決するだけで、
 #: 選べる候補をobject_infoのノードスキーマとして持たないため。
@@ -438,7 +441,9 @@ def _extract_option_names(payload: dict[str, Any], *, node: str, field: str) -> 
     candidates = entry[0]
     if isinstance(candidates, list):
         return tuple(name for name in candidates if isinstance(name, str))
-    if len(entry) > 1 and isinstance(entry[1], dict):
+    # 型マーカーまで見る。optionsという名前のメタデータを持つ別の型 (STRING等) を
+    # 選択肢と取り違えないため
+    if candidates == _COMBO_TYPE and len(entry) > 1 and isinstance(entry[1], dict):
         options = entry[1].get("options")
         if isinstance(options, list):
             return tuple(name for name in options if isinstance(name, str))

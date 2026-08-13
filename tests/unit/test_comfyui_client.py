@@ -349,6 +349,59 @@ async def test_available_upscale_models_empty_when_none_placed() -> None:
         assert await client.available_upscale_models() == ()
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        # COMBO形式だがメタデータが無い
+        {"UpscaleModelLoader": {"input": {"required": {"model_name": ["COMBO"]}}}},
+        # メタデータが辞書でない
+        {"UpscaleModelLoader": {"input": {"required": {"model_name": ["COMBO", "x"]}}}},
+        # optionsがリストでない
+        {
+            "UpscaleModelLoader": {
+                "input": {"required": {"model_name": ["COMBO", {"options": None}]}}
+            }
+        },
+        {
+            "UpscaleModelLoader": {
+                "input": {"required": {"model_name": ["COMBO", {"options": {"a": 1}}]}}
+            }
+        },
+        # COMBO以外の型がoptionsという名前のメタデータを持っていても選択肢とは見ない
+        {
+            "UpscaleModelLoader": {
+                "input": {"required": {"model_name": ["STRING", {"options": ["x.pth"]}]}}
+            }
+        },
+    ],
+)
+async def test_available_upscale_models_unexpected_shape_returns_empty(
+    payload: dict[str, Any],
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=payload)
+
+    async with _client(handler) as client:
+        assert await client.available_upscale_models() == ()
+
+
+async def test_available_upscale_models_skips_non_string_options() -> None:
+    """optionsに文字列以外が混ざっていても落とさず、文字列だけを返す。"""
+    payload = {
+        "UpscaleModelLoader": {
+            "input": {
+                "required": {"model_name": ["COMBO", {"options": ["a.pth", 1, None, "b.pth"]}]}
+            }
+        }
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=payload)
+
+    async with _client(handler) as client:
+        assert await client.available_upscale_models() == ("a.pth", "b.pth")
+
+
 async def test_available_upscale_models_with_combo_options_empty() -> None:
     """モデルを置いていない環境ではoptionsが空で返る。"""
     payload = {
