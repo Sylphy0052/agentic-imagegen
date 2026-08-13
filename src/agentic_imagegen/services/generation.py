@@ -17,7 +17,7 @@ from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.domain.policy import resolve_output_directory, resolve_source_image
 from agentic_imagegen.domain.results import GenerationResult, HealthStatus, ImageRef
-from agentic_imagegen.errors import TextCompositionError
+from agentic_imagegen.errors import InvalidGenerationSpec, TextCompositionError
 from agentic_imagegen.services.compose import ResolvedFont, compose_text
 from agentic_imagegen.workflows.injector import prepare_workflow
 
@@ -91,6 +91,7 @@ async def generate(
     prepared = prepare_workflow(
         spec,
         workflows_dir=workflows_dir,
+        project_root=project_root,
         source_image_name=source_image_name,
         control_image_name=control_image_name,
         reference_image_name=reference_image_name,
@@ -257,7 +258,11 @@ async def _upload_image(
         return None
 
     path = resolve_source_image(relative_path, project_root, max_bytes=settings.max_source_bytes)
-    name = await backend.upload_image(path)
+    try:
+        name = await backend.upload_image(path)
+    except InvalidGenerationSpec as exc:
+        # adapterはファイル名しか知らない。どのフィールドの指定だったかはここで補う
+        raise InvalidGenerationSpec(f"{label}.image を読み込めません: {relative_path}") from exc
     logger.info("%s image uploaded: %s -> %s", label, relative_path, name)
     return name
 

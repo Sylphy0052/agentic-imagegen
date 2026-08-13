@@ -190,7 +190,9 @@ class ComfyUIClient:
         try:
             data = path.read_bytes()
         except OSError as exc:
-            raise InvalidGenerationSpec(f"入力画像を読み込めません: {path}") from exc
+            # 呼び出し元が指定値を添えて投げ直せるよう、ここではファイル名だけを出す
+            # (adapterは作業ルートを知らないため、絶対パスを丸められない)
+            raise InvalidGenerationSpec(f"入力画像を読み込めません: {path.name}") from exc
 
         digest = hashlib.sha256(data).hexdigest()[:12]
         name = f"{_UPLOAD_PREFIX}{digest}_{path.name}"

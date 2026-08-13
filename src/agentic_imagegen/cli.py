@@ -334,7 +334,7 @@ def _handled_errors() -> Iterator[None]:
 
 
 def _load_and_validate(spec_path: Path, settings: Settings) -> GenerationSpec:
-    spec = load_spec(spec_path, presets_root=settings.presets_root)
+    spec = load_spec(spec_path, presets_root=settings.presets_root, project_root=Path.cwd())
     validate_against_limits(spec, settings)
     return spec
 
