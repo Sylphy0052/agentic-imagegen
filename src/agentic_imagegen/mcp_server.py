@@ -41,7 +41,8 @@ server: Final = MCPServer(
         "生成前に validate_generation でSpecを確認し、"
         "checkpointやLoRAは list_models / list_loras で、"
         "ControlNetモデルは list_controlnets で、"
-        "IPAdapterは list_ipadapters / list_clip_visions で"
+        "IPAdapterは list_ipadapters / list_clip_visions で、"
+        "promptに embedding:<name> を書く場合は list_embeddings で"
         "実在するものだけを指定すること。"
     ),
 )
@@ -122,6 +123,16 @@ async def list_text_encoders() -> list[str]:
 async def list_vaes() -> list[str]:
     """ComfyUIが持っているVAE名の一覧を返す。model.vae へ指定する。"""
     return await mcp_tools.list_vaes(Settings.from_env())
+
+
+@server.tool()
+async def list_embeddings() -> list[str]:
+    """ComfyUIが持っているTextual Inversion embedding名 (拡張子なし) の一覧を返す。
+
+    prompt中の `embedding:<name>` にはここに出る名前だけを指定する。
+    未配置のembeddingを指定した場合は生成前に拒否される。
+    """
+    return await mcp_tools.list_embeddings(Settings.from_env())
 
 
 @server.tool()

@@ -75,6 +75,40 @@ presetとSpec本体の連結規則は [presets](#presets) を参照。
 モデル系統ごとのプロンプトの書き方 (タグ語彙・語順・重み付け・品質タグの記法) は
 [prompting-guide.md](prompting-guide.md) を参照。
 
+### Textual Inversion embedding
+
+`positive` / `negative` の中に `embedding:<name>` と書くと、ComfyUIが
+`models/embeddings/` 配下の該当ファイルをCLIPTextEncode側で解決する
+(`easynegative` / `badhandv4` のような手・解剖の破綻を抑える定型embeddingなど)。
+
+```yaml
+prompt:
+  negative: >
+    embedding:easynegative, worst quality, low quality
+```
+
+- **`embedding:` の直前には空白が要る。** ComfyUIは空白の直後にある `embedding:` しか
+  embeddingとして解決しない。`1girl,embedding:easynegative` のように空白が無いと
+  ただの語として扱われ、警告すら出ずに無視される。この書き方は
+  `InvalidGenerationSpec` (exit code 2) で止める
+- **`<name>` の拡張子は付けても付けなくてもよい。** `list_embeddings` は拡張子を
+  落とした名前を返すが、ComfyUIは `easynegative.safetensors` のような指定も解決する
+- **未配置のembeddingを指定すると生成前に `InvalidGenerationSpec` (exit code 2) で止まる。**
+  ComfyUI自身は未配置のembeddingを見つけても例外にせず、警告ログを残して黙って
+  無視するだけ (生成は成功するがembeddingは効かない)。それでは気づけないため、
+  本リポジトリ側で生成直前に検出する
+- **このチェックは `imagegen generate` / MCPの `generate_image` / `generate_batch` でのみ行う。**
+  `imagegen validate` と MCPの `validate_generation` はComfyUIへ接続しないため、
+  embeddingの実在チェックはできない (スキーマと上限値だけを見る)
+- **プレフィックス無しの素の単語 (`easynegative` など) は対象外。** ComfyUI自体が
+  `embedding:` プレフィックスの無い語をembeddingとして解決しない仕様のため、
+  ここでもそのまま普通の単語 (トークン) として扱い、警告も拒否もしない。
+  意図してembeddingを効かせたい場合は必ず `embedding:` を付ける
+- 配置済みのembedding名は `list_embeddings` (MCP) で確認する。CLIからは
+  `~/ComfyUI/models/embeddings/` を直接確認する
+- checkpointの世代 (SD1.5 / SDXL) とembeddingの対応関係は検証しない (ComfyUI側の責務)。
+  詳細は [prompting-guide.md](prompting-guide.md) を参照
+
 ## presets
 
 繰り返し使う指定を3つの軸へまとめ、名前で参照する。1軸につき1つまで。

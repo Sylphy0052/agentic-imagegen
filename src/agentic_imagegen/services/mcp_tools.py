@@ -87,6 +87,15 @@ async def list_vaes(settings: Settings) -> list[str]:
         return list(await client.available_vaes())
 
 
+async def list_embeddings(settings: Settings) -> list[str]:
+    """ComfyUIが持っているTextual Inversion embedding名 (拡張子なし) を返す。
+
+    prompt中の `embedding:<name>` の `<name>` にはここに出る名前だけを指定する。
+    """
+    async with ComfyUIClient(settings) as client:
+        return list(await client.available_embeddings())
+
+
 async def _default_runner(
     spec: GenerationSpec, *, settings: Settings, project_root: Path
 ) -> GenerationResult:
@@ -445,6 +454,7 @@ __all__ = [
     "get_generation_status",
     "list_clip_visions",
     "list_controlnets",
+    "list_embeddings",
     "list_ipadapters",
     "list_loras",
     "list_models",

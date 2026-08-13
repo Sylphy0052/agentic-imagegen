@@ -46,6 +46,11 @@ _UNET_LOADER: Final = "UNETLoader"
 _TEXT_ENCODER_LOADER: Final = "CLIPLoader"
 _VAE_LOADER: Final = "VAELoader"
 
+#: embeddingはobject_info経由のノード選択肢ではなく専用エンドポイントで取得する。
+#: CLIPTextEncodeはテキスト中の `embedding:<name>` を実行時に解決するだけで、
+#: 選べる候補をobject_infoのノードスキーマとして持たないため。
+_EMBEDDINGS_PATH: Final = "/embeddings"
+
 #: アップロードした入力画像に付ける接頭辞。ComfyUIのinput配下で由来を判別できるようにする。
 _UPLOAD_PREFIX: Final = "imagegen_"
 
@@ -179,6 +184,16 @@ class ComfyUIClient:
         """単体で配布されているVAE名の一覧を取得する。"""
         payload = await self._get_json(f"/object_info/{_VAE_LOADER}")
         return _extract_option_names(payload, node=_VAE_LOADER, field="vae_name")
+
+    async def available_embeddings(self) -> tuple[str, ...]:
+        """利用可能なTextual Inversion embedding名 (拡張子なし) の一覧を取得する。
+
+        ComfyUIの `/embeddings` は拡張子を除いたファイル名を返す
+        (`os.path.splitext` で削られる)。prompt中の `embedding:<name>` の
+        `<name>` と同じ形なので、そのまま突き合わせに使える。
+        """
+        names = await self._get_json_list(_EMBEDDINGS_PATH)
+        return tuple(name for name in names if isinstance(name, str))
 
     async def upload_image(self, path: Path) -> str:
         """画像をComfyUIのinputへアップロードし、LoadImageで参照する名前を返す。
@@ -357,10 +372,22 @@ class ComfyUIClient:
         return entry if isinstance(entry, dict) else None
 
     async def _get_json(self, path: str, *, timeout: float | None = None) -> dict[str, Any]:
+        payload = await self._get_raw(path, timeout=timeout)
+        if not isinstance(payload, dict):
+            raise ComfyUIUnavailable(f"ComfyUIのレスポンス形式が想定外です: {self._base_url}{path}")
+        return payload
+
+    async def _get_json_list(self, path: str, *, timeout: float | None = None) -> list[Any]:
+        payload = await self._get_raw(path, timeout=timeout)
+        if not isinstance(payload, list):
+            raise ComfyUIUnavailable(f"ComfyUIのレスポンス形式が想定外です: {self._base_url}{path}")
+        return payload
+
+    async def _get_raw(self, path: str, *, timeout: float | None = None) -> Any:
         try:
             response = await self._client.get(path, timeout=timeout or self._client.timeout)
             response.raise_for_status()
-            payload = response.json()
+            return response.json()
         except httpx.HTTPStatusError as exc:
             raise ComfyUIUnavailable(
                 f"ComfyUIがエラーを返しました (HTTP {exc.response.status_code}): "
@@ -374,10 +401,6 @@ class ComfyUIClient:
             raise ComfyUIUnavailable(
                 f"ComfyUIのレスポンスを解釈できません: {self._base_url}{path}"
             ) from exc
-
-        if not isinstance(payload, dict):
-            raise ComfyUIUnavailable(f"ComfyUIのレスポンス形式が想定外です: {self._base_url}{path}")
-        return payload
 
 
 def _extract_option_names(payload: dict[str, Any], *, node: str, field: str) -> tuple[str, ...]:
