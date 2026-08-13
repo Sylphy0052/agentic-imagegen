@@ -182,12 +182,21 @@ txt2img.json  (手書きベース)
 `*_ipadapter` はKSamplerのMODEL入力だけを差し替えるため、positive / negativeを
 差し替える `*_controlnet` と同時にかけられる。
 
-組み合わせが20種になっても手で書かないのは、ノード参照を間違えたときに
+組み合わせが70種を超えても手で書かないのは、ノード参照を間違えたときに
 **形は正しいまま意味だけ壊れる**ためである (実際に一度踏んでいる)。
 スクリプトは生成後に次を検査する。
 
 - 存在しないノードIDや範囲外の出力スロットを参照していないか
 - ベースのノードを潰していないか (class_typeが変わっていないか)
+
+### 軸を1本足すとき
+
+生成しうるテンプレート名と、それを構成する軸の並びは
+[src/agentic_imagegen/workflows/axes.py](../src/agentic_imagegen/workflows/axes.py) が
+一元管理する。合成スクリプト・binding定義 (`adapters/comfyui/workflow.py`)・
+allowlist (`workflows/injector.py`) の3か所はいずれもこの列挙を辿るだけなので、
+軸を足しても組み合わせの数だけ宣言を書き足す必要はない。
+具体的な手順は `axes.py` のモジュールdocstringにある。
 
 ノードIDは用途ごとに帯を分けている。
 
