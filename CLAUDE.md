@@ -26,6 +26,7 @@ txt2img / preset / LoRA / img2img / MCP Server / ControlNet / IPAdapter / hires 
 | **CLAUDE.md** (この文書) | リポジトリを操作するときのルール。禁止事項・設計原則・ディレクトリ・環境変数・exit code |
 | [docs/spec-reference.md](docs/spec-reference.md) | GenerationSpecの全フィールド仕様。値域・既定値・組み合わせ規則・metadata.json |
 | [.claude/skills/imagegen/SKILL.md](.claude/skills/imagegen/SKILL.md) | 画像生成要求を受けたときの手順 |
+| [.claude/skills/prompt-builder/SKILL.md](.claude/skills/prompt-builder/SKILL.md) | プロンプトの組み立てとタグの実在確認の手順 |
 | [README.md](README.md) | プロジェクトの紹介、セットアップ、CLIの使い方 |
 | [docs/](docs/) | 環境構築とモデル別の運用知識 |
 

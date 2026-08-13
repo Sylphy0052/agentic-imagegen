@@ -88,6 +88,14 @@ curl -s 'https://danbooru.donmai.us/tags.json?search%5Bname%5D=oversized_clothes
   | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d[0]["post_count"] if d else "NOT_FOUND")'
 ```
 
+複数のタグをまとめて確認する場合は
+[.claude/skills/prompt-builder/scripts/tagcheck.py](../.claude/skills/prompt-builder/scripts/tagcheck.py)
+を使う。プロンプトをそのまま渡せる。
+
+```bash
+python3 .claude/skills/prompt-builder/scripts/tagcheck.py --prompt "1girl, solo, oversized"
+```
+
 - **確認はアンダースコア表記で行う。** Danbooruのタグ名は `hair_over_one_eye` の形で登録されている。
   プロンプトへ書くときはスペース区切りでよい (CLIPはどちらも同じに解釈する)
 - **`post_count` が0または数十なら効かないと判断する。** 数千以上あれば学習に寄与している
