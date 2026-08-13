@@ -550,6 +550,11 @@ middle-left   center         middle-right
 bottom-left   bottom-center  bottom-right
 ```
 
+`direction: vertical` では、句読点 (`、。，．`) と小書き文字 (`ぁぃぅぇぉっ`等の捨て仮名) の
+位置補正、および長音・括弧・三点リーダ・コロン類などの約物の90度回転 (時計回り) が常時効く。
+GenerationSpec側にON/OFFの指定はない。補正量はフォント実測ではなく固定値 (em比) を使う。
+縦中横とルビは未対応。
+
 ### text.layers[].stroke / shadow / box
 
 | ブロック | キー | 型 | 既定値 | 値域 |
