@@ -1,0 +1,23 @@
+# SD1.5系向けの画風preset。
+# 品質タグを厚めに積み、ネガティブプロンプトで破綻と混入物を抑える構成。
+# 解像度・seed・hires fixは再現性に直結するため、styleでは指定せずSpec側に任せる。
+#
+# easynegative のようなTextual Inversion embeddingはまだ扱えないため、
+# ここでは素のタグだけで組んでいる (Issue #59)。
+
+description: 品質タグを厚めに積んだアニメ調イラスト。SD1.5想定
+
+prompt:
+  positive: >
+    masterpiece, best quality, high quality, detailed, ultra-detailed, illustration
+
+  negative: >
+    multiple views, text, deformed, bad hand, deformed anatomy, deformed fingers,
+    logo, blurry, low quality, monochrome, signature, watermark, nsfw, 3d,
+    fantasy costume, sketches, worst quality
+
+generation:
+  sampler: dpmpp_2m
+  scheduler: karras
+  cfg: 7.0
+  steps: 30

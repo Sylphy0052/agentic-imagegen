@@ -1,0 +1,14 @@
+# 黒パーカーの男性キャラクタpreset。
+# 人物の外見的特徴と表情だけを書く。構図や画風は scene / style 側の責務とする。
+
+description: 黒髪・黒パーカーの物憂げなアニメ調男性キャラクタ
+
+prompt:
+  positive: >
+    1boy, solo, 20years, black hair, short hair, straight hair, hair over one eye,
+    covered eyes, bangs, shadow face, dark persona, hands in pockets,
+    black hoodie, hood up, hooded, oversized, hoodie, long sleeves,
+    pale skin, slight smile, mysterious, melancholic, male focus
+
+  negative: >
+    bad anatomy, bad hands, extra digits

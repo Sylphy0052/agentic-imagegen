@@ -77,8 +77,10 @@ prompt:
     bad anatomy, ...
 ```
 
-style presetはモデル系統ごとに選ぶ。`anime-soft` はSD1.5向け、`anima-base` はAnima向けで、
-品質タグとサンプラー設定は流用しない。連結と優先順位の規則は
+style presetはモデル系統ごとに選ぶ。`anime-soft` / `anime-detailed` はSD1.5向け、
+`anima-base` はAnima向けで、品質タグとサンプラー設定は流用しない。
+SD1.5向けの2つは負荷で使い分ける (`anime-soft` はsteps 20、`anime-detailed` はsteps 30で
+品質タグを厚めに積む)。連結と優先順位の規則は
 [presets](../../../docs/spec-reference.md#presets) を参照。
 
 同じキャラクタで別の構図を求められた場合は、character presetを再利用して

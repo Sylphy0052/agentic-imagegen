@@ -118,8 +118,9 @@ generation:
 - 適用したpreset名は解決後のSpecに残り、`metadata.json`にも記録される
 
 軸の責務を混ぜない。解像度とseedは再現性に直結するためpresetには書かず、Spec側で指定する。
-style presetはモデル系統ごとに用意する (`anime-soft`はSD1.5向け、`anima-base`はAnima向け)。
-品質タグとサンプラー設定はモデルの学習内容に依存するため流用しない。
+style presetはモデル系統ごとに用意する (`anime-soft` / `anime-detailed`はSD1.5向け、
+`anima-base`はAnima向け)。品質タグとサンプラー設定はモデルの学習内容に依存するため流用しない。
+SD1.5向けの2つはsteps 20の`anime-soft`とsteps 30の`anime-detailed`で、負荷に応じて選ぶ。
 
 ## generation
 
