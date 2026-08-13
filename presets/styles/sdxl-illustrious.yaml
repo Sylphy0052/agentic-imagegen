@@ -1,0 +1,27 @@
+# SDXL / Illustrious系 (novaAnimeXL_ilV190、hassakuXL、waiNSFWIllustriousなど) 向けの画風preset。
+# 実運用で使っている品質タグとネガティブプロンプトをそのまま持ち込む構成。
+# 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
+#
+# negativeXL_D のようなTextual Inversion embeddingはまだ扱えないため、
+# 相当する内容を素のタグへ展開している (Issue #59)。
+#
+# Illustrious系の配布元はclip skip 2を推奨するが、clip skipの指定は未対応 (Issue #60)。
+# 既定は1相当のため、clip skip 1で運用している場合はそのまま再現できる。
+
+description: Illustrious系SDXLの実運用設定。品質タグと定型ネガティブを積む
+
+prompt:
+  positive: >
+    masterpiece, best quality, ultra-detailed, high res
+
+  negative: >
+    super deformed, bad anatomy, bad hands, extra fingers, worst quality,
+    low quality, normal quality, lowres, blurry, jpeg artifacts, watermark, text,
+    logo, signature, speech bubble, 3d, photorealistic, harsh lighting, lens flare,
+    film grain, realistic, monochrome, censored, multiple views
+
+generation:
+  sampler: euler_ancestral
+  scheduler: normal
+  cfg: 7.0
+  steps: 30

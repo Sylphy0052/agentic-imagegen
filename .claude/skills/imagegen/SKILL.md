@@ -80,9 +80,12 @@ prompt:
 ```
 
 style presetはモデル系統ごとに選ぶ。`anime-soft` / `anime-detailed` はSD1.5向け、
+`sdxl-illustrious` / `sdxl-animagine` / `sdxl-shiratakimix` はSDXL向け、
 `anima-base` はAnima向けで、品質タグとサンプラー設定は流用しない。
 SD1.5向けの2つは負荷で使い分ける (`anime-soft` はsteps 20、`anime-detailed` はsteps 30で
-品質タグを厚めに積む)。連結と優先順位の規則は
+品質タグを厚めに積む)。SDXL向けの3つはcheckpointのfine-tune系統で選ぶ
+(Illustrious系とAnythingXLは `sdxl-illustrious`、Animagine XL系は `sdxl-animagine`、
+ShiratakiMix XL系は `sdxl-shiratakimix`)。一覧と連結・優先順位の規則は
 [presets](../../../docs/spec-reference.md#presets) を参照。
 
 同じキャラクタで別の構図を求められた場合は、character presetを再利用して

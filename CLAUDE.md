@@ -69,6 +69,7 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
 | [txt2img_preset_lora.yaml](specs/examples/txt2img_preset_lora.yaml) | preset・LoRAを使う場合 |
 | [img2img.yaml](specs/examples/img2img.yaml) | 既存画像を入力にするimg2img |
 | [txt2img_hires.yaml](specs/examples/txt2img_hires.yaml) | preset・hires fixで解像度を上げる場合 |
+| [txt2img_sdxl.yaml](specs/examples/txt2img_sdxl.yaml) | SDXL / Illustrious系のcheckpointを使う場合 |
 | [txt2img_anima.yaml](specs/examples/txt2img_anima.yaml) | DiT系モデル (Anima) を使う場合 |
 | [text_overlay.yaml](specs/examples/text_overlay.yaml) | 生成後に日本語テキストを合成する場合 |
 
@@ -95,9 +96,12 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
 
 - **軸の責務を混ぜない。** 解像度とseedは再現性に直結するためpresetには書かず、Spec側で指定する
 - **style presetはモデル系統ごとに用意する。** `anime-soft` / `anime-detailed` はSD1.5向け、
+  `sdxl-illustrious` / `sdxl-animagine` / `sdxl-shiratakimix` はSDXL向け、
   `anima-base` はAnima向け。品質タグとサンプラー設定はモデルの学習内容に依存するため流用しない。
   SD1.5向けの2つは負荷で使い分ける (`anime-soft` はsteps 20の下描き向け、
-  `anime-detailed` はsteps 30・品質タグ厚めの仕上げ向け)
+  `anime-detailed` はsteps 30・品質タグ厚めの仕上げ向け)。
+  SDXL向けの3つはcheckpointのfine-tune系統で選ぶ
+  (一覧は [presets](docs/spec-reference.md#presets))
 - **併用できない組み合わせがある。** hires fixとIPAdapter、DiT系モデルと
   LoRA / ControlNet / IPAdapterは指定するとその場で拒否される。
   hires fixとControlNetは併用できる (ControlNetが効くのは1段目だけ)。
