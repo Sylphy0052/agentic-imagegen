@@ -12,7 +12,9 @@ from agentic_imagegen.adapters.comfyui.workflow import (
     CONTROL_IMAGE_ROLE,
     CONTROL_LOADER_ROLE,
     CONTROL_PREPROCESSOR_ROLE,
+    HIRES_KSAMPLER_ROLE,
     TXT2IMG_CONTROLNET_BINDING,
+    UPSCALE_ROLE,
     build_workflow,
 )
 from agentic_imagegen.domain.models import GenerationSpec
@@ -172,9 +174,64 @@ class TestStructureValidation:
         assert _inputs(prepared.workflow, CONTROL_IMAGE_ROLE)["image"] == "a.png"
 
 
-def test_rejects_upscale_and_control_together() -> None:
-    """両方かけると生成時間が現実的でないためテンプレートを用意していない。"""
-    from pydantic import ValidationError
+class TestHiresFixCombination:
+    """hires fix との併用。ControlNet は1段目にだけ効かせる。"""
 
-    with pytest.raises(ValidationError, match="同時指定"):
-        _spec(generation={"seed": 5, "upscale": {"scale": 1.5}})
+    @pytest.mark.parametrize(
+        ("task", "loras", "expected"),
+        [
+            ("txt2img", None, "txt2img_hires_controlnet"),
+            ("txt2img", [LORA], "txt2img_lora_hires_controlnet"),
+            ("img2img", None, "img2img_hires_controlnet"),
+            ("img2img", [LORA], "img2img_lora_hires_controlnet"),
+        ],
+    )
+    def test_resolves_template(self, task: str, loras: Any, expected: str) -> None:
+        spec = _spec(
+            task=task,
+            loras=loras,
+            generation={"seed": 5, "upscale": {"scale": 1.5}},
+        )
+
+        assert resolve_workflow_name(spec) == expected
+        assert expected in ALLOWED_WORKFLOWS
+
+    def test_controlnet_feeds_only_the_first_pass(self) -> None:
+        """2段目のKSamplerは素のCLIPTextEncodeを受けたまま残る。
+
+        ControlNet が2段目にも掛かると、拡大後の解像度でControlNetの推論が
+        追加で走り、所要時間が伸びる。構図は1段目で決まっているため、
+        2段目は描き足しに徹する。
+        """
+        prepared = prepare_workflow(
+            _spec(generation={"seed": 5, "upscale": {"scale": 1.5}}),
+            control_image_name="a.png",
+        )
+        binding = ALLOWED_WORKFLOWS["txt2img_hires_controlnet"]
+        workflow = prepared.workflow
+        apply_node = binding.nodes[CONTROL_APPLY_ROLE].node_id
+        first = binding.nodes["ksampler"].node_id
+        second = binding.nodes[HIRES_KSAMPLER_ROLE].node_id
+        positive = binding.nodes["positive_prompt"].node_id
+        negative = binding.nodes["negative_prompt"].node_id
+
+        assert prepared.workflow_name == "txt2img_hires_controlnet"
+        assert workflow[first]["inputs"]["positive"] == [apply_node, 0]
+        assert workflow[first]["inputs"]["negative"] == [apply_node, 1]
+        assert workflow[second]["inputs"]["positive"] == [positive, 0]
+        assert workflow[second]["inputs"]["negative"] == [negative, 0]
+
+    def test_injects_both_upscale_and_control(self) -> None:
+        prepared = prepare_workflow(
+            _spec(generation={"seed": 5, "upscale": {"scale": 1.5, "denoise": 0.4}}),
+            control_image_name="a.png",
+        )
+        binding = ALLOWED_WORKFLOWS["txt2img_hires_controlnet"]
+        upscale = prepared.workflow[binding.nodes[UPSCALE_ROLE].node_id]["inputs"]
+        apply_node = prepared.workflow[binding.nodes[CONTROL_APPLY_ROLE].node_id]["inputs"]
+
+        assert upscale["scale_by"] == 1.5
+        assert prepared.workflow[binding.nodes[HIRES_KSAMPLER_ROLE].node_id]["inputs"][
+            "denoise"
+        ] == pytest.approx(0.4)
+        assert apply_node["strength"] == pytest.approx(0.8)

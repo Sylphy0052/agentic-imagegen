@@ -274,6 +274,22 @@ TXT2IMG_LORA_HIRES_BINDING: Final = _with_hires_fix(TXT2IMG_LORA_BINDING, name="
 IMG2IMG_HIRES_BINDING: Final = _with_hires_fix(IMG2IMG_BINDING, name="img2img_hires")
 IMG2IMG_LORA_HIRES_BINDING: Final = _with_hires_fix(IMG2IMG_LORA_BINDING, name="img2img_lora_hires")
 
+#: hires fix と ControlNet の併用。hires を先に重ねてから ControlNet をかけることで、
+#: ControlNetApplyAdvanced が差し替えるのは1段目のKSamplerだけになる。2段目は素の
+#: CLIPTextEncode を受けたまま残り、構図は1段目で決まり2段目は描き足しに徹する。
+TXT2IMG_HIRES_CONTROLNET_BINDING: Final = _with_controlnet(
+    TXT2IMG_HIRES_BINDING, name="txt2img_hires_controlnet"
+)
+TXT2IMG_LORA_HIRES_CONTROLNET_BINDING: Final = _with_controlnet(
+    TXT2IMG_LORA_HIRES_BINDING, name="txt2img_lora_hires_controlnet"
+)
+IMG2IMG_HIRES_CONTROLNET_BINDING: Final = _with_controlnet(
+    IMG2IMG_HIRES_BINDING, name="img2img_hires_controlnet"
+)
+IMG2IMG_LORA_HIRES_CONTROLNET_BINDING: Final = _with_controlnet(
+    IMG2IMG_LORA_HIRES_BINDING, name="img2img_lora_hires_controlnet"
+)
+
 #: IPAdapter (reference) 用ノードの役割名。
 REFERENCE_IMAGE_ROLE: Final = "reference_image"
 REFERENCE_LOADER_ROLE: Final = "reference_loader"
@@ -672,11 +688,13 @@ __all__ = [
     "IMG2IMG_CONTROLNET_BINDING",
     "IMG2IMG_CONTROLNET_IPADAPTER_BINDING",
     "IMG2IMG_HIRES_BINDING",
+    "IMG2IMG_HIRES_CONTROLNET_BINDING",
     "IMG2IMG_IPADAPTER_BINDING",
     "IMG2IMG_LORA_BINDING",
     "IMG2IMG_LORA_CONTROLNET_BINDING",
     "IMG2IMG_LORA_CONTROLNET_IPADAPTER_BINDING",
     "IMG2IMG_LORA_HIRES_BINDING",
+    "IMG2IMG_LORA_HIRES_CONTROLNET_BINDING",
     "IMG2IMG_LORA_IPADAPTER_BINDING",
     "LORA_SLOT_ROLES",
     "REFERENCE_APPLY_ROLE",
@@ -687,11 +705,13 @@ __all__ = [
     "TXT2IMG_CONTROLNET_BINDING",
     "TXT2IMG_CONTROLNET_IPADAPTER_BINDING",
     "TXT2IMG_HIRES_BINDING",
+    "TXT2IMG_HIRES_CONTROLNET_BINDING",
     "TXT2IMG_IPADAPTER_BINDING",
     "TXT2IMG_LORA_BINDING",
     "TXT2IMG_LORA_CONTROLNET_BINDING",
     "TXT2IMG_LORA_CONTROLNET_IPADAPTER_BINDING",
     "TXT2IMG_LORA_HIRES_BINDING",
+    "TXT2IMG_LORA_HIRES_CONTROLNET_BINDING",
     "TXT2IMG_LORA_IPADAPTER_BINDING",
     "UPSCALE_ROLE",
     "LinkRef",

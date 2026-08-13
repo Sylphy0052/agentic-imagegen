@@ -150,8 +150,18 @@ fp16の相対誤差は4.2e-4だった。
 | SD1.5 / 512x768 / 20 steps | Intel XPU | 約135秒 (初回はモデルロード込み) | 300 |
 | SD1.5 / 512x768 / 20 steps | CPU | 約12分 (36秒/step) | 1200 |
 | SD1.5 / 512x512 -> 768x768 (hires fix) | Intel XPU | 43.7秒 | 300 |
+| SD1.5 / 512x768 / 20 steps + ControlNet | Intel XPU | 61.3秒 | 300 |
+| SD1.5 / 512x768 -> 768x1152 (hires fix, 2段目8 steps) | Intel XPU | 135.7秒 | 300 |
+| 同上 + ControlNet | Intel XPU | 136.2秒 / 139.0秒 | 300 |
+
+いずれもモデルロード済み (2回目以降) の値。初回はモデルロードの分だけ上乗せされる。
 
 ControlNet / IPAdapterを使うと1-2割、hires fixを使うと倍以上に伸びる。
+hires fixとControlNetを併用してもControlNetは1段目にしか効かないため、hires fix単独からの
+増分はほぼ無い。
+
+同じSpec (同じseed・同じ解像度) を2回流すとComfyUI側でノード出力がキャッシュされ、
+数秒で返る。計測し直すときはseedを変える。
 SDXL / Illustrious系 (`novaAnimeXL_ilV190.safetensors`) はさらに遅く、常用しない。
 再計測した場合はこの表を直し、参照側の代表値と食い違っていないかだけを確認する。
 

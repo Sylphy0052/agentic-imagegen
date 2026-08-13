@@ -329,13 +329,23 @@ def build_all(base: Graph) -> dict[str, Graph]:
         "img2img_lora": with_lora_chain(img2img, IMG2IMG_LORA_IDS),
         "img2img_hires": with_hires_fix(img2img),
         "img2img_lora_hires": with_hires_fix(with_lora_chain(img2img, IMG2IMG_LORA_IDS)),
-        # ControlNet と hires の組み合わせは作らない。両方かけると生成時間が
-        # 現実的でなく、必要になってから足せばよい
         "txt2img_controlnet": with_controlnet(txt2img),
         "txt2img_lora_controlnet": with_controlnet(with_lora_chain(txt2img, LORA_IDS)),
         "img2img_controlnet": with_controlnet(img2img),
         "img2img_lora_controlnet": with_controlnet(with_lora_chain(img2img, IMG2IMG_LORA_IDS)),
-        # IPAdapter も hires とは組み合わせない (ControlNetと同じ理由)
+        # ControlNet と hires fix の併用。with_hires_fix を先に通してから
+        # with_controlnet をかけることで、ControlNet が効くのは1段目だけになる
+        # (2段目のKSamplerは素のCLIPTextEncodeを受けたまま残る)。
+        # 構図は1段目で決まっており、2段目は描き足しに徹する
+        "txt2img_hires_controlnet": with_controlnet(with_hires_fix(txt2img)),
+        "txt2img_lora_hires_controlnet": with_controlnet(
+            with_hires_fix(with_lora_chain(txt2img, LORA_IDS))
+        ),
+        "img2img_hires_controlnet": with_controlnet(with_hires_fix(img2img)),
+        "img2img_lora_hires_controlnet": with_controlnet(
+            with_hires_fix(with_lora_chain(img2img, IMG2IMG_LORA_IDS))
+        ),
+        # IPAdapter と hires fix の併用は未対応 (Issue #38)
         "txt2img_ipadapter": with_ipadapter(txt2img),
         "txt2img_lora_ipadapter": with_ipadapter(with_lora_chain(txt2img, LORA_IDS)),
         "img2img_ipadapter": with_ipadapter(img2img),

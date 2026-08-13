@@ -141,8 +141,9 @@ SDXL / Illustrious系は品質タグを先頭に置き `score_9` 系の記法は
 - **読める文字が要求されたらプロンプトへ書かず `text` で合成する。**
   SD1.5 / SDXL系のモデルは日本語をほぼ描けない。ネガティブプロンプトへ `text, watermark` を
   入れておくと、モデルが描く崩れた文字を減らせる
-- **併用できない組み合わせがある。** hires fixとControlNet / IPAdapter、DiT系モデルと
+- **併用できない組み合わせがある。** hires fixとIPAdapter、DiT系モデルと
   LoRA / img2img / hires fix / ControlNet / IPAdapterは指定するとその場で拒否される。
+  hires fixとControlNetは併用できる (ControlNetが効くのは1段目だけ)。
   一覧は [組み合わせの可否](../../../docs/spec-reference.md#組み合わせの可否)
 - 入力画像・参照画像・control画像は `inputs/` へ置く。生成前にComfyUIへ自動でアップロードされるため、
   `~/ComfyUI/input/` へ手で置かない

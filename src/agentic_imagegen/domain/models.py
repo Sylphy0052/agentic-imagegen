@@ -659,10 +659,8 @@ class GenerationSpec(_StrictModel):
         指定しても効かない項目は黙って無視せず拒否する。書いたのに反映されていない
         状態は、生成結果を見ても原因が分かりにくいため。
         """
-        if self.generation.upscale is not None and self.control is not None:
-            # 両方かけると生成時間が現実的でないため、テンプレートを用意していない
-            raise ValueError("upscale と control の同時指定は未対応です")
         if self.generation.upscale is not None and self.reference is not None:
+            # 両方かけると生成時間が現実的でないため、テンプレートを用意していない
             raise ValueError("upscale と reference の同時指定は未対応です")
         if self.model.uses_separate_loaders:
             self._validate_separate_loaders()
