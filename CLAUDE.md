@@ -54,6 +54,9 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
 | [txt2img_anima.yaml](specs/examples/txt2img_anima.yaml) | DiT系モデル (Anima) を使う場合 |
 | [text_overlay.yaml](specs/examples/text_overlay.yaml) | 生成後に日本語テキストを合成する場合 |
 
+モデルごとにプロンプトの書き方が違う (タグ語彙・語順・重み付けの効き方・品質タグの記法)。
+どのモデルで何を書くかは [docs/prompting-guide.md](docs/prompting-guide.md) を参照する。
+
 ## Presetを使う
 
 繰り返し使う指定は preset にまとめてSpecから名前で参照する。軸は3つで、
@@ -82,6 +85,10 @@ presets:
 
 新しいpresetを作るときは軸の責務を混ぜない。解像度とseedは再現性に直結するため
 presetには書かず、Spec側で指定する。
+
+style presetはモデル系統ごとに用意する。品質タグとサンプラー設定はモデルの学習内容に
+依存するため、SD1.5向けのものをAnimaへ流用しない。`anime-soft` はSD1.5向け、
+`anima-base` はAnima向け。
 
 ## LoRAを使う
 
@@ -277,8 +284,8 @@ Anima などのDiT系モデルは、UNet単体で配布されtext encoderとVAE�
 generation:
   width: 832        # Animaは1024x1024前後が前提。832x1216が扱いやすい
   height: 1216
-  steps: 28
-  cfg: 4.0          # SD1.5系より低め。5を超えると崩れやすい
+  steps: 32         # 配布元の推奨は30-50。下げすぎると線が甘くなる
+  cfg: 4.0          # SD1.5系より低め。推奨は4-5で、5を超えると崩れやすい
   sampler: er_sde
   scheduler: simple
 
@@ -294,9 +301,13 @@ model:
   テンプレートを用意していないため、指定するとその場で拒否される
 - モデル名は `list_diffusion_models` / `list_text_encoders` / `list_vaes` (MCP) で確認する
 - text encoderとVAEはUNetと対応関係がある。Animaなら Qwen3-0.6B と Qwen-Image VAE
+- **プロンプトはdanbooruタグ・自然文・その混在のいずれでもよい。** 絵師を指定する場合は
+  `@artist_name` のように `@` を前置する (付けないとほとんど効かない)。
+  品質タグとサンプラー設定は `presets/styles/anima-base.yaml` にまとめてある
 
 入手手順は [docs/comfyui-setup.md](docs/comfyui-setup.md)、サンプルは
-[specs/examples/txt2img_anima.yaml](specs/examples/txt2img_anima.yaml) を参照。
+[specs/examples/txt2img_anima.yaml](specs/examples/txt2img_anima.yaml)、
+プロンプトの書き方は [docs/prompting-guide.md](docs/prompting-guide.md) を参照。
 
 ## 複数枚をまとめて生成する
 
