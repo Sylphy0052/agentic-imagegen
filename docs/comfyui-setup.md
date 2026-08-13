@@ -176,6 +176,11 @@ uv run pytest -m integration
 - checkpointはComfyUIが実際に持っているものから選ぶ。SD1.5系を優先する
 - 特定のcheckpointで実行したい場合は `IMAGEGEN_TEST_CHECKPOINT` を指定する
 - 待ち時間は `IMAGEGEN_TIMEOUT` で調整できる (既定300秒)
+- ControlNetモデルやDiT系の UNet / text encoder / VAE を置いていない環境では、
+  それらを使うケースだけがskipされる。全体は失敗しない
+
+txt2img / hires fix / ControlNet / 両者の併用 / img2img / DiT系 (単体とimg2img+hires fix)
+を通しで確認する。XPU環境での所要時間は全10件で約90秒。
 
 ```bash
 IMAGEGEN_TEST_CHECKPOINT=meinamix_v12Final.safetensors \

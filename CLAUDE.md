@@ -168,7 +168,8 @@ uv run mypy src
 
 - **Unit Testから実ComfyUIへ接続しない。** `httpx.MockTransport` とフィクスチャで代替する
 - ComfyUIが必要なテストには `@pytest.mark.integration` を付ける。通常の `uv run pytest` ではskipされる
-- Integration Testは低負荷設定 (512x512 / steps 2-4 / batch_size 1) にする
+- Integration Testは低負荷設定 (512x512以下 / steps 2-4 / batch_size 1) にする。
+  必要なモデルがComfyUIに無いケース (ControlNet / DiT系) は失敗ではなくskipする
 
 ### 実装方針
 
