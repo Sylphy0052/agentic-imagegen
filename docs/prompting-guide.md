@@ -58,7 +58,7 @@ Specの書き方そのものは [CLAUDE.md](../CLAUDE.md)、失敗時の切り�
 | 解像度 | 512x512 - 1536x1536 (832x1216が扱いやすい) |
 | cfg | 4-5 |
 | steps | 30-50 |
-| sampler | `er_sde` (フラットでシャープ) / `euler_ancestral` (柔らかい線) / `dpmpp_2m_sde` (多様性) |
+| sampler | `er_sde` (フラットでシャープ) / `euler_ancestral` (柔らかい線) / `dpmpp_2m_sde_gpu` (多様性) |
 | scheduler | `simple` |
 
 - **danbooruタグ・自然文・その混在をすべて受け付ける。** 自然文で書く場合は最低2文書く
