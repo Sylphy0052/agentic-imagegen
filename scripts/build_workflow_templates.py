@@ -15,6 +15,12 @@ img2img / LoRA / hires fix の組み合わせを生成する。
 「形は正しいまま意味だけ壊れる」ためである (実際に一度踏んでいる)。
 生成後に参照整合性と、既存ノードを潰していないことを検査する。
 
+生成しうるテンプレート名と、それを構成する軸の並びは
+`agentic_imagegen.workflows.axes` が一元管理する。`build_all()` はその列挙結果を
+辿り、軸ごとのグラフ合成関数 (`AXIS_GRAPH_BUILDERS`) を引いて順に適用するだけである。
+軸を1本足すときにここで書くのは、そのグラフ合成関数と `AXIS_GRAPH_BUILDERS` への
+登録だけでよい (テンプレート名の列挙自体はaxes側で決まる)。
+
 使い方:
 
     uv run python scripts/build_workflow_templates.py            # 生成
@@ -27,8 +33,22 @@ import argparse
 import copy
 import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+from agentic_imagegen.workflows.axes import (
+    AXIS_CONTROLNET,
+    AXIS_HIRES,
+    AXIS_HIRES_MODEL,
+    AXIS_IPADAPTER,
+    AXIS_LORA,
+    AXIS_UNET,
+    AXIS_VAE,
+    Task,
+    axes_in_build_order,
+    iter_template_specs,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS_DIR = REPO_ROOT / "workflows"
@@ -443,105 +463,54 @@ def with_external_vae(graph: Graph) -> Graph:
     return graph
 
 
-def _insert_vae_suffix(name: str) -> str:
-    """テンプレート名の先頭 (taskの直後) へ `_vae` を挿す。
+#: LoRAのノードID帯はtaskごとに空き番が違う (img2imgは10/11をLoadImageと
+#: VAEEncodeで使っている)ため、他の軸と違いtask別のテーブルを引く。
+_LORA_IDS_BY_TASK: dict[Task, tuple[str, ...]] = {
+    "txt2img": LORA_IDS,
+    "img2img": IMG2IMG_LORA_IDS,
+}
 
-    `_vae` は `_unet` と同じ位置 (LoRAより手前) に入れる。VAELoaderもグラフ上流の
-    ローダー段であるため。例: `txt2img_lora_hires` -> `txt2img_vae_lora_hires`。
-    """
-    task, sep, rest = name.partition("_")
-    if not sep:
-        return f"{task}_vae"
-    return f"{task}_vae_{rest}"
+#: 軸ごとのグラフ合成関数。`build_all()` が `iter_template_specs()` の列挙から
+#: 軸の並びを受け取り、ここを引いて順に適用する。`lora` だけはtaskごとに
+#: ノードID帯が違うため、ここには登録せず `build_all()` 側で個別に呼ぶ。
+#: 軸を1本足したら、対応するグラフ合成関数をここへ登録する。
+AXIS_GRAPH_BUILDERS: dict[str, Callable[[Graph], Graph]] = {
+    AXIS_UNET: to_separate_loaders,
+    AXIS_VAE: with_external_vae,
+    AXIS_HIRES: with_hires_fix,
+    AXIS_HIRES_MODEL: with_hires_model_fix,
+    AXIS_CONTROLNET: with_controlnet,
+    AXIS_IPADAPTER: with_ipadapter,
+}
 
 
 def build_all(base: Graph) -> dict[str, Graph]:
-    """ベースから全テンプレートを組み立てる。"""
-    txt2img = copy.deepcopy(base)
-    img2img = to_img2img(base)
+    """ベースから全テンプレートを組み立てる。
 
-    # checkpoint系。txt2img自身は手書きのベースなので生成対象に含めない
-    checkpoint_templates: dict[str, Graph] = {
-        "txt2img_lora": with_lora_chain(txt2img, LORA_IDS),
-        "txt2img_hires": with_hires_fix(txt2img),
-        "txt2img_lora_hires": with_hires_fix(with_lora_chain(txt2img, LORA_IDS)),
-        # アップスケールモデルを使う版。latent拡大の派生と同じ形で並べる
-        "txt2img_hires_model": with_hires_model_fix(txt2img),
-        "txt2img_lora_hires_model": with_hires_model_fix(with_lora_chain(txt2img, LORA_IDS)),
-        "img2img": img2img,
-        "img2img_lora": with_lora_chain(img2img, IMG2IMG_LORA_IDS),
-        "img2img_hires": with_hires_fix(img2img),
-        "img2img_lora_hires": with_hires_fix(with_lora_chain(img2img, IMG2IMG_LORA_IDS)),
-        "img2img_hires_model": with_hires_model_fix(img2img),
-        "img2img_lora_hires_model": with_hires_model_fix(
-            with_lora_chain(img2img, IMG2IMG_LORA_IDS)
-        ),
-        "txt2img_controlnet": with_controlnet(txt2img),
-        "txt2img_lora_controlnet": with_controlnet(with_lora_chain(txt2img, LORA_IDS)),
-        "img2img_controlnet": with_controlnet(img2img),
-        "img2img_lora_controlnet": with_controlnet(with_lora_chain(img2img, IMG2IMG_LORA_IDS)),
-        # ControlNet と hires fix の併用。with_hires_fix を先に通してから
-        # with_controlnet をかけることで、ControlNet が効くのは1段目だけになる
-        # (2段目のKSamplerは素のCLIPTextEncodeを受けたまま残る)。
-        # 構図は1段目で決まっており、2段目は描き足しに徹する
-        "txt2img_hires_controlnet": with_controlnet(with_hires_fix(txt2img)),
-        "txt2img_lora_hires_controlnet": with_controlnet(
-            with_hires_fix(with_lora_chain(txt2img, LORA_IDS))
-        ),
-        "img2img_hires_controlnet": with_controlnet(with_hires_fix(img2img)),
-        "img2img_lora_hires_controlnet": with_controlnet(
-            with_hires_fix(with_lora_chain(img2img, IMG2IMG_LORA_IDS))
-        ),
-        "txt2img_hires_model_controlnet": with_controlnet(with_hires_model_fix(txt2img)),
-        "txt2img_lora_hires_model_controlnet": with_controlnet(
-            with_hires_model_fix(with_lora_chain(txt2img, LORA_IDS))
-        ),
-        "img2img_hires_model_controlnet": with_controlnet(with_hires_model_fix(img2img)),
-        "img2img_lora_hires_model_controlnet": with_controlnet(
-            with_hires_model_fix(with_lora_chain(img2img, IMG2IMG_LORA_IDS))
-        ),
-        # IPAdapter と hires fix の併用は未対応 (Issue #38)
-        "txt2img_ipadapter": with_ipadapter(txt2img),
-        "txt2img_lora_ipadapter": with_ipadapter(with_lora_chain(txt2img, LORA_IDS)),
-        "img2img_ipadapter": with_ipadapter(img2img),
-        "img2img_lora_ipadapter": with_ipadapter(with_lora_chain(img2img, IMG2IMG_LORA_IDS)),
-        # 構図 (ControlNet) と人物特徴 (IPAdapter) の併用。同一キャラクタを
-        # 異なる構図で出すために要る
-        "txt2img_controlnet_ipadapter": with_ipadapter(with_controlnet(txt2img)),
-        "txt2img_lora_controlnet_ipadapter": with_ipadapter(
-            with_controlnet(with_lora_chain(txt2img, LORA_IDS))
-        ),
-        "img2img_controlnet_ipadapter": with_ipadapter(with_controlnet(img2img)),
-        "img2img_lora_controlnet_ipadapter": with_ipadapter(
-            with_controlnet(with_lora_chain(img2img, IMG2IMG_LORA_IDS))
-        ),
+    生成するテンプレート名と、それを構成する軸の並びは `iter_template_specs()`
+    (agentic_imagegen.workflows.axes) が一元管理する。合成順は
+    `axes_in_build_order()` に従う。テンプレート名の接尾辞順 (`_vae` はunetの直後)
+    とは vae の適用順だけが異なることに注意する (vaeは常に最後に適用する。
+    hires fix が増やすVAEDecode / VAEEncodeのVAE参照もまとめて拾うため)。
+    """
+    task_bases: dict[Task, Graph] = {
+        "txt2img": copy.deepcopy(base),
+        "img2img": to_img2img(base),
     }
 
-    # DiT系。ローダーを分けてから他の派生をかける。逆順にすると、後から足した
-    # 2段目のKSamplerがCheckpointLoaderを見たまま残る
-    # (LoRA / ControlNet / IPAdapter との組み合わせはSpecの検証で拒否している)
-    unet_templates: dict[str, Graph] = {
-        "txt2img_unet": to_separate_loaders(txt2img),
-        "txt2img_unet_hires": with_hires_fix(to_separate_loaders(txt2img)),
-        "txt2img_unet_hires_model": with_hires_model_fix(to_separate_loaders(txt2img)),
-        "img2img_unet": to_separate_loaders(img2img),
-        "img2img_unet_hires": with_hires_fix(to_separate_loaders(img2img)),
-        "img2img_unet_hires_model": with_hires_model_fix(to_separate_loaders(img2img)),
-    }
-
-    # 外部VAE版。checkpoint系だけが対象で、DiT系は既に独自のVAELoaderルートを
-    # 持つため対象にしない。ローダー段の合成のため、他の合成をかけた後に適用する。
-    # これにより with_hires_model_fix が増やしたVAEDecode / VAEEncodeのVAE参照も
-    # 一緒に拾える (with_external_vae がグラフを機械的に走査するため)
-    vae_templates: dict[str, Graph] = {
-        "txt2img_vae": with_external_vae(txt2img),
-        **{
-            _insert_vae_suffix(name): with_external_vae(graph)
-            for name, graph in checkpoint_templates.items()
-        },
-    }
-
-    return {**checkpoint_templates, **unet_templates, **vae_templates}
+    templates: dict[str, Graph] = {}
+    for spec in iter_template_specs():
+        # 軸ごとの合成関数はいずれも先頭で deepcopy するが、軸が1つも無い場合
+        # (img2img) はベースがそのまま成果物になる。ここで複製しておかないと
+        # task_bases と成果物が同じオブジェクトを指す
+        graph = copy.deepcopy(task_bases[spec.task])
+        for axis in axes_in_build_order(spec.axes):
+            if axis == AXIS_LORA:
+                graph = with_lora_chain(graph, _LORA_IDS_BY_TASK[spec.task])
+            else:
+                graph = AXIS_GRAPH_BUILDERS[axis](graph)
+        templates[spec.name] = graph
+    return templates
 
 
 def verify(name: str, base: Graph, graph: Graph) -> None:

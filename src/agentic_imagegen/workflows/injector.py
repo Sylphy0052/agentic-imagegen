@@ -13,76 +13,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from agentic_imagegen.adapters.comfyui.workflow import (
-    IMG2IMG_BINDING,
-    IMG2IMG_CONTROLNET_BINDING,
-    IMG2IMG_CONTROLNET_IPADAPTER_BINDING,
-    IMG2IMG_HIRES_BINDING,
-    IMG2IMG_HIRES_CONTROLNET_BINDING,
-    IMG2IMG_HIRES_MODEL_BINDING,
-    IMG2IMG_HIRES_MODEL_CONTROLNET_BINDING,
-    IMG2IMG_IPADAPTER_BINDING,
-    IMG2IMG_LORA_BINDING,
-    IMG2IMG_LORA_CONTROLNET_BINDING,
-    IMG2IMG_LORA_CONTROLNET_IPADAPTER_BINDING,
-    IMG2IMG_LORA_HIRES_BINDING,
-    IMG2IMG_LORA_HIRES_CONTROLNET_BINDING,
-    IMG2IMG_LORA_HIRES_MODEL_BINDING,
-    IMG2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING,
-    IMG2IMG_LORA_IPADAPTER_BINDING,
-    IMG2IMG_UNET_BINDING,
-    IMG2IMG_UNET_HIRES_BINDING,
-    IMG2IMG_UNET_HIRES_MODEL_BINDING,
-    IMG2IMG_VAE_BINDING,
-    IMG2IMG_VAE_CONTROLNET_BINDING,
-    IMG2IMG_VAE_CONTROLNET_IPADAPTER_BINDING,
-    IMG2IMG_VAE_HIRES_BINDING,
-    IMG2IMG_VAE_HIRES_CONTROLNET_BINDING,
-    IMG2IMG_VAE_HIRES_MODEL_BINDING,
-    IMG2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING,
-    IMG2IMG_VAE_IPADAPTER_BINDING,
-    IMG2IMG_VAE_LORA_BINDING,
-    IMG2IMG_VAE_LORA_CONTROLNET_BINDING,
-    IMG2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING,
-    IMG2IMG_VAE_LORA_HIRES_BINDING,
-    IMG2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING,
-    IMG2IMG_VAE_LORA_HIRES_MODEL_BINDING,
-    IMG2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING,
-    IMG2IMG_VAE_LORA_IPADAPTER_BINDING,
-    TXT2IMG_BINDING,
-    TXT2IMG_CONTROLNET_BINDING,
-    TXT2IMG_CONTROLNET_IPADAPTER_BINDING,
-    TXT2IMG_HIRES_BINDING,
-    TXT2IMG_HIRES_CONTROLNET_BINDING,
-    TXT2IMG_HIRES_MODEL_BINDING,
-    TXT2IMG_HIRES_MODEL_CONTROLNET_BINDING,
-    TXT2IMG_IPADAPTER_BINDING,
-    TXT2IMG_LORA_BINDING,
-    TXT2IMG_LORA_CONTROLNET_BINDING,
-    TXT2IMG_LORA_CONTROLNET_IPADAPTER_BINDING,
-    TXT2IMG_LORA_HIRES_BINDING,
-    TXT2IMG_LORA_HIRES_CONTROLNET_BINDING,
-    TXT2IMG_LORA_HIRES_MODEL_BINDING,
-    TXT2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING,
-    TXT2IMG_LORA_IPADAPTER_BINDING,
-    TXT2IMG_UNET_BINDING,
-    TXT2IMG_UNET_HIRES_BINDING,
-    TXT2IMG_UNET_HIRES_MODEL_BINDING,
-    TXT2IMG_VAE_BINDING,
-    TXT2IMG_VAE_CONTROLNET_BINDING,
-    TXT2IMG_VAE_CONTROLNET_IPADAPTER_BINDING,
-    TXT2IMG_VAE_HIRES_BINDING,
-    TXT2IMG_VAE_HIRES_CONTROLNET_BINDING,
-    TXT2IMG_VAE_HIRES_MODEL_BINDING,
-    TXT2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING,
-    TXT2IMG_VAE_IPADAPTER_BINDING,
-    TXT2IMG_VAE_LORA_BINDING,
-    TXT2IMG_VAE_LORA_CONTROLNET_BINDING,
-    TXT2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING,
-    TXT2IMG_VAE_LORA_HIRES_BINDING,
-    TXT2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING,
-    TXT2IMG_VAE_LORA_HIRES_MODEL_BINDING,
-    TXT2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING,
-    TXT2IMG_VAE_LORA_IPADAPTER_BINDING,
+    ALL_BINDINGS,
     WorkflowBinding,
     build_workflow,
     resolve_seed,
@@ -90,85 +21,25 @@ from agentic_imagegen.adapters.comfyui.workflow import (
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.domain.policy import display_path
 from agentic_imagegen.errors import WorkflowValidationError
+from agentic_imagegen.workflows.axes import (
+    AXIS_CONTROLNET,
+    AXIS_HIRES,
+    AXIS_HIRES_MODEL,
+    AXIS_IPADAPTER,
+    AXIS_LORA,
+    AXIS_UNET,
+    AXIS_VAE,
+    suffix_for,
+)
 
 #: リポジトリ同梱のWorkflowテンプレート置き場。
 WORKFLOWS_DIR: Final = Path(__file__).resolve().parents[3] / "workflows"
 
 #: 実行を許可するworkflow。ユーザー入力から任意のJSONを実行させないための allowlist。
-ALLOWED_WORKFLOWS: Final[dict[str, WorkflowBinding]] = {
-    "txt2img": TXT2IMG_BINDING,
-    "txt2img_lora": TXT2IMG_LORA_BINDING,
-    "img2img": IMG2IMG_BINDING,
-    "img2img_lora": IMG2IMG_LORA_BINDING,
-    "txt2img_hires": TXT2IMG_HIRES_BINDING,
-    "txt2img_lora_hires": TXT2IMG_LORA_HIRES_BINDING,
-    "img2img_hires": IMG2IMG_HIRES_BINDING,
-    "img2img_lora_hires": IMG2IMG_LORA_HIRES_BINDING,
-    "txt2img_controlnet": TXT2IMG_CONTROLNET_BINDING,
-    "txt2img_lora_controlnet": TXT2IMG_LORA_CONTROLNET_BINDING,
-    "img2img_controlnet": IMG2IMG_CONTROLNET_BINDING,
-    "img2img_lora_controlnet": IMG2IMG_LORA_CONTROLNET_BINDING,
-    "txt2img_hires_controlnet": TXT2IMG_HIRES_CONTROLNET_BINDING,
-    "txt2img_lora_hires_controlnet": TXT2IMG_LORA_HIRES_CONTROLNET_BINDING,
-    "img2img_hires_controlnet": IMG2IMG_HIRES_CONTROLNET_BINDING,
-    "img2img_lora_hires_controlnet": IMG2IMG_LORA_HIRES_CONTROLNET_BINDING,
-    "txt2img_ipadapter": TXT2IMG_IPADAPTER_BINDING,
-    "txt2img_lora_ipadapter": TXT2IMG_LORA_IPADAPTER_BINDING,
-    "img2img_ipadapter": IMG2IMG_IPADAPTER_BINDING,
-    "img2img_lora_ipadapter": IMG2IMG_LORA_IPADAPTER_BINDING,
-    "txt2img_controlnet_ipadapter": TXT2IMG_CONTROLNET_IPADAPTER_BINDING,
-    "txt2img_lora_controlnet_ipadapter": TXT2IMG_LORA_CONTROLNET_IPADAPTER_BINDING,
-    "img2img_controlnet_ipadapter": IMG2IMG_CONTROLNET_IPADAPTER_BINDING,
-    "img2img_lora_controlnet_ipadapter": IMG2IMG_LORA_CONTROLNET_IPADAPTER_BINDING,
-    "txt2img_unet": TXT2IMG_UNET_BINDING,
-    "txt2img_unet_hires": TXT2IMG_UNET_HIRES_BINDING,
-    "img2img_unet": IMG2IMG_UNET_BINDING,
-    "img2img_unet_hires": IMG2IMG_UNET_HIRES_BINDING,
-    "txt2img_hires_model": TXT2IMG_HIRES_MODEL_BINDING,
-    "txt2img_lora_hires_model": TXT2IMG_LORA_HIRES_MODEL_BINDING,
-    "img2img_hires_model": IMG2IMG_HIRES_MODEL_BINDING,
-    "img2img_lora_hires_model": IMG2IMG_LORA_HIRES_MODEL_BINDING,
-    "txt2img_unet_hires_model": TXT2IMG_UNET_HIRES_MODEL_BINDING,
-    "img2img_unet_hires_model": IMG2IMG_UNET_HIRES_MODEL_BINDING,
-    "txt2img_hires_model_controlnet": TXT2IMG_HIRES_MODEL_CONTROLNET_BINDING,
-    "txt2img_lora_hires_model_controlnet": TXT2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING,
-    "img2img_hires_model_controlnet": IMG2IMG_HIRES_MODEL_CONTROLNET_BINDING,
-    "img2img_lora_hires_model_controlnet": IMG2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING,
-    # 外部VAE (checkpoint + vae)。checkpoint系32件それぞれの派生。DiT系 (unet系) は
-    # 既に独自のVAELoaderルートを持つため対象外
-    "txt2img_vae": TXT2IMG_VAE_BINDING,
-    "txt2img_vae_lora": TXT2IMG_VAE_LORA_BINDING,
-    "img2img_vae": IMG2IMG_VAE_BINDING,
-    "img2img_vae_lora": IMG2IMG_VAE_LORA_BINDING,
-    "txt2img_vae_hires": TXT2IMG_VAE_HIRES_BINDING,
-    "txt2img_vae_lora_hires": TXT2IMG_VAE_LORA_HIRES_BINDING,
-    "img2img_vae_hires": IMG2IMG_VAE_HIRES_BINDING,
-    "img2img_vae_lora_hires": IMG2IMG_VAE_LORA_HIRES_BINDING,
-    "txt2img_vae_hires_model": TXT2IMG_VAE_HIRES_MODEL_BINDING,
-    "txt2img_vae_lora_hires_model": TXT2IMG_VAE_LORA_HIRES_MODEL_BINDING,
-    "img2img_vae_hires_model": IMG2IMG_VAE_HIRES_MODEL_BINDING,
-    "img2img_vae_lora_hires_model": IMG2IMG_VAE_LORA_HIRES_MODEL_BINDING,
-    "txt2img_vae_controlnet": TXT2IMG_VAE_CONTROLNET_BINDING,
-    "txt2img_vae_lora_controlnet": TXT2IMG_VAE_LORA_CONTROLNET_BINDING,
-    "img2img_vae_controlnet": IMG2IMG_VAE_CONTROLNET_BINDING,
-    "img2img_vae_lora_controlnet": IMG2IMG_VAE_LORA_CONTROLNET_BINDING,
-    "txt2img_vae_hires_controlnet": TXT2IMG_VAE_HIRES_CONTROLNET_BINDING,
-    "txt2img_vae_lora_hires_controlnet": TXT2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING,
-    "img2img_vae_hires_controlnet": IMG2IMG_VAE_HIRES_CONTROLNET_BINDING,
-    "img2img_vae_lora_hires_controlnet": IMG2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING,
-    "txt2img_vae_hires_model_controlnet": TXT2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING,
-    "txt2img_vae_lora_hires_model_controlnet": TXT2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING,
-    "img2img_vae_hires_model_controlnet": IMG2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING,
-    "img2img_vae_lora_hires_model_controlnet": IMG2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING,
-    "txt2img_vae_ipadapter": TXT2IMG_VAE_IPADAPTER_BINDING,
-    "txt2img_vae_lora_ipadapter": TXT2IMG_VAE_LORA_IPADAPTER_BINDING,
-    "img2img_vae_ipadapter": IMG2IMG_VAE_IPADAPTER_BINDING,
-    "img2img_vae_lora_ipadapter": IMG2IMG_VAE_LORA_IPADAPTER_BINDING,
-    "txt2img_vae_controlnet_ipadapter": TXT2IMG_VAE_CONTROLNET_IPADAPTER_BINDING,
-    "txt2img_vae_lora_controlnet_ipadapter": TXT2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING,
-    "img2img_vae_controlnet_ipadapter": IMG2IMG_VAE_CONTROLNET_IPADAPTER_BINDING,
-    "img2img_vae_lora_controlnet_ipadapter": IMG2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING,
-}
+#: 生成しうるテンプレート名と、それを構成するbindingは
+#: `adapters.comfyui.workflow.ALL_BINDINGS` (軸の定義は `workflows.axes`) が
+#: 一元管理する。ここはその結果をそのまま許可済み集合として受け取るだけ。
+ALLOWED_WORKFLOWS: Final[dict[str, WorkflowBinding]] = dict(ALL_BINDINGS)
 
 
 def resolve_workflow_name(spec: GenerationSpec) -> str:
@@ -176,28 +47,33 @@ def resolve_workflow_name(spec: GenerationSpec) -> str:
 
     `task` は論理的なタスク名であり、テンプレートはそれとLoRA指定の有無で決まる。
     LoRA未指定でLoRA用テンプレートを使う意味はないため、素のテンプレートを選ぶ。
+
+    どの軸をどう判定するかはSpecの構造に依存するためここに書く。判定した軸の
+    並びからテンプレート名を組み立てる部分は `workflows.axes` (`AXIS_ORDER` /
+    `suffix_for()`) と共有し、`ALLOWED_WORKFLOWS` の元になる列挙 (`ALL_BINDINGS`)
+    と食い違わないようにする。
     """
-    suffix = ""
+    present_axes: list[str] = []
     if spec.model.uses_separate_loaders:
         # UNet / CLIP / VAE を別々に読む形式。ローダーの分割はLoRAより手前の軸なので
         # 接尾辞も先頭へ置く。LoRA / ControlNet / IPAdapter との組み合わせは
         # Specのバリデーションで拒否している
-        suffix += "_unet"
+        present_axes.append(AXIS_UNET)
     else:
         if spec.model.uses_external_vae:
             # checkpoint同梱ではなく外部VAEを使う指定。VAELoaderもグラフ上流の
             # ローダー段のため、_unet と同じ位置 (LoRAより手前) へ置く
-            suffix += "_vae"
+            present_axes.append(AXIS_VAE)
         if spec.model.loras:
-            suffix += "_lora"
+            present_axes.append(AXIS_LORA)
     if spec.generation.upscale is not None:
         # 拡大の経路がlatentとpixelで別テンプレートになる
-        suffix += "_hires_model" if spec.generation.upscale.uses_model else "_hires"
+        present_axes.append(AXIS_HIRES_MODEL if spec.generation.upscale.uses_model else AXIS_HIRES)
     if spec.control is not None:
-        suffix += "_controlnet"
+        present_axes.append(AXIS_CONTROLNET)
     if spec.reference is not None:
-        suffix += "_ipadapter"
-    return f"{spec.task}{suffix}"
+        present_axes.append(AXIS_IPADAPTER)
+    return f"{spec.task}{suffix_for(tuple(present_axes))}"
 
 
 def get_binding(name: str) -> WorkflowBinding:

@@ -18,6 +18,7 @@ from typing import Any, Final
 
 from agentic_imagegen.domain.models import MAX_SEED, RANDOM_SEED, GenerationSpec
 from agentic_imagegen.errors import WorkflowValidationError
+from agentic_imagegen.workflows import axes
 
 
 @dataclass(frozen=True, slots=True)
@@ -308,11 +309,6 @@ def _with_hires_model_fix(base: WorkflowBinding, *, name: str) -> WorkflowBindin
     return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
 
 
-TXT2IMG_LORA_BINDING: Final = _with_lora_chain(
-    TXT2IMG_BINDING, name="txt2img_lora", first_node_id=10
-)
-
-
 IMG2IMG_BINDING: Final = WorkflowBinding(
     name="img2img",
     nodes={
@@ -344,11 +340,6 @@ IMG2IMG_BINDING: Final = WorkflowBinding(
     ),
 )
 
-
-#: img2imgにLoRAを重ねた構成。VAEはLoraLoaderを通らないため checkpoint 直結のまま。
-IMG2IMG_LORA_BINDING: Final = _with_lora_chain(
-    IMG2IMG_BINDING, name="img2img_lora", first_node_id=20
-)
 
 #: ControlNet で使うノードの役割名。
 CONTROL_IMAGE_ROLE: Final = "control_image"
@@ -393,75 +384,6 @@ def _with_controlnet(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
     )
     return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
 
-
-TXT2IMG_CONTROLNET_BINDING: Final = _with_controlnet(TXT2IMG_BINDING, name="txt2img_controlnet")
-TXT2IMG_LORA_CONTROLNET_BINDING: Final = _with_controlnet(
-    TXT2IMG_LORA_BINDING, name="txt2img_lora_controlnet"
-)
-IMG2IMG_CONTROLNET_BINDING: Final = _with_controlnet(IMG2IMG_BINDING, name="img2img_controlnet")
-IMG2IMG_LORA_CONTROLNET_BINDING: Final = _with_controlnet(
-    IMG2IMG_LORA_BINDING, name="img2img_lora_controlnet"
-)
-
-TXT2IMG_HIRES_BINDING: Final = _with_hires_fix(TXT2IMG_BINDING, name="txt2img_hires")
-TXT2IMG_LORA_HIRES_BINDING: Final = _with_hires_fix(TXT2IMG_LORA_BINDING, name="txt2img_lora_hires")
-IMG2IMG_HIRES_BINDING: Final = _with_hires_fix(IMG2IMG_BINDING, name="img2img_hires")
-IMG2IMG_LORA_HIRES_BINDING: Final = _with_hires_fix(IMG2IMG_LORA_BINDING, name="img2img_lora_hires")
-
-#: DiT系 (UNet / CLIP / VAE を別々に読む形式)。ローダーを分けてから他の派生をかける。
-#: 逆順にすると、後から足した2段目のKSamplerがCheckpointLoaderを見たまま残る。
-TXT2IMG_UNET_BINDING: Final = _to_separate_loaders(TXT2IMG_BINDING, name="txt2img_unet")
-TXT2IMG_UNET_HIRES_BINDING: Final = _with_hires_fix(TXT2IMG_UNET_BINDING, name="txt2img_unet_hires")
-IMG2IMG_UNET_BINDING: Final = _to_separate_loaders(IMG2IMG_BINDING, name="img2img_unet")
-IMG2IMG_UNET_HIRES_BINDING: Final = _with_hires_fix(IMG2IMG_UNET_BINDING, name="img2img_unet_hires")
-
-#: hires fix と ControlNet の併用。hires を先に重ねてから ControlNet をかけることで、
-#: ControlNetApplyAdvanced が差し替えるのは1段目のKSamplerだけになる。2段目は素の
-#: CLIPTextEncode を受けたまま残り、構図は1段目で決まり2段目は描き足しに徹する。
-TXT2IMG_HIRES_CONTROLNET_BINDING: Final = _with_controlnet(
-    TXT2IMG_HIRES_BINDING, name="txt2img_hires_controlnet"
-)
-TXT2IMG_LORA_HIRES_CONTROLNET_BINDING: Final = _with_controlnet(
-    TXT2IMG_LORA_HIRES_BINDING, name="txt2img_lora_hires_controlnet"
-)
-IMG2IMG_HIRES_CONTROLNET_BINDING: Final = _with_controlnet(
-    IMG2IMG_HIRES_BINDING, name="img2img_hires_controlnet"
-)
-IMG2IMG_LORA_HIRES_CONTROLNET_BINDING: Final = _with_controlnet(
-    IMG2IMG_LORA_HIRES_BINDING, name="img2img_lora_hires_controlnet"
-)
-
-#: アップスケールモデルを使うhires fix。latent拡大版と同じ組み合わせを揃える。
-TXT2IMG_HIRES_MODEL_BINDING: Final = _with_hires_model_fix(
-    TXT2IMG_BINDING, name="txt2img_hires_model"
-)
-TXT2IMG_LORA_HIRES_MODEL_BINDING: Final = _with_hires_model_fix(
-    TXT2IMG_LORA_BINDING, name="txt2img_lora_hires_model"
-)
-IMG2IMG_HIRES_MODEL_BINDING: Final = _with_hires_model_fix(
-    IMG2IMG_BINDING, name="img2img_hires_model"
-)
-IMG2IMG_LORA_HIRES_MODEL_BINDING: Final = _with_hires_model_fix(
-    IMG2IMG_LORA_BINDING, name="img2img_lora_hires_model"
-)
-TXT2IMG_UNET_HIRES_MODEL_BINDING: Final = _with_hires_model_fix(
-    TXT2IMG_UNET_BINDING, name="txt2img_unet_hires_model"
-)
-IMG2IMG_UNET_HIRES_MODEL_BINDING: Final = _with_hires_model_fix(
-    IMG2IMG_UNET_BINDING, name="img2img_unet_hires_model"
-)
-TXT2IMG_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_controlnet(
-    TXT2IMG_HIRES_MODEL_BINDING, name="txt2img_hires_model_controlnet"
-)
-TXT2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_controlnet(
-    TXT2IMG_LORA_HIRES_MODEL_BINDING, name="txt2img_lora_hires_model_controlnet"
-)
-IMG2IMG_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_controlnet(
-    IMG2IMG_HIRES_MODEL_BINDING, name="img2img_hires_model_controlnet"
-)
-IMG2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_controlnet(
-    IMG2IMG_LORA_HIRES_MODEL_BINDING, name="img2img_lora_hires_model_controlnet"
-)
 
 #: IPAdapter (reference) 用ノードの役割名。
 REFERENCE_IMAGE_ROLE: Final = "reference_image"
@@ -510,120 +432,68 @@ def _with_ipadapter(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
     return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
 
 
-TXT2IMG_IPADAPTER_BINDING: Final = _with_ipadapter(TXT2IMG_BINDING, name="txt2img_ipadapter")
-TXT2IMG_LORA_IPADAPTER_BINDING: Final = _with_ipadapter(
-    TXT2IMG_LORA_BINDING, name="txt2img_lora_ipadapter"
-)
-IMG2IMG_IPADAPTER_BINDING: Final = _with_ipadapter(IMG2IMG_BINDING, name="img2img_ipadapter")
-IMG2IMG_LORA_IPADAPTER_BINDING: Final = _with_ipadapter(
-    IMG2IMG_LORA_BINDING, name="img2img_lora_ipadapter"
-)
+#: LoRAのノードID帯はtaskごとに空き番が違う (img2imgは10/11をLoadImageと
+#: VAEEncodeで使っている)ため、他の軸と違いtask別のテーブルを引く。
+_LORA_FIRST_NODE_ID: Final[dict[axes.Task, int]] = {"txt2img": 10, "img2img": 20}
 
-TXT2IMG_CONTROLNET_IPADAPTER_BINDING: Final = _with_ipadapter(
-    TXT2IMG_CONTROLNET_BINDING, name="txt2img_controlnet_ipadapter"
-)
-TXT2IMG_LORA_CONTROLNET_IPADAPTER_BINDING: Final = _with_ipadapter(
-    TXT2IMG_LORA_CONTROLNET_BINDING, name="txt2img_lora_controlnet_ipadapter"
-)
-IMG2IMG_CONTROLNET_IPADAPTER_BINDING: Final = _with_ipadapter(
-    IMG2IMG_CONTROLNET_BINDING, name="img2img_controlnet_ipadapter"
-)
-IMG2IMG_LORA_CONTROLNET_IPADAPTER_BINDING: Final = _with_ipadapter(
-    IMG2IMG_LORA_CONTROLNET_BINDING, name="img2img_lora_controlnet_ipadapter"
-)
+#: 軸ごとのbinding合成関数。`_build_all_bindings()` が `axes.iter_template_specs()`
+#: の列挙から軸の並びを受け取り、ここを引いて順に適用する。
+#: `lora` だけはtaskごとにノードID帯が違うため、ここには登録せず
+#: `_build_all_bindings()` 側で個別に呼ぶ。
+#: 軸を1本足したら、対応する `_with_*` 関数をここへ登録する。
+AXIS_BINDING_BUILDERS: Final[dict[str, Callable[..., WorkflowBinding]]] = {
+    axes.AXIS_UNET: _to_separate_loaders,
+    axes.AXIS_VAE: _with_external_vae,
+    axes.AXIS_HIRES: _with_hires_fix,
+    axes.AXIS_HIRES_MODEL: _with_hires_model_fix,
+    axes.AXIS_CONTROLNET: _with_controlnet,
+    axes.AXIS_IPADAPTER: _with_ipadapter,
+}
 
-#: 外部VAE (checkpoint + vae)。checkpoint系32件それぞれの派生。ローダー段の合成
-#: のため、他の軸 (LoRA / hires fix / ControlNet / IPAdapter) を組み合わせ終えた
-#: bindingへ最後にかける。これにより後から足されたVAEDecode / VAEEncodeの
-#: VAE参照も一緒に差し替えの検証対象になる。DiT系 (`*_unet`) は対象外。
-TXT2IMG_VAE_BINDING: Final = _with_external_vae(TXT2IMG_BINDING, name="txt2img_vae")
-TXT2IMG_VAE_LORA_BINDING: Final = _with_external_vae(TXT2IMG_LORA_BINDING, name="txt2img_vae_lora")
-TXT2IMG_VAE_HIRES_BINDING: Final = _with_external_vae(
-    TXT2IMG_HIRES_BINDING, name="txt2img_vae_hires"
-)
-TXT2IMG_VAE_LORA_HIRES_BINDING: Final = _with_external_vae(
-    TXT2IMG_LORA_HIRES_BINDING, name="txt2img_vae_lora_hires"
-)
-TXT2IMG_VAE_HIRES_MODEL_BINDING: Final = _with_external_vae(
-    TXT2IMG_HIRES_MODEL_BINDING, name="txt2img_vae_hires_model"
-)
-TXT2IMG_VAE_LORA_HIRES_MODEL_BINDING: Final = _with_external_vae(
-    TXT2IMG_LORA_HIRES_MODEL_BINDING, name="txt2img_vae_lora_hires_model"
-)
-IMG2IMG_VAE_BINDING: Final = _with_external_vae(IMG2IMG_BINDING, name="img2img_vae")
-IMG2IMG_VAE_LORA_BINDING: Final = _with_external_vae(IMG2IMG_LORA_BINDING, name="img2img_vae_lora")
-IMG2IMG_VAE_HIRES_BINDING: Final = _with_external_vae(
-    IMG2IMG_HIRES_BINDING, name="img2img_vae_hires"
-)
-IMG2IMG_VAE_LORA_HIRES_BINDING: Final = _with_external_vae(
-    IMG2IMG_LORA_HIRES_BINDING, name="img2img_vae_lora_hires"
-)
-IMG2IMG_VAE_HIRES_MODEL_BINDING: Final = _with_external_vae(
-    IMG2IMG_HIRES_MODEL_BINDING, name="img2img_vae_hires_model"
-)
-IMG2IMG_VAE_LORA_HIRES_MODEL_BINDING: Final = _with_external_vae(
-    IMG2IMG_LORA_HIRES_MODEL_BINDING, name="img2img_vae_lora_hires_model"
-)
-TXT2IMG_VAE_CONTROLNET_BINDING: Final = _with_external_vae(
-    TXT2IMG_CONTROLNET_BINDING, name="txt2img_vae_controlnet"
-)
-TXT2IMG_VAE_LORA_CONTROLNET_BINDING: Final = _with_external_vae(
-    TXT2IMG_LORA_CONTROLNET_BINDING, name="txt2img_vae_lora_controlnet"
-)
-IMG2IMG_VAE_CONTROLNET_BINDING: Final = _with_external_vae(
-    IMG2IMG_CONTROLNET_BINDING, name="img2img_vae_controlnet"
-)
-IMG2IMG_VAE_LORA_CONTROLNET_BINDING: Final = _with_external_vae(
-    IMG2IMG_LORA_CONTROLNET_BINDING, name="img2img_vae_lora_controlnet"
-)
-TXT2IMG_VAE_HIRES_CONTROLNET_BINDING: Final = _with_external_vae(
-    TXT2IMG_HIRES_CONTROLNET_BINDING, name="txt2img_vae_hires_controlnet"
-)
-TXT2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING: Final = _with_external_vae(
-    TXT2IMG_LORA_HIRES_CONTROLNET_BINDING, name="txt2img_vae_lora_hires_controlnet"
-)
-IMG2IMG_VAE_HIRES_CONTROLNET_BINDING: Final = _with_external_vae(
-    IMG2IMG_HIRES_CONTROLNET_BINDING, name="img2img_vae_hires_controlnet"
-)
-IMG2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING: Final = _with_external_vae(
-    IMG2IMG_LORA_HIRES_CONTROLNET_BINDING, name="img2img_vae_lora_hires_controlnet"
-)
-TXT2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_external_vae(
-    TXT2IMG_HIRES_MODEL_CONTROLNET_BINDING, name="txt2img_vae_hires_model_controlnet"
-)
-TXT2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_external_vae(
-    TXT2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING, name="txt2img_vae_lora_hires_model_controlnet"
-)
-IMG2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_external_vae(
-    IMG2IMG_HIRES_MODEL_CONTROLNET_BINDING, name="img2img_vae_hires_model_controlnet"
-)
-IMG2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING: Final = _with_external_vae(
-    IMG2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING, name="img2img_vae_lora_hires_model_controlnet"
-)
-TXT2IMG_VAE_IPADAPTER_BINDING: Final = _with_external_vae(
-    TXT2IMG_IPADAPTER_BINDING, name="txt2img_vae_ipadapter"
-)
-TXT2IMG_VAE_LORA_IPADAPTER_BINDING: Final = _with_external_vae(
-    TXT2IMG_LORA_IPADAPTER_BINDING, name="txt2img_vae_lora_ipadapter"
-)
-IMG2IMG_VAE_IPADAPTER_BINDING: Final = _with_external_vae(
-    IMG2IMG_IPADAPTER_BINDING, name="img2img_vae_ipadapter"
-)
-IMG2IMG_VAE_LORA_IPADAPTER_BINDING: Final = _with_external_vae(
-    IMG2IMG_LORA_IPADAPTER_BINDING, name="img2img_vae_lora_ipadapter"
-)
-TXT2IMG_VAE_CONTROLNET_IPADAPTER_BINDING: Final = _with_external_vae(
-    TXT2IMG_CONTROLNET_IPADAPTER_BINDING, name="txt2img_vae_controlnet_ipadapter"
-)
-TXT2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING: Final = _with_external_vae(
-    TXT2IMG_LORA_CONTROLNET_IPADAPTER_BINDING, name="txt2img_vae_lora_controlnet_ipadapter"
-)
-IMG2IMG_VAE_CONTROLNET_IPADAPTER_BINDING: Final = _with_external_vae(
-    IMG2IMG_CONTROLNET_IPADAPTER_BINDING, name="img2img_vae_controlnet_ipadapter"
-)
-IMG2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING: Final = _with_external_vae(
-    IMG2IMG_LORA_CONTROLNET_IPADAPTER_BINDING, name="img2img_vae_lora_controlnet_ipadapter"
-)
+_BASE_BINDINGS: Final[dict[axes.Task, WorkflowBinding]] = {
+    "txt2img": TXT2IMG_BINDING,
+    "img2img": IMG2IMG_BINDING,
+}
+
+
+def _build_all_bindings() -> dict[str, WorkflowBinding]:
+    """`axes.iter_template_specs()` の列挙から、生成しうる全bindingを組み立てる。
+
+    合成順は `axes.axes_in_build_order()` に従う。テンプレート名の接尾辞順
+    (`axes.AXIS_ORDER`) とは vae の位置だけ異なることに注意する
+    (vaeは常に最後に適用する。理由は `axes.AXIS_BUILD_ORDER` のコメントを参照)。
+    """
+    bindings: dict[str, WorkflowBinding] = {"txt2img": TXT2IMG_BINDING}
+    for spec in axes.iter_template_specs():
+        binding = _BASE_BINDINGS[spec.task]
+        for axis in axes.axes_in_build_order(spec.axes):
+            if axis == axes.AXIS_LORA:
+                binding = _with_lora_chain(
+                    binding, name=spec.name, first_node_id=_LORA_FIRST_NODE_ID[spec.task]
+                )
+            else:
+                binding = AXIS_BINDING_BUILDERS[axis](binding, name=spec.name)
+        bindings[spec.name] = binding
+    return bindings
+
+
+#: 生成しうる全テンプレートのbinding。`workflows/injector.py` の `ALLOWED_WORKFLOWS` は
+#: この辞書から作る。
+ALL_BINDINGS: Final[dict[str, WorkflowBinding]] = _build_all_bindings()
+
+#: 個別のテストから直接参照される代表的なbinding。値は `ALL_BINDINGS` の該当要素と
+#: 同一であり、ここでの別名づけは後方互換のためだけに存在する。
+TXT2IMG_LORA_BINDING: Final = ALL_BINDINGS["txt2img_lora"]
+TXT2IMG_HIRES_BINDING: Final = ALL_BINDINGS["txt2img_hires"]
+TXT2IMG_HIRES_MODEL_BINDING: Final = ALL_BINDINGS["txt2img_hires_model"]
+TXT2IMG_UNET_BINDING: Final = ALL_BINDINGS["txt2img_unet"]
+TXT2IMG_CONTROLNET_BINDING: Final = ALL_BINDINGS["txt2img_controlnet"]
+TXT2IMG_IPADAPTER_BINDING: Final = ALL_BINDINGS["txt2img_ipadapter"]
+TXT2IMG_VAE_BINDING: Final = ALL_BINDINGS["txt2img_vae"]
+TXT2IMG_VAE_LORA_BINDING: Final = ALL_BINDINGS["txt2img_vae_lora"]
+TXT2IMG_VAE_HIRES_MODEL_BINDING: Final = ALL_BINDINGS["txt2img_vae_hires_model"]
+IMG2IMG_LORA_BINDING: Final = ALL_BINDINGS["img2img_lora"]
+IMG2IMG_VAE_BINDING: Final = ALL_BINDINGS["img2img_vae"]
 
 
 def resolve_seed(seed: int) -> int:
@@ -1000,6 +870,7 @@ def _inject_loras(
 
 
 __all__ = [
+    "ALL_BINDINGS",
     "CLIP_SKIP_ROLE",
     "CONTROL_APPLY_ROLE",
     "CONTROL_IMAGE_ROLE",
@@ -1007,40 +878,8 @@ __all__ = [
     "CONTROL_PREPROCESSOR_ROLE",
     "HIRES_KSAMPLER_ROLE",
     "IMG2IMG_BINDING",
-    "IMG2IMG_CONTROLNET_BINDING",
-    "IMG2IMG_CONTROLNET_IPADAPTER_BINDING",
-    "IMG2IMG_HIRES_BINDING",
-    "IMG2IMG_HIRES_CONTROLNET_BINDING",
-    "IMG2IMG_HIRES_MODEL_BINDING",
-    "IMG2IMG_HIRES_MODEL_CONTROLNET_BINDING",
-    "IMG2IMG_IPADAPTER_BINDING",
     "IMG2IMG_LORA_BINDING",
-    "IMG2IMG_LORA_CONTROLNET_BINDING",
-    "IMG2IMG_LORA_CONTROLNET_IPADAPTER_BINDING",
-    "IMG2IMG_LORA_HIRES_BINDING",
-    "IMG2IMG_LORA_HIRES_CONTROLNET_BINDING",
-    "IMG2IMG_LORA_HIRES_MODEL_BINDING",
-    "IMG2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING",
-    "IMG2IMG_LORA_IPADAPTER_BINDING",
-    "IMG2IMG_UNET_BINDING",
-    "IMG2IMG_UNET_HIRES_BINDING",
-    "IMG2IMG_UNET_HIRES_MODEL_BINDING",
     "IMG2IMG_VAE_BINDING",
-    "IMG2IMG_VAE_CONTROLNET_BINDING",
-    "IMG2IMG_VAE_CONTROLNET_IPADAPTER_BINDING",
-    "IMG2IMG_VAE_HIRES_BINDING",
-    "IMG2IMG_VAE_HIRES_CONTROLNET_BINDING",
-    "IMG2IMG_VAE_HIRES_MODEL_BINDING",
-    "IMG2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING",
-    "IMG2IMG_VAE_IPADAPTER_BINDING",
-    "IMG2IMG_VAE_LORA_BINDING",
-    "IMG2IMG_VAE_LORA_CONTROLNET_BINDING",
-    "IMG2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING",
-    "IMG2IMG_VAE_LORA_HIRES_BINDING",
-    "IMG2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING",
-    "IMG2IMG_VAE_LORA_HIRES_MODEL_BINDING",
-    "IMG2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING",
-    "IMG2IMG_VAE_LORA_IPADAPTER_BINDING",
     "LORA_SLOT_ROLES",
     "REFERENCE_APPLY_ROLE",
     "REFERENCE_CLIP_VISION_ROLE",
@@ -1048,38 +887,14 @@ __all__ = [
     "REFERENCE_LOADER_ROLE",
     "TXT2IMG_BINDING",
     "TXT2IMG_CONTROLNET_BINDING",
-    "TXT2IMG_CONTROLNET_IPADAPTER_BINDING",
     "TXT2IMG_HIRES_BINDING",
-    "TXT2IMG_HIRES_CONTROLNET_BINDING",
     "TXT2IMG_HIRES_MODEL_BINDING",
-    "TXT2IMG_HIRES_MODEL_CONTROLNET_BINDING",
     "TXT2IMG_IPADAPTER_BINDING",
     "TXT2IMG_LORA_BINDING",
-    "TXT2IMG_LORA_CONTROLNET_BINDING",
-    "TXT2IMG_LORA_CONTROLNET_IPADAPTER_BINDING",
-    "TXT2IMG_LORA_HIRES_BINDING",
-    "TXT2IMG_LORA_HIRES_CONTROLNET_BINDING",
-    "TXT2IMG_LORA_HIRES_MODEL_BINDING",
-    "TXT2IMG_LORA_HIRES_MODEL_CONTROLNET_BINDING",
-    "TXT2IMG_LORA_IPADAPTER_BINDING",
-    "TXT2IMG_UNET_HIRES_BINDING",
-    "TXT2IMG_UNET_HIRES_MODEL_BINDING",
+    "TXT2IMG_UNET_BINDING",
     "TXT2IMG_VAE_BINDING",
-    "TXT2IMG_VAE_CONTROLNET_BINDING",
-    "TXT2IMG_VAE_CONTROLNET_IPADAPTER_BINDING",
-    "TXT2IMG_VAE_HIRES_BINDING",
-    "TXT2IMG_VAE_HIRES_CONTROLNET_BINDING",
     "TXT2IMG_VAE_HIRES_MODEL_BINDING",
-    "TXT2IMG_VAE_HIRES_MODEL_CONTROLNET_BINDING",
-    "TXT2IMG_VAE_IPADAPTER_BINDING",
     "TXT2IMG_VAE_LORA_BINDING",
-    "TXT2IMG_VAE_LORA_CONTROLNET_BINDING",
-    "TXT2IMG_VAE_LORA_CONTROLNET_IPADAPTER_BINDING",
-    "TXT2IMG_VAE_LORA_HIRES_BINDING",
-    "TXT2IMG_VAE_LORA_HIRES_CONTROLNET_BINDING",
-    "TXT2IMG_VAE_LORA_HIRES_MODEL_BINDING",
-    "TXT2IMG_VAE_LORA_HIRES_MODEL_CONTROLNET_BINDING",
-    "TXT2IMG_VAE_LORA_IPADAPTER_BINDING",
     "UPSCALE_MODEL_APPLY_ROLE",
     "UPSCALE_MODEL_DECODE_ROLE",
     "UPSCALE_MODEL_ENCODE_ROLE",
