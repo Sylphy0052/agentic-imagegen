@@ -26,8 +26,10 @@ batch、日本語テキスト合成、DiT系モデル (Anima) 対応まで一通
 | 日本語テキスト合成 | 生成後にPillowで合成 (`text` / `compose`) |
 | DiT系モデル (Anima) | UNet / CLIP / VAEを個別指定するローダに対応 |
 
-進捗の詳細は [Issue #1](https://github.com/Sylphy0052/agentic-imagegen/issues/1) (Roadmap) を
-参照。最初の設計は [docs/plan/phase1.md](docs/plan/phase1.md) を参照。
+ここまでの経緯と実機確認の結果は
+[Issue #1](https://github.com/Sylphy0052/agentic-imagegen/issues/1) (Roadmap、完了済み) を
+参照。未着手の拡張はopenなIssueで個別に管理している。
+最初の設計は [docs/plan/phase1.md](docs/plan/phase1.md) を参照。
 
 ## 必要環境
 

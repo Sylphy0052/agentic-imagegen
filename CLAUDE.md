@@ -12,8 +12,10 @@ Claude Code -> GenerationSpec -> Python CLI (imagegen) -> ComfyUI API -> 画像�
 
 txt2img / preset / LoRA / img2img / MCP Server / ControlNet / IPAdapter / hires fix / batch /
 日本語テキスト合成 / DiT系モデル (Anima) 対応まで実装済み。
-進捗の一次情報は [Issue #1](https://github.com/Sylphy0052/agentic-imagegen/issues/1) (Roadmap)
-を参照。最初の設計は [docs/plan/phase1.md](docs/plan/phase1.md) を参照。
+ここまでの経緯と実機確認の結果は
+[Issue #1](https://github.com/Sylphy0052/agentic-imagegen/issues/1) (Roadmap、完了済み)
+の棚卸しにまとまっている。未着手の拡張はopenなIssueで個別に管理し、それぞれ着手条件を
+明文化してある。最初の設計は [docs/plan/phase1.md](docs/plan/phase1.md) を参照。
 
 ## 画像生成要求を受けたときの手順
 
