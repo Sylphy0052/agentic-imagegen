@@ -57,6 +57,9 @@ ls ~/ComfyUI/models/diffusion_models/ ~/ComfyUI/models/text_encoders/ ~/ComfyUI/
 新しく作るときは軸の責務を混ぜない。解像度とseedは再現性に直結するため
 presetには書かず、Spec側で指定する。
 
+**style presetはモデル系統に合わせて選ぶ。** 品質タグとサンプラー設定はモデルの学習内容に
+依存するため流用できない。`anime-soft` はSD1.5向け、`anima-base` はAnima向け。
+
 ```yaml
 # presets/characters/<name>.yaml
 description: 一行でどんなキャラクタか
@@ -98,6 +101,11 @@ output:
 
 presetで足りない要素だけ `prompt.positive` に足す。preset側と重複するトークンは
 自動で除去されるので、重複を気にして削る必要はない。
+
+**プロンプトの書き方はモデル系統ごとに違う。** SD1.5はdanbooruタグ主体で75トークンまで、
+SDXL / Illustrious系は品質タグを先頭に置き `score_9` 系の記法は使わない、Animaはタグと
+自然文のどちらでもよく絵師タグに `@` を前置する、といった差がある。語順・重み付けの効き方・
+品質タグの記法は [docs/prompting-guide.md](../../../docs/prompting-guide.md) を参照する。
 
 LoRAを使う場合は `model.loras` に足す (同時3件まで)。
 
@@ -197,8 +205,8 @@ ControlNet / IPAdapter との同時指定は拒否される。
 generation:
   width: 832        # 1024x1024前後が前提。832x1216が扱いやすい
   height: 1216
-  steps: 28
-  cfg: 4.0          # SD1.5系より低め。5を超えると崩れやすい
+  steps: 32         # 配布元の推奨は30-50
+  cfg: 4.0          # SD1.5系より低め。推奨は4-5で、5を超えると崩れやすい
   sampler: er_sde
   scheduler: simple
 
@@ -211,6 +219,10 @@ model:
 テンプレートは `txt2img_unet` へ切り替わる。**`checkpoint` とは排他で、3つは揃えて指定する。**
 LoRA / img2img / hires fix / ControlNet / IPAdapter との併用は拒否される。
 text encoderとVAEはUNetと対応関係があるため、勝手に別のものへ差し替えない。
+
+品質タグとサンプラー設定は `style: anima-base` で足りる。プロンプトはdanbooruタグ・自然文・
+その混在のいずれでもよく、**絵師を指定する場合は `@artist_name` のように `@` を前置する**
+(付けないとほとんど効かない)。
 
 ### 画像に日本語を入れる場合
 
