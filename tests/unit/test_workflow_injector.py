@@ -2,6 +2,7 @@
 
 import copy
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ from agentic_imagegen.adapters.comfyui.workflow import (
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.errors import WorkflowValidationError
 from agentic_imagegen.workflows.injector import (
+    ALLOWED_WORKFLOWS,
     WORKFLOWS_DIR,
     load_workflow_template,
     prepare_workflow,
@@ -66,6 +68,29 @@ def test_repository_template_is_loadable() -> None:
 def test_unknown_workflow_name_rejected(name: str) -> None:
     with pytest.raises(WorkflowValidationError, match="許可されていません"):
         load_workflow_template(name)
+
+
+def test_allowlist_matches_template_files() -> None:
+    """allowlistと同梱テンプレートの集合を一致させる。
+
+    allowlistにあってファイルが無いと実行時まで気づけず、ファイルがあって
+    allowlistに無いと存在するのに使えないテンプレートが増える。
+    """
+    files = {path.stem for path in WORKFLOWS_DIR.glob("*.json")}
+
+    assert files == set(ALLOWED_WORKFLOWS)
+
+
+def test_readme_lists_every_template() -> None:
+    """workflows/README.md の同梱テンプレート表を実体と一致させる。
+
+    テンプレートを足したときに表への追記を忘れると、読む側からは
+    存在しないテンプレートに見える。
+    """
+    readme = (WORKFLOWS_DIR / "README.md").read_text(encoding="utf-8")
+    listed = set(re.findall(r"^\| `([a-z0-9_]+)\.json` \|", readme, re.MULTILINE))
+
+    assert listed == set(ALLOWED_WORKFLOWS)
 
 
 @pytest.mark.parametrize(
