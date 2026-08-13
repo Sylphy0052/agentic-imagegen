@@ -29,6 +29,7 @@ EXPECTED_TOOLS = {
     "list_diffusion_models",
     "list_text_encoders",
     "list_vaes",
+    "list_embeddings",
     "list_workflows",
 }
 

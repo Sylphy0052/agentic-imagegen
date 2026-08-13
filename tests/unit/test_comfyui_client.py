@@ -321,3 +321,42 @@ async def test_available_diffusion_models_empty_when_none_placed() -> None:
 
     async with _client(handler) as client:
         assert await client.available_diffusion_models() == ()
+
+
+async def test_available_embeddings() -> None:
+    """`/embeddings` はobject_info経由ではなく専用エンドポイントで、拡張子を含まない。"""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/embeddings"
+        return httpx.Response(200, json=["easynegative", "badhandv4"])
+
+    async with _client(handler) as client:
+        assert await client.available_embeddings() == ("easynegative", "badhandv4")
+
+
+async def test_available_embeddings_empty_when_none_placed() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[])
+
+    async with _client(handler) as client:
+        assert await client.available_embeddings() == ()
+
+
+async def test_available_embeddings_unreachable_raises() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused", request=request)
+
+    async with _client(handler) as client:
+        with pytest.raises(ComfyUIUnavailable):
+            await client.available_embeddings()
+
+
+async def test_available_embeddings_unexpected_shape_raises() -> None:
+    """object_info系のようにdictを返す想定外レスポンスも検出する。"""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"unexpected": "shape"})
+
+    async with _client(handler) as client:
+        with pytest.raises(ComfyUIUnavailable):
+            await client.available_embeddings()

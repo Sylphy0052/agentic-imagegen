@@ -9,7 +9,7 @@ import pytest
 from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.domain.results import HealthStatus, ImageRef
-from agentic_imagegen.errors import GenerationTimeout, OutputNotFound
+from agentic_imagegen.errors import GenerationTimeout, InvalidGenerationSpec, OutputNotFound
 from agentic_imagegen.services.generation import generate
 
 PROMPT_ID = "b3f0a1c2-0000-4000-8000-000000000001"
@@ -26,13 +26,16 @@ class FakeBackend:
         wait_error: Exception | None = None,
         outputs_error: Exception | None = None,
         health_error: Exception | None = None,
+        embeddings: tuple[str, ...] = (),
     ) -> None:
         self.images = images
         self.wait_error = wait_error
         self.outputs_error = outputs_error
         self.health_error = health_error
+        self.embeddings = embeddings
         self.submitted: dict[str, Any] | None = None
         self.wait_timeout: float | None = None
+        self.embeddings_queried = False
 
     async def submit(self, workflow: dict[str, Any]) -> str:
         self.submitted = workflow
@@ -59,6 +62,10 @@ class FakeBackend:
             comfyui_version="0.32.0",
             devices=("xpu:0 Intel(R) Graphics [0x7d55]",),
         )
+
+    async def available_embeddings(self) -> tuple[str, ...]:
+        self.embeddings_queried = True
+        return self.embeddings
 
 
 def _settings(tmp_path: Path, **overrides: Any) -> Settings:
@@ -242,7 +249,6 @@ async def test_generate_without_images_raises(tmp_path: Path) -> None:
 
 
 async def test_generate_rejects_output_outside_project_root(tmp_path: Path) -> None:
-    from agentic_imagegen.errors import InvalidGenerationSpec
 
     backend = FakeBackend(images=_images(1))
 
@@ -262,3 +268,62 @@ async def test_generate_uses_settings_output_root_when_spec_omits_it(tmp_path: P
     result = await generate(_spec(), settings, backend=backend, project_root=tmp_path)
 
     assert result.directory.parent.parent.name == "generated"
+
+
+async def test_generate_rejects_missing_embedding(tmp_path: Path) -> None:
+    """embedding:<name> が未配置なら、投入前にInvalidGenerationSpecで止める。
+
+    ComfyUI自身は未配置のembeddingを見つけても例外にせず、警告ログを残して
+    黙って無視するだけ (効かないことにユーザーが気づけない)。
+    """
+    backend = FakeBackend(images=_images(1), embeddings=())
+
+    with pytest.raises(InvalidGenerationSpec, match="easynegative"):
+        await generate(
+            _spec(prompt={"negative": "embedding:easynegative, worst quality"}),
+            _settings(tmp_path),
+            backend=backend,
+            project_root=tmp_path,
+        )
+
+    assert backend.submitted is None
+
+
+async def test_generate_allows_placed_embedding(tmp_path: Path) -> None:
+    backend = FakeBackend(images=_images(1), embeddings=("easynegative",))
+
+    result = await generate(
+        _spec(prompt={"negative": "embedding:easynegative, worst quality"}),
+        _settings(tmp_path),
+        backend=backend,
+        project_root=tmp_path,
+    )
+
+    assert result.prompt_id == PROMPT_ID
+    assert backend.embeddings_queried is True
+
+
+async def test_generate_reports_multiple_missing_embeddings(tmp_path: Path) -> None:
+    backend = FakeBackend(images=_images(1), embeddings=("easynegative",))
+
+    with pytest.raises(InvalidGenerationSpec, match="badhandv4"):
+        await generate(
+            _spec(
+                prompt={
+                    "positive": "1girl, embedding:foo_style",
+                    "negative": "embedding:easynegative, embedding:badhandv4",
+                }
+            ),
+            _settings(tmp_path),
+            backend=backend,
+            project_root=tmp_path,
+        )
+
+
+async def test_generate_skips_embedding_lookup_when_not_referenced(tmp_path: Path) -> None:
+    """promptにembedding:記法が無ければ、ComfyUIへ問い合わせない。"""
+    backend = FakeBackend(images=_images(1))
+
+    await generate(_spec(), _settings(tmp_path), backend=backend, project_root=tmp_path)
+
+    assert backend.embeddings_queried is False

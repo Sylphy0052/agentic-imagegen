@@ -20,6 +20,19 @@ Specの書き方そのものは [spec-reference.md](spec-reference.md)、失敗�
 - **seedを固定したままpromptとcfgを詰め、最後にseedを振って構図を探す。**
   seedと生成パラメータを同時に動かすと、何が効いたのか判別できない
 
+### Textual Inversion embedding
+
+`easynegative` / `badhandv4` のような定型embeddingを使う場合は、必ず
+`embedding:<name>` とプレフィックスを付けて書く (`embedding:easynegative`)。
+プレフィックスの無い素の単語はComfyUI側でもembeddingとして解決されず、
+ただの単語として扱われる (警告も拒否もされない)。
+
+`embedding:<name>` と書いた場合は、生成前に該当ファイルが
+`~/ComfyUI/models/embeddings/` に実在するかを自動で検証する。未配置なら
+`imagegen generate` / MCPの `generate_image` が実行前に拒否する
+(検証の仕組みと`imagegen validate`との違いは
+[spec-reference.md](spec-reference.md#prompt) を参照)。
+
 ## SD1.5系 (meinamix_v12Finalなど)
 
 | 項目 | 目安 |
@@ -248,6 +261,9 @@ preset本体は [presets/styles/sdxl-illustrious.yaml](../presets/styles/sdxl-il
   blurry, jpeg artifacts, chromatic aberration`
 - **重み付けはSDXL系より強い値が要る。** `(chibi:2)` のような指定でようやく効く
 - tag dropoutで学習されているため、関連タグを網羅する必要はない
+- **SD1.5 / SDXL向けのTextual Inversion embeddingを流用できるとは限らない。**
+  text encoderがCLIPではなくQwen3-0.6Bのため、`embedding:<name>` の実在チェック自体は
+  他のモデルと同様に働くが、埋め込みベクトルの互換性はComfyUI側の責務であり未検証
 
 **モデル配布元が推奨する `beta57` はKSamplerのschedulerではない。**
 `beta` schedulerのalpha=0.5 / beta=0.7を指す通称であり、指定するには `BetaSamplingScheduler`

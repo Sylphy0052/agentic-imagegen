@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Final, Protocol
 
 from agentic_imagegen.config import Settings
+from agentic_imagegen.domain.embeddings import extract_embedding_names
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.domain.policy import resolve_output_directory, resolve_source_image
 from agentic_imagegen.domain.results import GenerationResult, HealthStatus, ImageRef
@@ -54,6 +55,8 @@ class GenerationBackend(Protocol):
 
     async def upload_image(self, path: Path) -> str: ...
 
+    async def available_embeddings(self) -> tuple[str, ...]: ...
+
 
 async def generate(
     spec: GenerationSpec,
@@ -65,6 +68,7 @@ async def generate(
     workflows_dir: Path | None = None,
 ) -> GenerationResult:
     """Specに従って画像を生成し、結果をプロジェクト配下へ保存する。"""
+    await _validate_embeddings(spec, backend)
     directory = _prepare_directory(spec, settings, project_root)
 
     source_image_name = await _upload_image(
@@ -265,6 +269,30 @@ async def _upload_image(
         raise InvalidGenerationSpec(f"{label}.image を読み込めません: {relative_path}") from exc
     logger.info("%s image uploaded: %s -> %s", label, relative_path, name)
     return name
+
+
+async def _validate_embeddings(spec: GenerationSpec, backend: GenerationBackend) -> None:
+    """promptで参照しているembeddingがComfyUIに実在するか検証する。
+
+    ComfyUI自身は未配置のembeddingを見つけても例外を出さず、警告ログを残して
+    黙って無視するだけ (生成そのものは成功するがembeddingは効かない)。
+    それではユーザーが気づけないため、投入前にここで検出する。
+
+    prompt中に `embedding:` 記法が無ければComfyUIへ問い合わせない
+    (無駄な往復を避ける)。
+    """
+    referenced = extract_embedding_names(spec.prompt.positive, spec.prompt.negative)
+    if not referenced:
+        return
+
+    available = set(await backend.available_embeddings())
+    missing = [name for name in referenced if name not in available]
+    if missing:
+        raise InvalidGenerationSpec(
+            "未配置のembeddingが指定されています: "
+            f"{', '.join(missing)} "
+            f"(配置済み: {', '.join(sorted(available)) if available else 'なし'})"
+        )
 
 
 async def _collect_backend_info(backend: GenerationBackend) -> dict[str, Any] | None:
