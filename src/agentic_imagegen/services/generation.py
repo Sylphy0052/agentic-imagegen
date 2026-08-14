@@ -220,19 +220,22 @@ def resolve_fonts_root(settings: Settings, project_root: Path) -> Path:
 
 
 def _prepare_directory(spec: GenerationSpec, settings: Settings, project_root: Path) -> Path:
-    """`<出力ルート>/<日付>/<prefix>` を作業ルート内に解決する。
+    """`<出力ルート>/<日付>/<時刻>_<prefix>` を作業ルート内に解決する。
 
-    同じ日に同じprefixで再実行した場合は連番を付け、既存の結果を上書きしない。
+    ディレクトリ名の先頭へ実行時刻 (HHMMSS) を置き、同じprefixの結果が時系列に並ぶようにする。
+    同じ秒に再実行した場合は連番を付け、既存の結果を上書きしない。
     """
     directory = spec.output.directory or str(settings.output_root)
     base = resolve_output_directory(directory, project_root)
-    day = datetime.now().astimezone().strftime("%Y-%m-%d")
-    candidate = base / day / spec.output.prefix
+    now = datetime.now().astimezone()
+    day = now.strftime("%Y-%m-%d")
+    name = f"{now.strftime('%H%M%S')}_{spec.output.prefix}"
+    candidate = base / day / name
 
     if not candidate.exists():
         return candidate
     for suffix in range(2, _MAX_DIRECTORY_SUFFIX):
-        numbered = candidate.with_name(f"{spec.output.prefix}-{suffix}")
+        numbered = candidate.with_name(f"{name}-{suffix}")
         if not numbered.exists():
             return numbered
     return candidate

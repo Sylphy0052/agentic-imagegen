@@ -140,9 +140,9 @@ uv run imagegen generate specs/examples/txt2img.yaml
 ```text
 prompt_id: 5f2c...
 seed: 883021
-directory: /path/to/outputs/2026-08-12/blue_hair
-/path/to/outputs/2026-08-12/blue_hair/image_0001.png
-metadata: /path/to/outputs/2026-08-12/blue_hair/metadata.json
+directory: /path/to/outputs/2026-08-12/143052_blue_hair
+/path/to/outputs/2026-08-12/143052_blue_hair/image_0001.png
+metadata: /path/to/outputs/2026-08-12/143052_blue_hair/metadata.json
 ```
 
 タイムアウトを個別指定する場合:
@@ -165,9 +165,9 @@ uv run imagegen batch specs/generated/a.yaml --seeds 111,222,333
 
 ```text
 [1/2] specs/generated/a.yaml (seed=111)
-  -> /path/to/outputs/2026-08-12/sample/image_0001.png
+  -> /path/to/outputs/2026-08-12/143052_sample/image_0001.png
 [2/2] specs/generated/a.yaml (seed=222)
-  -> /path/to/outputs/2026-08-12/sample-2/image_0001.png
+  -> /path/to/outputs/2026-08-12/143118_sample/image_0001.png
 成功 2 / 失敗 0
 ```
 

@@ -11,7 +11,7 @@ description: WAI-illustrious-SD1.5向け。Illustrious系のタグ記法に合�
 
 prompt:
   positive: >
-    masterpiece, best quality, absurdres, highres, very aesthetic, anime coloring
+    masterpiece, best quality, absurdres, highres, very aesthetic
 
   negative: >
     worst quality, low quality, lowres, bad anatomy, bad hands, extra digits,

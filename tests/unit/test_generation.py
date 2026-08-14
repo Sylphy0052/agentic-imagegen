@@ -1,6 +1,7 @@
 """生成サービス (Spec -> Workflow -> バックエンド -> 保存) のテスト。"""
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -130,7 +131,8 @@ async def test_generate_uses_dated_directory(tmp_path: Path) -> None:
     result = await generate(_spec(), _settings(tmp_path), backend=backend, project_root=tmp_path)
 
     assert result.directory.parent.parent.name == "outputs"
-    assert result.directory.name == "blue_hair"
+    # ディレクトリ名は <時刻>_<prefix>
+    assert re.fullmatch(r"\d{6}_blue_hair", result.directory.name), result.directory.name
     assert result.directory.is_relative_to(tmp_path)
     # 日付ディレクトリは YYYY-MM-DD 形式
     date_part = result.directory.parent.name
