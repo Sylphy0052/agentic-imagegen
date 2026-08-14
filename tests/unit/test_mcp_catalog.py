@@ -16,7 +16,7 @@ import pytest
 
 from agentic_imagegen.config import Settings
 from agentic_imagegen.services import mcp_tools
-from agentic_imagegen.services.catalog import CatalogBackendFactory
+from agentic_imagegen.services.catalog import CatalogBackend, CatalogBackendFactory
 
 
 class _FakeCatalogBackend:
@@ -115,6 +115,31 @@ _LIST_FUNCTIONS: tuple[tuple[Callable[..., Coroutine[None, None, list[str]]], st
     (mcp_tools.list_upscale_models, "upscale_models"),
     (mcp_tools.list_embeddings, "embeddings"),
 )
+
+
+def test_list_functions_cover_every_catalog_tool() -> None:
+    """列挙系を1つ足したら `_LIST_FUNCTIONS` へも足す。
+
+    このテーブルの取りこぼしは、追加した関数のテストが単に存在しない形で出るため
+    テストの成否には現れない。`mcp_tools` が公開している `list_*` と突き合わせて
+    追加漏れをここで落とす。`list_workflows` はバックエンドへ接続しないため除く。
+    """
+    exported = {
+        name for name in dir(mcp_tools) if name.startswith("list_") and name != "list_workflows"
+    }
+
+    assert {list_fn.__name__ for list_fn, _ in _LIST_FUNCTIONS} == exported
+
+
+def test_list_functions_cover_every_catalog_backend_method() -> None:
+    """`CatalogBackend` の `available_*` が全て、いずれかの列挙系から呼ばれている。
+
+    Protocolへメソッドを足しただけで、それを返すtoolが無い状態を防ぐ。
+    テーブルの属性名は `_FakeCatalogBackend` の命名 (available_ を外した形) に合わせる。
+    """
+    protocol_methods = {name for name in dir(CatalogBackend) if name.startswith("available_")}
+
+    assert {f"available_{attribute}" for _, attribute in _LIST_FUNCTIONS} == protocol_methods
 
 
 @pytest.mark.parametrize(
