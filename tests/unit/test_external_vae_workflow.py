@@ -191,11 +191,19 @@ class TestDerivedTemplates:
                     assert value != [checkpoint_id, 2]
 
     def test_vae_count_matches_checkpoint_template_count(self) -> None:
-        """checkpoint系32件それぞれに `_vae` 版が1つずつ対応する。"""
+        """checkpoint系のテンプレートそれぞれに `_vae` 版が1つずつ対応する。
+
+        件数そのものは軸を足すたびに変わるため、`_vae` を差し込んだ名前が
+        すべて存在することで1対1を見る。
+        """
         checkpoint_names = {
             name for name in ALLOWED_WORKFLOWS if "unet" not in name and "vae" not in name
         }
         vae_names = {name for name in ALLOWED_WORKFLOWS if "_vae" in name}
 
-        assert len(checkpoint_names) == 32
-        assert len(vae_names) == 32
+        assert len(checkpoint_names) == len(vae_names)
+        # `_vae` はタスク名の直後に入る (AXIS_ORDER が unet / vae / lora ... の順)
+        assert {
+            name.replace("txt2img", "txt2img_vae", 1).replace("img2img", "img2img_vae", 1)
+            for name in checkpoint_names
+        } == vae_names

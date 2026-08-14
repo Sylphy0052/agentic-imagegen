@@ -447,11 +447,13 @@ source:
 ## control (ControlNet)
 
 参考画像からCannyで線画を取り、その構図を保ったまま生成する。txt2img / img2imgの両方で使える。
+既に線画・深度図・骨格図になっている画像は`preprocessor: none`でそのまま渡す。
 
 | キー | 型 | 既定値 | 値域 |
 | --- | --- | --- | --- |
 | `image` | string | 必須 | リポジトリ配下の相対パス。拡張子は`source`と同じ |
 | `model` | string | 必須 | `~/ComfyUI/models/controlnet/`のファイル名。拡張子は`.safetensors` / `.pth` / `.ckpt` |
+| `preprocessor` | string | `canny` | `canny` / `none`。`none`は前処理を通さず`image`をそのまま制御画像にする |
 | `strength` | float | 1.0 | 0.0-10.0。効かせる強さ |
 | `start_percent` | float | 0.0 | 0.0-1.0。効かせ始める進行度 |
 | `end_percent` | float | 1.0 | 0.0-1.0。効かせ終える進行度。構図だけ借りるなら下げる |
@@ -459,6 +461,8 @@ source:
 | `high_threshold` | float | 0.8 | 0.01-0.99 |
 
 `low_threshold < high_threshold`、`start_percent < end_percent`を満たさないと拒否される。
+`preprocessor: none`のときはCannyを通さないため、`low_threshold` / `high_threshold`を
+書くと拒否される (書いた値が効かないまま素通りするのを防ぐ)。
 
 ```yaml
 control:
@@ -469,10 +473,24 @@ control:
   high_threshold: 0.7
 ```
 
+前処理済みの画像をそのまま使う場合。
+
+```yaml
+control:
+  image: inputs/openpose.png
+  model: control_v11p_sd15_openpose_fp16.safetensors
+  preprocessor: none
+  strength: 0.9
+```
+
 - 指定するとテンプレートが`*_controlnet`へ自動的に切り替わる
+  (`preprocessor: none`なら`*_controlnet_raw`)
 - control画像は生成前にComfyUIへ自動でアップロードされる
-- **前処理はCannyのみ。** pose / depthはpreprocessorのカスタムノードが要るため未対応
-  ([Issue #37](https://github.com/Sylphy0052/agentic-imagegen/issues/37))
+- **リポジトリ内で行える前処理はCannyのみ。** pose / depth / lineartなどの抽出は
+  ComfyUI標準ノードに無いため、外部ツールで作った制御画像を`preprocessor: none`で渡す。
+  `model`にはその制御画像の種類に合ったControlNetを指定する
+  (openposeの骨格図なら`control_v11p_sd15_openpose_*`)。
+  種類が食い違うと拒否はされないが、構図がまったく効かない絵になる
 - 線が強く出すぎる場合は`low_threshold`を上げて細かい線を捨てるか、`strength`を下げる。
   写真やイラストをそのまま渡すと輪郭を拾いすぎ、元絵のエッジが残ったような絵になりやすい
 - `generation.upscale` (hires fix) と併用できる。ControlNetが効くのは1段目だけで、
@@ -753,7 +771,7 @@ Specの内容から自動的に決まる。`uv run imagegen validate`の`Workflo
 | 1 | `model.checkpoint`と`model.vae`を併用 (`model.unet`が無い場合) | `_vae` |
 | 2 | `model.loras`が空でない (`model.unet`が無い場合) | `_lora` |
 | 3 | `generation.upscale`を指定 | `_hires` (`upscale.model`を指定した場合は`_hires_model`) |
-| 4 | `control`を指定 | `_controlnet` |
+| 4 | `control`を指定 | `_controlnet` (`preprocessor: none`なら`_controlnet_raw`) |
 | 5 | `reference`を指定 | `_ipadapter` |
 
 `_unet`と`_vae`は同じ位置に入り、両立しない (DiT系は`checkpoint`を持たないため)。

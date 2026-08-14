@@ -39,6 +39,7 @@ from typing import Any
 
 from agentic_imagegen.workflows.axes import (
     AXIS_CONTROLNET,
+    AXIS_CONTROLNET_RAW,
     AXIS_HIRES,
     AXIS_HIRES_MODEL,
     AXIS_IPADAPTER,
@@ -337,15 +338,21 @@ def with_hires_model_fix(graph: Graph) -> Graph:
     return graph
 
 
-def with_controlnet(graph: Graph) -> Graph:
+def _build_controlnet(graph: Graph, *, preprocess: bool) -> Graph:
     """CLIPTextEncode と KSampler の間に ControlNet を挟む。
 
-    control画像は Canny で線画へ変換してから ControlNetApplyAdvanced へ渡す。
+    `preprocess` が True なら control画像を Canny で線画へ変換してから
+    ControlNetApplyAdvanced へ渡し、False なら LoadImage の出力をそのまま渡す
+    (前処理済みの制御画像を使う経路)。
+
     ApplyAdvanced は positive / negative の両方を返すため、KSamplerの
     2つの入力をどちらもここから受け直す。
     """
     graph = copy.deepcopy(graph)
-    for node_id in (CONTROL_LOAD_IMAGE, CONTROL_PREPROCESSOR, CONTROL_LOADER, CONTROL_APPLY):
+    used_ids = [CONTROL_LOAD_IMAGE, CONTROL_LOADER, CONTROL_APPLY]
+    if preprocess:
+        used_ids.append(CONTROL_PREPROCESSOR)
+    for node_id in used_ids:
         if node_id in graph:
             raise ValueError(f"ControlNet用のノードID {node_id} が既に使われている")
 
@@ -353,14 +360,15 @@ def with_controlnet(graph: Graph) -> Graph:
         "class_type": "LoadImage",
         "inputs": {"image": DEFAULT_SOURCE_IMAGE},
     }
-    graph[CONTROL_PREPROCESSOR] = {
-        "class_type": "Canny",
-        "inputs": {
-            "image": [CONTROL_LOAD_IMAGE, 0],
-            "low_threshold": 0.4,
-            "high_threshold": 0.8,
-        },
-    }
+    if preprocess:
+        graph[CONTROL_PREPROCESSOR] = {
+            "class_type": "Canny",
+            "inputs": {
+                "image": [CONTROL_LOAD_IMAGE, 0],
+                "low_threshold": 0.4,
+                "high_threshold": 0.8,
+            },
+        }
     graph[CONTROL_LOADER] = {
         "class_type": "ControlNetLoader",
         "inputs": {"control_net_name": DEFAULT_CONTROLNET},
@@ -371,7 +379,7 @@ def with_controlnet(graph: Graph) -> Graph:
             "positive": graph[KSAMPLER]["inputs"]["positive"],
             "negative": graph[KSAMPLER]["inputs"]["negative"],
             "control_net": [CONTROL_LOADER, 0],
-            "image": [CONTROL_PREPROCESSOR, 0],
+            "image": [CONTROL_PREPROCESSOR if preprocess else CONTROL_LOAD_IMAGE, 0],
             "strength": 1.0,
             "start_percent": 0.0,
             "end_percent": 1.0,
@@ -380,6 +388,16 @@ def with_controlnet(graph: Graph) -> Graph:
     graph[KSAMPLER]["inputs"]["positive"] = [CONTROL_APPLY, 0]
     graph[KSAMPLER]["inputs"]["negative"] = [CONTROL_APPLY, 1]
     return graph
+
+
+def with_controlnet(graph: Graph) -> Graph:
+    """control画像を Canny で線画へ変換してから ControlNet へ渡す。"""
+    return _build_controlnet(graph, preprocess=True)
+
+
+def with_controlnet_raw(graph: Graph) -> Graph:
+    """前処理済みの control画像をそのまま ControlNet へ渡す。"""
+    return _build_controlnet(graph, preprocess=False)
 
 
 def with_ipadapter(graph: Graph) -> Graph:
@@ -480,6 +498,7 @@ AXIS_GRAPH_BUILDERS: dict[str, Callable[[Graph], Graph]] = {
     AXIS_HIRES: with_hires_fix,
     AXIS_HIRES_MODEL: with_hires_model_fix,
     AXIS_CONTROLNET: with_controlnet,
+    AXIS_CONTROLNET_RAW: with_controlnet_raw,
     AXIS_IPADAPTER: with_ipadapter,
 }
 

@@ -26,21 +26,33 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `img2img_hires.json` | hires fix付きimage-to-image |
 | `img2img_lora_hires.json` | LoRA + hires fix (img2img) |
 | `txt2img_controlnet.json` | ControlNet付きtext-to-image |
+| `txt2img_controlnet_raw.json` | ControlNet付きtext-to-image / 制御画像を前処理せずそのまま渡す |
 | `txt2img_lora_controlnet.json` | LoRA + ControlNet |
+| `txt2img_lora_controlnet_raw.json` | LoRA + ControlNet / 制御画像を前処理せずそのまま渡す |
 | `img2img_controlnet.json` | ControlNet付きimage-to-image |
+| `img2img_controlnet_raw.json` | ControlNet付きimage-to-image / 制御画像を前処理せずそのまま渡す |
 | `img2img_lora_controlnet.json` | LoRA + ControlNet (img2img) |
+| `img2img_lora_controlnet_raw.json` | LoRA + ControlNet (img2img) / 制御画像を前処理せずそのまま渡す |
 | `txt2img_hires_controlnet.json` | hires fix + ControlNet (ControlNetが効くのは1段目だけ) |
+| `txt2img_hires_controlnet_raw.json` | hires fix + ControlNet (ControlNetが効くのは1段目だけ) / 制御画像を前処理せずそのまま渡す |
 | `txt2img_lora_hires_controlnet.json` | LoRA + hires fix + ControlNet |
+| `txt2img_lora_hires_controlnet_raw.json` | LoRA + hires fix + ControlNet / 制御画像を前処理せずそのまま渡す |
 | `img2img_hires_controlnet.json` | hires fix + ControlNet (img2img) |
+| `img2img_hires_controlnet_raw.json` | hires fix + ControlNet (img2img) / 制御画像を前処理せずそのまま渡す |
 | `img2img_lora_hires_controlnet.json` | LoRA + hires fix + ControlNet (img2img) |
+| `img2img_lora_hires_controlnet_raw.json` | LoRA + hires fix + ControlNet (img2img) / 制御画像を前処理せずそのまま渡す |
 | `txt2img_ipadapter.json` | IPAdapter付きtext-to-image |
 | `txt2img_lora_ipadapter.json` | LoRA + IPAdapter |
 | `img2img_ipadapter.json` | IPAdapter付きimage-to-image |
 | `img2img_lora_ipadapter.json` | LoRA + IPAdapter (img2img) |
 | `txt2img_controlnet_ipadapter.json` | ControlNet + IPAdapter |
+| `txt2img_controlnet_raw_ipadapter.json` | ControlNet + IPAdapter / 制御画像を前処理せずそのまま渡す |
 | `txt2img_lora_controlnet_ipadapter.json` | LoRA + ControlNet + IPAdapter |
+| `txt2img_lora_controlnet_raw_ipadapter.json` | LoRA + ControlNet + IPAdapter / 制御画像を前処理せずそのまま渡す |
 | `img2img_controlnet_ipadapter.json` | ControlNet + IPAdapter (img2img) |
+| `img2img_controlnet_raw_ipadapter.json` | ControlNet + IPAdapter (img2img) / 制御画像を前処理せずそのまま渡す |
 | `img2img_lora_controlnet_ipadapter.json` | LoRA + ControlNet + IPAdapter (img2img) |
+| `img2img_lora_controlnet_raw_ipadapter.json` | LoRA + ControlNet + IPAdapter (img2img) / 制御画像を前処理せずそのまま渡す |
 | `txt2img_unet.json` | UNet / text encoder / VAEを別々に読むtext-to-image (DiT系) |
 | `txt2img_unet_hires.json` | DiT系 + hires fix |
 | `img2img_unet.json` | DiT系のimage-to-image |
@@ -52,9 +64,13 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `txt2img_unet_hires_model.json` | DiT系 + モデル拡大のhires fix |
 | `img2img_unet_hires_model.json` | DiT系 + モデル拡大のhires fix (img2img) |
 | `txt2img_hires_model_controlnet.json` | モデル拡大のhires fix + ControlNet |
+| `txt2img_hires_model_controlnet_raw.json` | モデル拡大のhires fix + ControlNet / 制御画像を前処理せずそのまま渡す |
 | `txt2img_lora_hires_model_controlnet.json` | LoRA + モデル拡大のhires fix + ControlNet |
+| `txt2img_lora_hires_model_controlnet_raw.json` | LoRA + モデル拡大のhires fix + ControlNet / 制御画像を前処理せずそのまま渡す |
 | `img2img_hires_model_controlnet.json` | モデル拡大のhires fix + ControlNet (img2img) |
+| `img2img_hires_model_controlnet_raw.json` | モデル拡大のhires fix + ControlNet (img2img) / 制御画像を前処理せずそのまま渡す |
 | `img2img_lora_hires_model_controlnet.json` | LoRA + モデル拡大のhires fix + ControlNet (img2img) |
+| `img2img_lora_hires_model_controlnet_raw.json` | LoRA + モデル拡大のhires fix + ControlNet (img2img) / 制御画像を前処理せずそのまま渡す |
 | `txt2img_vae.json` | 外部VAEへ差し替えたtext-to-image (`CheckpointLoaderSimple`のVAE出力を`VAELoader`へ差し替えた構成) |
 | `txt2img_vae_lora.json` | 外部VAE + LoRA |
 | `img2img_vae.json` | 外部VAEへ差し替えたimage-to-image |
@@ -68,25 +84,41 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `img2img_vae_hires_model.json` | 外部VAE + モデル拡大のhires fix (img2img) |
 | `img2img_vae_lora_hires_model.json` | 外部VAE + LoRA + モデル拡大のhires fix (img2img) |
 | `txt2img_vae_controlnet.json` | 外部VAE + ControlNet |
+| `txt2img_vae_controlnet_raw.json` | 外部VAE + ControlNet / 制御画像を前処理せずそのまま渡す |
 | `txt2img_vae_lora_controlnet.json` | 外部VAE + LoRA + ControlNet |
+| `txt2img_vae_lora_controlnet_raw.json` | 外部VAE + LoRA + ControlNet / 制御画像を前処理せずそのまま渡す |
 | `img2img_vae_controlnet.json` | 外部VAE + ControlNet (img2img) |
+| `img2img_vae_controlnet_raw.json` | 外部VAE + ControlNet (img2img) / 制御画像を前処理せずそのまま渡す |
 | `img2img_vae_lora_controlnet.json` | 外部VAE + LoRA + ControlNet (img2img) |
+| `img2img_vae_lora_controlnet_raw.json` | 外部VAE + LoRA + ControlNet (img2img) / 制御画像を前処理せずそのまま渡す |
 | `txt2img_vae_hires_controlnet.json` | 外部VAE + hires fix + ControlNet |
+| `txt2img_vae_hires_controlnet_raw.json` | 外部VAE + hires fix + ControlNet / 制御画像を前処理せずそのまま渡す |
 | `txt2img_vae_lora_hires_controlnet.json` | 外部VAE + LoRA + hires fix + ControlNet |
+| `txt2img_vae_lora_hires_controlnet_raw.json` | 外部VAE + LoRA + hires fix + ControlNet / 制御画像を前処理せずそのまま渡す |
 | `img2img_vae_hires_controlnet.json` | 外部VAE + hires fix + ControlNet (img2img) |
+| `img2img_vae_hires_controlnet_raw.json` | 外部VAE + hires fix + ControlNet (img2img) / 制御画像を前処理せずそのまま渡す |
 | `img2img_vae_lora_hires_controlnet.json` | 外部VAE + LoRA + hires fix + ControlNet (img2img) |
+| `img2img_vae_lora_hires_controlnet_raw.json` | 外部VAE + LoRA + hires fix + ControlNet (img2img) / 制御画像を前処理せずそのまま渡す |
 | `txt2img_vae_hires_model_controlnet.json` | 外部VAE + モデル拡大のhires fix + ControlNet |
+| `txt2img_vae_hires_model_controlnet_raw.json` | 外部VAE + モデル拡大のhires fix + ControlNet / 制御画像を前処理せずそのまま渡す |
 | `txt2img_vae_lora_hires_model_controlnet.json` | 外部VAE + LoRA + モデル拡大のhires fix + ControlNet |
+| `txt2img_vae_lora_hires_model_controlnet_raw.json` | 外部VAE + LoRA + モデル拡大のhires fix + ControlNet / 制御画像を前処理せずそのまま渡す |
 | `img2img_vae_hires_model_controlnet.json` | 外部VAE + モデル拡大のhires fix + ControlNet (img2img) |
+| `img2img_vae_hires_model_controlnet_raw.json` | 外部VAE + モデル拡大のhires fix + ControlNet (img2img) / 制御画像を前処理せずそのまま渡す |
 | `img2img_vae_lora_hires_model_controlnet.json` | 外部VAE + LoRA + モデル拡大のhires fix + ControlNet (img2img) |
+| `img2img_vae_lora_hires_model_controlnet_raw.json` | 外部VAE + LoRA + モデル拡大のhires fix + ControlNet (img2img) / 制御画像を前処理せずそのまま渡す |
 | `txt2img_vae_ipadapter.json` | 外部VAE + IPAdapter |
 | `txt2img_vae_lora_ipadapter.json` | 外部VAE + LoRA + IPAdapter |
 | `img2img_vae_ipadapter.json` | 外部VAE + IPAdapter (img2img) |
 | `img2img_vae_lora_ipadapter.json` | 外部VAE + LoRA + IPAdapter (img2img) |
 | `txt2img_vae_controlnet_ipadapter.json` | 外部VAE + ControlNet + IPAdapter |
+| `txt2img_vae_controlnet_raw_ipadapter.json` | 外部VAE + ControlNet + IPAdapter / 制御画像を前処理せずそのまま渡す |
 | `txt2img_vae_lora_controlnet_ipadapter.json` | 外部VAE + LoRA + ControlNet + IPAdapter |
+| `txt2img_vae_lora_controlnet_raw_ipadapter.json` | 外部VAE + LoRA + ControlNet + IPAdapter / 制御画像を前処理せずそのまま渡す |
 | `img2img_vae_controlnet_ipadapter.json` | 外部VAE + ControlNet + IPAdapter (img2img) |
+| `img2img_vae_controlnet_raw_ipadapter.json` | 外部VAE + ControlNet + IPAdapter (img2img) / 制御画像を前処理せずそのまま渡す |
 | `img2img_vae_lora_controlnet_ipadapter.json` | 外部VAE + LoRA + ControlNet + IPAdapter (img2img) |
+| `img2img_vae_lora_controlnet_raw_ipadapter.json` | 外部VAE + LoRA + ControlNet + IPAdapter (img2img) / 制御画像を前処理せずそのまま渡す |
 
 どれを使うかは `task` と `model.loras` / `generation.upscale` / `control` / `reference` の有無、
 `model.unet` の指定で自動的に決まる。定義は
@@ -207,7 +239,7 @@ allowlist (`workflows/injector.py`) の3か所はいずれもこの列挙を辿�
 | 20-22 | img2img系のLoRA |
 | 30-31 | hires fix (LatentUpscaleBy / 2段目KSampler) |
 | 32-36 | モデル拡大のhires fix (VAEDecode / UpscaleModelLoader / ImageUpscaleWithModel / ImageScaleBy / VAEEncode) |
-| 40-43 | ControlNet (LoadImage / Canny / ControlNetLoader / ControlNetApplyAdvanced) |
+| 40-43 | ControlNet (LoadImage / Canny / ControlNetLoader / ControlNetApplyAdvanced)。`_controlnet_raw`はCanny (41) を持たず、`ControlNetApplyAdvanced`が`LoadImage`を直接読む |
 | 50-53 | IPAdapter (LoadImage / IPAdapterModelLoader / CLIPVisionLoader / IPAdapterAdvanced) |
 | 60-62 | DiT系のローダー分割 (UNETLoader / CLIPLoader / VAELoader) |
 | 70 | clip skip (CLIPSetLastLayer、全テンプレート共通で1個) |

@@ -14,6 +14,7 @@ import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
 from agentic_imagegen import mcp_server
+from agentic_imagegen.workflows.axes import ALL_TEMPLATE_NAMES
 
 EXPECTED_TOOLS = {
     "validate_generation",
@@ -118,81 +119,17 @@ async def test_get_generation_status_rejects_unknown_job() -> None:
 
 
 async def test_list_workflows_returns_allowlist() -> None:
+    """許可済みテンプレートの全件を返す。
+
+    期待値の手書き列挙は置かない (理由は tests/unit/test_mcp_tools.py の
+    TestListWorkflows を参照)。
+    """
     result = await mcp_server.server.call_tool("list_workflows", {})
 
     payload = _payload(result)
-    assert set(payload) == {
-        "txt2img",
-        "txt2img_lora",
-        "txt2img_hires",
-        "txt2img_lora_hires",
-        "txt2img_controlnet",
-        "txt2img_lora_controlnet",
-        "img2img",
-        "img2img_lora",
-        "img2img_hires",
-        "img2img_lora_hires",
-        "img2img_controlnet",
-        "img2img_lora_controlnet",
-        "txt2img_hires_controlnet",
-        "txt2img_lora_hires_controlnet",
-        "img2img_hires_controlnet",
-        "img2img_lora_hires_controlnet",
-        "txt2img_ipadapter",
-        "txt2img_lora_ipadapter",
-        "img2img_ipadapter",
-        "img2img_lora_ipadapter",
-        "txt2img_controlnet_ipadapter",
-        "txt2img_lora_controlnet_ipadapter",
-        "img2img_controlnet_ipadapter",
-        "img2img_lora_controlnet_ipadapter",
-        "txt2img_unet",
-        "txt2img_unet_hires",
-        "img2img_unet",
-        "img2img_unet_hires",
-        "txt2img_hires_model",
-        "txt2img_lora_hires_model",
-        "img2img_hires_model",
-        "img2img_lora_hires_model",
-        "txt2img_unet_hires_model",
-        "img2img_unet_hires_model",
-        "txt2img_hires_model_controlnet",
-        "txt2img_lora_hires_model_controlnet",
-        "img2img_hires_model_controlnet",
-        "img2img_lora_hires_model_controlnet",
-        "img2img_vae",
-        "img2img_vae_controlnet",
-        "img2img_vae_controlnet_ipadapter",
-        "img2img_vae_hires",
-        "img2img_vae_hires_controlnet",
-        "img2img_vae_hires_model",
-        "img2img_vae_hires_model_controlnet",
-        "img2img_vae_ipadapter",
-        "img2img_vae_lora",
-        "img2img_vae_lora_controlnet",
-        "img2img_vae_lora_controlnet_ipadapter",
-        "img2img_vae_lora_hires",
-        "img2img_vae_lora_hires_controlnet",
-        "img2img_vae_lora_hires_model",
-        "img2img_vae_lora_hires_model_controlnet",
-        "img2img_vae_lora_ipadapter",
-        "txt2img_vae",
-        "txt2img_vae_controlnet",
-        "txt2img_vae_controlnet_ipadapter",
-        "txt2img_vae_hires",
-        "txt2img_vae_hires_controlnet",
-        "txt2img_vae_hires_model",
-        "txt2img_vae_hires_model_controlnet",
-        "txt2img_vae_ipadapter",
-        "txt2img_vae_lora",
-        "txt2img_vae_lora_controlnet",
-        "txt2img_vae_lora_controlnet_ipadapter",
-        "txt2img_vae_lora_hires",
-        "txt2img_vae_lora_hires_controlnet",
-        "txt2img_vae_lora_hires_model",
-        "txt2img_vae_lora_hires_model_controlnet",
-        "txt2img_vae_lora_ipadapter",
-    }
+
+    assert set(payload) == set(ALL_TEMPLATE_NAMES)
+    assert {"txt2img", "txt2img_controlnet", "txt2img_controlnet_raw"} <= set(payload)
 
 
 async def test_validate_generation_reports_valid(tmp_path: Path) -> None:

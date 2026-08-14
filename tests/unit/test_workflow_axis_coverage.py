@@ -20,6 +20,7 @@ import pytest
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.workflows.axes import (
     AXIS_CONTROLNET,
+    AXIS_CONTROLNET_RAW,
     AXIS_HIRES,
     AXIS_HIRES_MODEL,
     AXIS_IPADAPTER,
@@ -80,6 +81,8 @@ def _payload_for(task: str, present_axes: frozenset[str]) -> dict[str, Any]:
 
     if AXIS_CONTROLNET in present_axes:
         payload["control"] = dict(CONTROL)
+    elif AXIS_CONTROLNET_RAW in present_axes:
+        payload["control"] = {**CONTROL, "preprocessor": "none"}
     if AXIS_IPADAPTER in present_axes:
         payload["reference"] = dict(REFERENCE)
 
