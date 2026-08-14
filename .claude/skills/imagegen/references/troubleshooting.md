@@ -25,7 +25,8 @@ Specを直して `validate` からやり直す。検証を緩めて通すこと�
 uv run imagegen health
 ```
 
-- 未起動なら起動する: `cd ~/ComfyUI && ./.venv/bin/python main.py --listen 127.0.0.1 --port 8188`
+- 生成は `scripts/comfyui-session.sh generate <spec>` で行う (起動と停止を含む)
+- 手で起動する場合: `cd ~/ComfyUI && ./.venv/bin/python main.py --listen 127.0.0.1 --port 8188`
 - ポートを変えている場合は `COMFYUI_BASE_URL` を合わせる
 - 起動直後はモデル一覧の準備中で失敗することがある。数秒待って再試行する
 

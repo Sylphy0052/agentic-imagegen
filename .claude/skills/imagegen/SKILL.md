@@ -28,9 +28,16 @@ uv run imagegen health
 
 未起動なら次で起動し、[docs/xpu-setup.md](../../../docs/xpu-setup.md) を案内する。
 
+生成は `scripts/comfyui-session.sh` 経由で行うため、事前の手動起動は要らない
+(スクリプトが起動し、生成し、停止する)。状態だけ見たいときや、手で立ち上げて
+デバッグしたいときは次を使う。
+
 ```bash
 cd ~/ComfyUI && ./.venv/bin/python main.py --listen 127.0.0.1 --port 8188
 ```
+
+手で起動したComfyUIが動いている間は `scripts/comfyui-session.sh` はそれを使い、
+停止もしない。
 
 ### 2. 使えるcheckpointとpresetを確かめる
 
@@ -203,7 +210,7 @@ uv run imagegen validate specs/generated/<name>.yaml
 ### 7. generateする
 
 ```bash
-uv run imagegen generate specs/generated/<name>.yaml
+scripts/comfyui-session.sh generate specs/generated/<name>.yaml
 ```
 
 所要時間はSD1.5 / 512x768 / 20 stepsで **XPU約135秒、CPU約12分**。
@@ -214,8 +221,8 @@ uv run imagegen generate specs/generated/<name>.yaml
 seedを変えて何枚か出す場合や、複数のSpecを流す場合は `batch` を使う。
 
 ```bash
-uv run imagegen batch specs/generated/<name>.yaml --seeds 111,222,333
-uv run imagegen batch specs/generated/a.yaml specs/generated/b.yaml
+scripts/comfyui-session.sh batch specs/generated/<name>.yaml --seeds 111,222,333
+scripts/comfyui-session.sh batch specs/generated/a.yaml specs/generated/b.yaml
 ```
 
 1件失敗しても残りは続き、最後にサマリが出る。Specの検証は実行前に全件行うため、
