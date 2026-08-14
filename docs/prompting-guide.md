@@ -89,17 +89,20 @@ sampler / scheduler / cfg / stepsをSpec側で書き直す必要はない。
   SD1.5向けのstyle presetと設定を流用しない。目安は後述の
   [SDXL / Illustrious系](#sdxl--illustrious系-novaanimexl_ilv190など)を参照
 
-配布元の推奨のうち、現状の実装では指定できないものが3つある。
+配布元の推奨のうち、Spec側で明示しないと既定値のままになるものが3つある。
 
-- **clip skipは大半のモデルが2を推奨する。** 現行のテンプレートは1相当で固定
-  ([Issue #60](https://github.com/Sylphy0052/agentic-imagegen/issues/60))。
-  1で運用する分には現状の出力と一致するが、配布元のサンプル画像へ絵柄を寄せたい場合は差が出る
-- **外部VAEの差し替えを前提にするモデルが多い**
-  (`kl-f8-anime2` / `vae-ft-mse-840000-ema` / `Pastel-Waifu-Diffusion`)。
-  現行未対応 ([Issue #57](https://github.com/Sylphy0052/agentic-imagegen/issues/57))。
+- **clip skipは大半のモデルが2を推奨する。** 既定は未指定 (1相当) のため、
+  `model.clip_skip: 2` と書く
+  ([model.clip_skip](spec-reference.md#modelclip_skip))。
+  1のままでも破綻はしないが、配布元のサンプル画像へ絵柄を寄せたい場合は差が出る
+- **外部VAEの差し替えを前提にするモデルが多い。** `model.vae` へファイル名を書くと
+  checkpoint同梱のVAEの代わりに使う ([model](spec-reference.md#model))。
+  配置済みは `kl-f8-anime2.ckpt` と `vae-ft-mse-840000-ema-pruned.safetensors` で、
+  実在するものは `list_vaes` で確認する。
   `anylora` はVAEを焼き込み済みのため差し替え不要
-- **hires fixのアップスケーラは `R-ESRGAN 4x+Anime6B` が定番**
-  ([Issue #58](https://github.com/Sylphy0052/agentic-imagegen/issues/58))
+- **hires fixのアップスケーラは `R-ESRGAN 4x+Anime6B` が定番。**
+  `generation.upscale.model` へ `RealESRGAN_x4plus_anime_6B.pth` を指定する
+  ([generation.upscale](spec-reference.md#generationupscale-hires-fix))
 
 ### タグの実在を確認する
 
@@ -178,7 +181,9 @@ A1111 / Forgeでは品質タグを先頭へ置く書き方が通例だが、pres
   上げるほど元の構図から離れ、下げるほど拡大しただけの絵に近づく
 - `upscale.steps`は1段目の1/3程度 (steps 30なら10) から始める
 - 2段目のcfgとsamplerは1段目と同じ値を使う。片方だけ変える手段は用意していない
-- アップスケーラは使えずlatent拡大だけになる。外部VAEとclip skipも指定できない
+- `upscale.model`を書くとlatent拡大ではなくアップスケールモデル (ESRGAN系) で拡大する。
+  `RealESRGAN_x4plus_anime_6B.pth` が配置済み。省略するとlatent拡大になる
+- 外部VAE (`model.vae`) とclip skip (`model.clip_skip`) はhires fixと併用できる
   (前掲の[配置済みのSD1.5系モデル](#配置済みのsd15系モデル)を参照)
 
 ## SDXL / Illustrious系 (novaAnimeXL_ilV190など)
@@ -199,9 +204,8 @@ A1111 / Forgeでは品質タグを先頭へ置く書き方が通例だが、pres
   キャラクタ名もDanbooruの表記順に従う
   (確認手順は [タグの実在を確認する](#タグの実在を確認する))
 - v2.0以降は自然文とタグの併用に対応する
-- **配布元はclip skip 2を推奨するが指定できない**
-  ([Issue #60](https://github.com/Sylphy0052/agentic-imagegen/issues/60))。
-  既定は1相当のため、clip skip 1で運用している場合との差は出ない
+- **配布元はclip skip 2を推奨する。** 既定は未指定 (1相当) のため、
+  `model.clip_skip: 2` と書く ([model.clip_skip](spec-reference.md#modelclip_skip))
 
 ### モデルごとの推奨設定
 
@@ -239,11 +243,10 @@ style presetを系統ごとに分けているのはこのため。
 - **実運用の定番である1024x1536の2倍 (2048x3072) は既定の上限を超える。**
   `IMAGEGEN_MAX_HEIGHT` (2048) と`IMAGEGEN_MAX_PIXELS` (4194304) の両方に当たるため、
   通すには環境変数を引き上げる
-- **配布元が推奨する`R-ESRGAN 4x+Anime6B`は使えない**
-  (latent拡大のみ。[Issue #58](https://github.com/Sylphy0052/agentic-imagegen/issues/58))
-- **`sdxlVAE`のような外部VAEへの差し替えも未対応**
-  ([Issue #57](https://github.com/Sylphy0052/agentic-imagegen/issues/57))。
-  checkpoint同梱のVAEを使う
+- **配布元が推奨する`R-ESRGAN 4x+Anime6B`は`upscale.model`で使える。**
+  `RealESRGAN_x4plus_anime_6B.pth` を指定する
+- **`sdxlVAE`のような外部VAEは`model.vae`で差し替えられる。** ただし配置済みのVAEは
+  SD1.5向けのため、SDXL向けのVAEを使うなら`~/ComfyUI/models/vae/`へ置いてから指定する
 
 SDXLはSD1.5の3-4倍の計算量になる。CPU推論では実用的な時間で終わらないため、
 XPU ([xpu-setup.md](xpu-setup.md)) を用意してから使う。
