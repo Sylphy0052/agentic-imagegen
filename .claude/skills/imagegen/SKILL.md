@@ -172,8 +172,9 @@ SDXL / Illustrious系は品質タグを先頭に置き `score_9` 系の記法は
 判断に効く点だけをここに残す。
 
 - **img2imgでは `width` / `height` を書かない。** 入力画像のサイズをそのまま使うため拒否される
-- **ControlNetの前処理はCannyのみ。** pose / depthは使えない。
-  線が強く出すぎる場合は `low_threshold` を上げるか `strength` を下げる
+- **ControlNetでリポジトリ内で行える前処理はCannyのみ。** 線が強く出すぎる場合は
+  `low_threshold` を上げるか `strength` を下げる。骨格図・深度図など前処理済みの画像は
+  `preprocessor: none` でそのまま渡す (`model` はその制御画像に合ったものを指定する)
 - **IPAdapterで背景まで引きずられる場合は `weight_type: style transfer`。**
   weightを下げても背景が変わる前に顔立ちが崩れるだけで、切り分けは `weight_type` で行う
 - **読める文字が要求されたらプロンプトへ書かず `text` で合成する。**

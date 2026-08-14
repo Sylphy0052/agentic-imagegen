@@ -15,6 +15,7 @@ from agentic_imagegen.services.mcp_tools import (
     list_workflows,
     validate_generation,
 )
+from agentic_imagegen.workflows.axes import ALL_TEMPLATE_NAMES
 
 VALID_SPEC: dict[str, Any] = {
     "version": "1",
@@ -126,85 +127,20 @@ class TestValidateGeneration:
 
 class TestListWorkflows:
     def test_returns_allowed_workflows(self) -> None:
+        """許可済みテンプレートの全件を返す。
+
+        期待値をここへ手で並べると、軸を1本足すたびに組み合わせの数だけ
+        書き足すことになる (Issue #84 で他の3か所から潰した重複)。
+        `ALL_TEMPLATE_NAMES` は `workflows.axes` の列挙、`list_workflows()` が
+        返すのは `adapters.comfyui.workflow` のbinding由来で、別経路のため
+        突き合わせる意味がある。
+        """
         names = list_workflows()
 
-        assert set(names) == {
-            "txt2img",
-            "txt2img_lora",
-            "txt2img_hires",
-            "txt2img_lora_hires",
-            "img2img",
-            "img2img_lora",
-            "img2img_hires",
-            "img2img_lora_hires",
-            "txt2img_controlnet",
-            "txt2img_lora_controlnet",
-            "img2img_controlnet",
-            "img2img_lora_controlnet",
-            "txt2img_hires_controlnet",
-            "txt2img_lora_hires_controlnet",
-            "img2img_hires_controlnet",
-            "img2img_lora_hires_controlnet",
-            "txt2img_ipadapter",
-            "txt2img_lora_ipadapter",
-            "img2img_ipadapter",
-            "img2img_lora_ipadapter",
-            "txt2img_controlnet_ipadapter",
-            "txt2img_lora_controlnet_ipadapter",
-            "img2img_controlnet_ipadapter",
-            "img2img_lora_controlnet_ipadapter",
-            "txt2img_unet",
-            "txt2img_unet_hires",
-            "img2img_unet",
-            "img2img_unet_hires",
-            "txt2img_hires_model",
-            "txt2img_lora_hires_model",
-            "img2img_hires_model",
-            "img2img_lora_hires_model",
-            "txt2img_unet_hires_model",
-            "img2img_unet_hires_model",
-            "txt2img_hires_model_controlnet",
-            "txt2img_lora_hires_model_controlnet",
-            "img2img_hires_model_controlnet",
-            "img2img_lora_hires_model_controlnet",
-            "img2img_vae",
-            "img2img_vae_controlnet",
-            "img2img_vae_controlnet_ipadapter",
-            "img2img_vae_hires",
-            "img2img_vae_hires_controlnet",
-            "img2img_vae_hires_model",
-            "img2img_vae_hires_model_controlnet",
-            "img2img_vae_ipadapter",
-            "img2img_vae_lora",
-            "img2img_vae_lora_controlnet",
-            "img2img_vae_lora_controlnet_ipadapter",
-            "img2img_vae_lora_hires",
-            "img2img_vae_lora_hires_controlnet",
-            "img2img_vae_lora_hires_model",
-            "img2img_vae_lora_hires_model_controlnet",
-            "img2img_vae_lora_ipadapter",
-            "txt2img_vae",
-            "txt2img_vae_controlnet",
-            "txt2img_vae_controlnet_ipadapter",
-            "txt2img_vae_hires",
-            "txt2img_vae_hires_controlnet",
-            "txt2img_vae_hires_model",
-            "txt2img_vae_hires_model_controlnet",
-            "txt2img_vae_ipadapter",
-            "txt2img_vae_lora",
-            "txt2img_vae_lora_controlnet",
-            "txt2img_vae_lora_controlnet_ipadapter",
-            "txt2img_vae_lora_hires",
-            "txt2img_vae_lora_hires_controlnet",
-            "txt2img_vae_lora_hires_model",
-            "txt2img_vae_lora_hires_model_controlnet",
-            "txt2img_vae_lora_ipadapter",
-        }
-
-    def test_is_sorted(self) -> None:
-        names = list_workflows()
-
+        assert set(names) == set(ALL_TEMPLATE_NAMES)
         assert names == sorted(names)
+        # 代表例。軸の組み合わせが名前へどう並ぶかを目で見て分かるようにしておく
+        assert {"txt2img", "txt2img_controlnet", "txt2img_controlnet_raw"} <= set(names)
 
 
 class TestValidateReportsAdvancedOptions:

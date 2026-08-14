@@ -219,7 +219,7 @@ output:
 | `model.loras` | LoRAを重ねて適用する | [model.loras](docs/spec-reference.md#modelloras) |
 | `model.unet` / `clip` / `vae` | DiT系モデル (Anima) を3ローダ構成で使う | [DiT系モデル](docs/spec-reference.md#dit系モデル-anima) |
 | `source` | 既存画像を入力にして描き直す (img2img) | [source](docs/spec-reference.md#source-img2img) |
-| `control` | 参考画像から線画 (Canny) を取り構図を保つ | [control](docs/spec-reference.md#control-controlnet) |
+| `control` | 参考画像から線画 (Canny) を取り構図を保つ。前処理済みの画像もそのまま渡せる | [control](docs/spec-reference.md#control-controlnet) |
 | `reference` | 参照画像の顔立ち・服装・画風を引き継ぐ (IPAdapter) | [reference](docs/spec-reference.md#reference-ipadapter) |
 | `generation.upscale` | latentのまま拡大し2段目で描き足す (hires fix) | [generation.upscale](docs/spec-reference.md#generationupscale-hires-fix) |
 | `text` | 生成後に日本語テキストを合成する | [text](docs/spec-reference.md#text-テキスト合成) |

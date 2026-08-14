@@ -235,3 +235,89 @@ class TestHiresFixCombination:
             "denoise"
         ] == pytest.approx(0.4)
         assert apply_node["strength"] == pytest.approx(0.8)
+
+
+RAW_CONTROL = {**CONTROL, "preprocessor": "none"}
+del RAW_CONTROL["low_threshold"]
+del RAW_CONTROL["high_threshold"]
+
+
+class TestPreprocessorNone:
+    """Issue #37: 前処理済みの制御画像を Canny を通さずに渡す経路。"""
+
+    @pytest.mark.parametrize(
+        ("task", "loras", "expected"),
+        [
+            ("txt2img", None, "txt2img_controlnet_raw"),
+            ("txt2img", [LORA], "txt2img_lora_controlnet_raw"),
+            ("img2img", None, "img2img_controlnet_raw"),
+            ("img2img", [LORA], "img2img_lora_controlnet_raw"),
+        ],
+    )
+    def test_selects_raw_template(
+        self, task: str, loras: list[dict[str, Any]] | None, expected: str
+    ) -> None:
+        spec = _spec(task=task, control=RAW_CONTROL, loras=loras)
+
+        assert resolve_workflow_name(spec) == expected
+        assert expected in ALLOWED_WORKFLOWS
+
+    def test_template_has_no_canny_node(self) -> None:
+        template = load_workflow_template("txt2img_controlnet_raw")
+
+        assert all(node["class_type"] != "Canny" for node in template.values())
+
+    def test_apply_reads_the_loaded_image_directly(self) -> None:
+        binding = ALLOWED_WORKFLOWS["txt2img_controlnet_raw"]
+        template = load_workflow_template("txt2img_controlnet_raw")
+        apply_node = template[binding.nodes[CONTROL_APPLY_ROLE].node_id]
+
+        assert apply_node["inputs"]["image"] == [binding.nodes[CONTROL_IMAGE_ROLE].node_id, 0]
+
+    def test_binding_has_no_preprocessor_role(self) -> None:
+        assert CONTROL_PREPROCESSOR_ROLE not in ALLOWED_WORKFLOWS["txt2img_controlnet_raw"].nodes
+
+    def test_injects_control_parameters(self) -> None:
+        prepared = prepare_workflow(
+            _spec(control=RAW_CONTROL), control_image_name="imagegen_abc_lineart.png"
+        )
+        binding = ALLOWED_WORKFLOWS["txt2img_controlnet_raw"]
+        workflow = prepared.workflow
+
+        assert prepared.workflow_name == "txt2img_controlnet_raw"
+        assert (
+            workflow[binding.nodes[CONTROL_IMAGE_ROLE].node_id]["inputs"]["image"]
+            == "imagegen_abc_lineart.png"
+        )
+        apply_node = workflow[binding.nodes[CONTROL_APPLY_ROLE].node_id]["inputs"]
+        assert apply_node["strength"] == pytest.approx(0.8)
+        assert apply_node["start_percent"] == pytest.approx(0.1)
+        assert apply_node["end_percent"] == pytest.approx(0.9)
+
+    def test_rejects_spec_and_template_mismatch(self) -> None:
+        """Canny入りテンプレートへ preprocessor: none のSpecを渡したら落とす。
+
+        前処理の有無が黙って入れ替わると、出てくる絵だけが変わって原因が追えない。
+        """
+        template = load_workflow_template("txt2img_controlnet")
+
+        with pytest.raises(WorkflowValidationError, match="preprocessor"):
+            build_workflow(
+                template,
+                _spec(control=RAW_CONTROL),
+                seed=1,
+                binding=TXT2IMG_CONTROLNET_BINDING,
+                control_image_name="a.png",
+            )
+
+    def test_rejects_raw_template_with_canny_spec(self) -> None:
+        template = load_workflow_template("txt2img_controlnet_raw")
+
+        with pytest.raises(WorkflowValidationError, match="preprocessor"):
+            build_workflow(
+                template,
+                _spec(),
+                seed=1,
+                binding=ALLOWED_WORKFLOWS["txt2img_controlnet_raw"],
+                control_image_name="a.png",
+            )

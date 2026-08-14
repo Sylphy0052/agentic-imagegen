@@ -118,4 +118,51 @@ def test_accepts_uppercase_suffix() -> None:
 
 def test_rejects_unknown_key() -> None:
     with pytest.raises(ValidationError):
-        GenerationSpec.model_validate(_spec(preprocessor="openpose"))
+        GenerationSpec.model_validate(_spec(guidance="strong"))
+
+
+class TestControlPreprocessor:
+    """Issue #37: 前処理済みの制御画像を Canny を通さずに渡す指定。"""
+
+    def test_defaults_to_canny(self) -> None:
+        control = GenerationSpec.model_validate(_spec()).control
+
+        assert control is not None
+        assert control.preprocessor == "canny"
+        assert control.skips_preprocessor is False
+
+    def test_accepts_none(self) -> None:
+        control = GenerationSpec.model_validate(_spec(preprocessor="none")).control
+
+        assert control is not None
+        assert control.preprocessor == "none"
+        assert control.skips_preprocessor is True
+
+    @pytest.mark.parametrize("value", ["openpose", "depth", "canny "])
+    def test_rejects_unsupported_preprocessor(self, value: str) -> None:
+        # pose / depth はpreprocessorのカスタムノードが未導入のため受け付けない。
+        with pytest.raises(ValidationError):
+            GenerationSpec.model_validate(_spec(preprocessor=value))
+
+    @pytest.mark.parametrize("key", ["low_threshold", "high_threshold"])
+    def test_rejects_canny_thresholds_when_preprocessor_is_none(self, key: str) -> None:
+        # 書いたのに効かない指定は作らない。Cannyを通さないなら閾値は指定できない。
+        with pytest.raises(ValidationError, match="preprocessor"):
+            GenerationSpec.model_validate(_spec(preprocessor="none", **{key: 0.5}))
+
+    def test_allows_thresholds_with_canny(self) -> None:
+        control = GenerationSpec.model_validate(
+            _spec(preprocessor="canny", low_threshold=0.2, high_threshold=0.6)
+        ).control
+
+        assert control is not None
+        assert control.low_threshold == 0.2
+        assert control.high_threshold == 0.6
+
+    def test_keeps_threshold_defaults_when_preprocessor_is_none(self) -> None:
+        # 明示していなければ既定値のままで通る (Cannyを通さないため使われない)。
+        control = GenerationSpec.model_validate(_spec(preprocessor="none")).control
+
+        assert control is not None
+        assert control.low_threshold == 0.4
+        assert control.high_threshold == 0.8

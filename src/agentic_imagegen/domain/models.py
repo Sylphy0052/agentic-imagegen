@@ -176,6 +176,12 @@ TextAlign = Literal["left", "center", "right"]
 
 TextDirection = Literal["horizontal", "vertical"]
 
+#: ControlNetへ渡す前の前処理。`canny` は制御画像をCannyで線画へ変換してから渡し、
+#: `none` は外部で用意済みの制御画像 (線画・pose・depthなど) をそのまま渡す。
+#: pose / depth の前処理そのものは preprocessor のカスタムノードが要るため持たない
+#: ([Issue #37](https://github.com/Sylphy0052/agentic-imagegen/issues/37))。
+ControlPreprocessor = Literal["canny", "none"]
+
 #: テキスト合成に使うフォントとして受け付ける拡張子。
 ALLOWED_FONT_SUFFIXES: Final = frozenset({".ttf", ".otf", ".ttc"})
 
@@ -566,21 +572,32 @@ class SourceSpec(_StrictModel):
 class ControlSpec(_StrictModel):
     """ControlNetの指定。
 
-    control画像は Canny で線画へ変換してから使う。前処理済みの線画を直接渡す
-    経路は今のところ持たない (必要になったら足す)。
+    既定 (`preprocessor: canny`) では control画像を Canny で線画へ変換してから使う。
+    `preprocessor: none` を指定すると変換を通さず、外部で用意済みの制御画像
+    (線画・pose・depthなど) をそのまま ControlNet へ渡す。指定した画像に対応する
+    ControlNetモデルを `model` へ選ぶのは利用者側の責任になる。
+
+    pose / depth の前処理そのものは preprocessor のカスタムノードが要るため持たない。
     """
 
     #: 構図の元になる画像。リポジトリ配下の相対パス。
     image: str = Field(min_length=1)
     #: ComfyUIの models/controlnet 配下のファイル名。
     model: str = Field(min_length=1)
+    #: 制御画像の前処理。`none` は前処理済みの画像をそのまま渡す。
+    preprocessor: ControlPreprocessor = "canny"
     strength: Annotated[float, Field(ge=0.0, le=10.0)] = 1.0
     #: 効かせ始める / 終える進行度。構図だけ借りたい場合は end_percent を下げる。
     start_percent: Annotated[float, Field(ge=0.0, le=1.0)] = 0.0
     end_percent: Annotated[float, Field(ge=0.0, le=1.0)] = 1.0
-    #: Cannyの閾値。低いほど細かい線を拾う。
+    #: Cannyの閾値。低いほど細かい線を拾う。`preprocessor: none` では使わない。
     low_threshold: Annotated[float, Field(ge=0.01, le=0.99)] = 0.4
     high_threshold: Annotated[float, Field(ge=0.01, le=0.99)] = 0.8
+
+    @property
+    def skips_preprocessor(self) -> bool:
+        """前処理を通さず制御画像をそのまま渡す指定かどうか。"""
+        return self.preprocessor == "none"
 
     @field_validator("image")
     @classmethod
@@ -598,6 +615,15 @@ class ControlSpec(_StrictModel):
             raise ValueError("low_threshold は high_threshold より小さくしてください")
         if self.start_percent >= self.end_percent:
             raise ValueError("start_percent は end_percent より小さくしてください")
+
+        # 書いたのに効かない指定は作らない。Cannyを通さないなら閾値は指定できない
+        if self.skips_preprocessor:
+            specified = self.model_fields_set & {"low_threshold", "high_threshold"}
+            if specified:
+                keys = " / ".join(sorted(specified))
+                raise ValueError(
+                    f"preprocessor が none のときは Canny を通さないため {keys} は指定できません"
+                )
         return self
 
 

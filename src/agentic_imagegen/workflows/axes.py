@@ -51,8 +51,11 @@ AXIS_LORA: Final = "lora"
 AXIS_HIRES: Final = "hires"
 #: hires fix (アップスケールモデルでの拡大)。`hires` と同じ軸の別の値。
 AXIS_HIRES_MODEL: Final = "hires_model"
-#: ControlNetで構図を指定する。
+#: ControlNetで構図を指定する (制御画像をCannyで線画へ変換してから渡す)。
 AXIS_CONTROLNET: Final = "controlnet"
+#: ControlNetで構図を指定する (前処理済みの制御画像をそのまま渡す)。
+#: `controlnet` と同じ軸の別の値で、Cannyノードの有無だけが違う。
+AXIS_CONTROLNET_RAW: Final = "controlnet_raw"
 #: IPAdapterで参照画像の特徴を寄せる。
 AXIS_IPADAPTER: Final = "ipadapter"
 
@@ -65,6 +68,7 @@ AXIS_ORDER: Final[tuple[str, ...]] = (
     AXIS_HIRES,
     AXIS_HIRES_MODEL,
     AXIS_CONTROLNET,
+    AXIS_CONTROLNET_RAW,
     AXIS_IPADAPTER,
 )
 
@@ -79,15 +83,17 @@ AXIS_BUILD_ORDER: Final[tuple[str, ...]] = (
     AXIS_HIRES,
     AXIS_HIRES_MODEL,
     AXIS_CONTROLNET,
+    AXIS_CONTROLNET_RAW,
     AXIS_IPADAPTER,
     AXIS_VAE,
 )
 
 #: 同時に指定できない軸の組。
-#: - unet (DiT系) は vae / lora / controlnet / ipadapter と排他
+#: - unet (DiT系) は vae / lora / controlnet / controlnet_raw / ipadapter と排他
 #:   (control / reference は Specのバリデーションでも拒否している。
 #:   hires / hires_model とは併用できる)
 #: - hires と hires_model は同じ軸の2値であるため互いに排他
+#: - controlnet と controlnet_raw も同じ軸の2値であるため互いに排他
 #: - ipadapter は hires / hires_model と併用しない
 #:   (Specのバリデーションが upscale と reference の同時指定を拒否している。Issue #38)
 _EXCLUSIVE_PAIRS: Final[frozenset[frozenset[str]]] = frozenset(
@@ -96,10 +102,12 @@ _EXCLUSIVE_PAIRS: Final[frozenset[frozenset[str]]] = frozenset(
         (AXIS_UNET, AXIS_VAE),
         (AXIS_UNET, AXIS_LORA),
         (AXIS_UNET, AXIS_CONTROLNET),
+        (AXIS_UNET, AXIS_CONTROLNET_RAW),
         (AXIS_UNET, AXIS_IPADAPTER),
         (AXIS_HIRES, AXIS_HIRES_MODEL),
         (AXIS_HIRES, AXIS_IPADAPTER),
         (AXIS_HIRES_MODEL, AXIS_IPADAPTER),
+        (AXIS_CONTROLNET, AXIS_CONTROLNET_RAW),
     )
 )
 
@@ -161,6 +169,7 @@ __all__ = [
     "ALL_TEMPLATE_NAMES",
     "AXIS_BUILD_ORDER",
     "AXIS_CONTROLNET",
+    "AXIS_CONTROLNET_RAW",
     "AXIS_HIRES",
     "AXIS_HIRES_MODEL",
     "AXIS_IPADAPTER",

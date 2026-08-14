@@ -348,16 +348,24 @@ CONTROL_LOADER_ROLE: Final = "control_loader"
 CONTROL_APPLY_ROLE: Final = "control_apply"
 
 
-def _with_controlnet(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
+def _build_controlnet_binding(
+    base: WorkflowBinding, *, name: str, preprocess: bool
+) -> WorkflowBinding:
     """既存のbindingに ControlNet を挟んだbindingを組み立てる。
 
     ControlNetApplyAdvanced は positive / negative の両方を返すため、
     KSamplerの2つの入力をどちらもここから受け直す。片方だけ繋ぎ替えると
     条件が食い違ったまま生成が成功してしまう。
+
+    `preprocess` が False のときは Canny を挟まず、LoadImage をそのまま
+    ControlNetApplyAdvanced へ繋ぐ (前処理済みの制御画像を渡す経路)。
     """
     nodes = dict(base.nodes)
     nodes[CONTROL_IMAGE_ROLE] = NodeRef("40", "LoadImage", ("image",))
-    nodes[CONTROL_PREPROCESSOR_ROLE] = NodeRef("41", "Canny", ("low_threshold", "high_threshold"))
+    if preprocess:
+        nodes[CONTROL_PREPROCESSOR_ROLE] = NodeRef(
+            "41", "Canny", ("low_threshold", "high_threshold")
+        )
     nodes[CONTROL_LOADER_ROLE] = NodeRef("42", "ControlNetLoader", ("control_net_name",))
     nodes[CONTROL_APPLY_ROLE] = NodeRef(
         "43",
@@ -371,11 +379,16 @@ def _with_controlnet(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
         for link in base.links
         if not (link.source_node == "ksampler" and link.input_key in {"positive", "negative"})
     ]
+    if preprocess:
+        links.append(LinkRef(CONTROL_PREPROCESSOR_ROLE, "image", CONTROL_IMAGE_ROLE))
     links.extend(
         [
-            LinkRef(CONTROL_PREPROCESSOR_ROLE, "image", CONTROL_IMAGE_ROLE),
             LinkRef(CONTROL_APPLY_ROLE, "control_net", CONTROL_LOADER_ROLE),
-            LinkRef(CONTROL_APPLY_ROLE, "image", CONTROL_PREPROCESSOR_ROLE),
+            LinkRef(
+                CONTROL_APPLY_ROLE,
+                "image",
+                CONTROL_PREPROCESSOR_ROLE if preprocess else CONTROL_IMAGE_ROLE,
+            ),
             LinkRef(CONTROL_APPLY_ROLE, "positive", "positive_prompt"),
             LinkRef(CONTROL_APPLY_ROLE, "negative", "negative_prompt"),
             LinkRef("ksampler", "positive", CONTROL_APPLY_ROLE),
@@ -383,6 +396,16 @@ def _with_controlnet(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
         ]
     )
     return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
+
+
+def _with_controlnet(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
+    """制御画像を Canny で線画へ変換してから ControlNet へ渡すbinding。"""
+    return _build_controlnet_binding(base, name=name, preprocess=True)
+
+
+def _with_controlnet_raw(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
+    """前処理済みの制御画像をそのまま ControlNet へ渡すbinding。"""
+    return _build_controlnet_binding(base, name=name, preprocess=False)
 
 
 #: IPAdapter (reference) 用ノードの役割名。
@@ -447,6 +470,7 @@ AXIS_BINDING_BUILDERS: Final[dict[str, Callable[..., WorkflowBinding]]] = {
     axes.AXIS_HIRES: _with_hires_fix,
     axes.AXIS_HIRES_MODEL: _with_hires_model_fix,
     axes.AXIS_CONTROLNET: _with_controlnet,
+    axes.AXIS_CONTROLNET_RAW: _with_controlnet_raw,
     axes.AXIS_IPADAPTER: _with_ipadapter,
 }
 
@@ -738,12 +762,23 @@ def _inject_controlnet(
             f"Workflow ({binding.name}) のcontrol画像がComfyUIへアップロードされていません"
         )
 
+    has_preprocessor = CONTROL_PREPROCESSOR_ROLE in binding.nodes
+    if has_preprocessor is control.skips_preprocessor:
+        # テンプレート選択 (resolve_workflow_name) とSpecの指定が食い違っている。
+        # 前処理の有無が黙って入れ替わると、出てくる絵だけが変わって原因が追えない
+        expected = "前処理なし" if control.skips_preprocessor else "Canny前処理あり"
+        raise WorkflowValidationError(
+            f"Workflow ({binding.name}) の前処理の有無が、Specの preprocessor "
+            f"({control.preprocessor}, {expected}) と一致しません"
+        )
+
     inputs_of(CONTROL_IMAGE_ROLE)["image"] = control_image_name
     inputs_of(CONTROL_LOADER_ROLE)["control_net_name"] = control.model
 
-    preprocessor = inputs_of(CONTROL_PREPROCESSOR_ROLE)
-    preprocessor["low_threshold"] = control.low_threshold
-    preprocessor["high_threshold"] = control.high_threshold
+    if has_preprocessor:
+        preprocessor = inputs_of(CONTROL_PREPROCESSOR_ROLE)
+        preprocessor["low_threshold"] = control.low_threshold
+        preprocessor["high_threshold"] = control.high_threshold
 
     apply_node = inputs_of(CONTROL_APPLY_ROLE)
     apply_node["strength"] = control.strength

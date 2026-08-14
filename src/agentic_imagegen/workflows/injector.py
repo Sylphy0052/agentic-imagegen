@@ -23,6 +23,7 @@ from agentic_imagegen.domain.policy import display_path
 from agentic_imagegen.errors import WorkflowValidationError
 from agentic_imagegen.workflows.axes import (
     AXIS_CONTROLNET,
+    AXIS_CONTROLNET_RAW,
     AXIS_HIRES,
     AXIS_HIRES_MODEL,
     AXIS_IPADAPTER,
@@ -70,7 +71,10 @@ def resolve_workflow_name(spec: GenerationSpec) -> str:
         # 拡大の経路がlatentとpixelで別テンプレートになる
         present_axes.append(AXIS_HIRES_MODEL if spec.generation.upscale.uses_model else AXIS_HIRES)
     if spec.control is not None:
-        present_axes.append(AXIS_CONTROLNET)
+        # 前処理の有無で Canny ノードの有無が変わるため別テンプレートになる
+        present_axes.append(
+            AXIS_CONTROLNET_RAW if spec.control.skips_preprocessor else AXIS_CONTROLNET
+        )
     if spec.reference is not None:
         present_axes.append(AXIS_IPADAPTER)
     return f"{spec.task}{suffix_for(tuple(present_axes))}"
