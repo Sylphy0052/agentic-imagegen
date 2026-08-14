@@ -1,0 +1,25 @@
+# waiIllustriousSD15_v1.safetensors 向けの画風preset。
+# 画風と品質タグ、それに合うサンプラー設定を書く。
+# 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
+#
+# 配布元 (civitai model 2174578 / version 2448811) はWAI-illustrious-SDXLの蒸留版とだけ述べ、
+# sampler / cfg / stepsの推奨を出していない。蒸留元のIllustrious系に倣い
+# cfg 6.0 / steps 28 / dpmpp_2m + karras を暫定の既定とした。実写寄りに寄る場合はcfgを下げる。
+# 品質タグの記法はIllustrious系と同じで、score_9系の記法は使わない。
+
+description: WAI-illustrious-SD1.5向け。Illustrious系のタグ記法に合わせた暫定設定
+
+prompt:
+  positive: >
+    masterpiece, best quality, absurdres, highres, very aesthetic, anime coloring
+
+  negative: >
+    worst quality, low quality, lowres, bad anatomy, bad hands, extra digits,
+    blurry, jpeg artifacts, text, watermark, signature, monochrome, sketch, 3d,
+    multiple views
+
+generation:
+  sampler: dpmpp_2m
+  scheduler: karras
+  cfg: 6.0
+  steps: 28

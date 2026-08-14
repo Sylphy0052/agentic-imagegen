@@ -1,0 +1,24 @@
+# perfectdeliberate_v20.safetensors 向けの画風preset。
+# 画風と品質タグ、それに合うサンプラー設定を書く。
+# 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
+#
+# 配布元 (civitai model 111274 / version 307086) の推奨は
+# steps 20-50 / cfg 5-8 / Euler a または DPM++ 2M Karras / 832x1216などの高めの解像度。
+# 決定的に再現したいため dpmpp_2m + karras を採り、推奨の中央付近で cfg 6.5 / steps 30 とした。
+
+description: PerfectDeliberate-Anime v2向けのアニメ調。厚めの塗りと高めの解像度が前提
+
+prompt:
+  positive: >
+    masterpiece, best quality, absurdres, highres, anime coloring
+
+  negative: >
+    worst quality, low quality, lowres, bad anatomy, bad hands, extra digits,
+    blurry, jpeg artifacts, text, watermark, signature, monochrome, sketch, 3d,
+    multiple views
+
+generation:
+  sampler: dpmpp_2m
+  scheduler: karras
+  cfg: 6.5
+  steps: 30

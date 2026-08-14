@@ -67,6 +67,8 @@ Specの書き方そのものは [spec-reference.md](spec-reference.md)、失敗�
 | `darkSushiMixMix_225D.safetensors` | 2.25D (2Dと2.5Dの中間) | `dpmpp_sde` / `karras` | 20-60 | 7.5 | `sd15-darksushi` |
 | `hassakuSD15_v13.safetensors` | 明るくコントラストの強いアニメ調 | `ddim` / `normal` | 20 | 8 | `sd15-hassaku` |
 | `chilloutmix_NiPrunedFp16Fix.safetensors` | 写実寄り。人物の肌と質感に振れる | `dpmpp_sde` / `karras` | 20前後 | 7前後 | `sd15-chilloutmix` |
+| `perfectdeliberate_v20.safetensors` | アニメ調。厚めの塗り。高めの解像度が前提 | `dpmpp_2m` / `karras` | 20-50 | 5-8 | `sd15-perfectdeliberate` |
+| `waiIllustriousSD15_v1.safetensors` | WAI-illustrious-SDXLの蒸留版。Illustrious系のタグ記法で書く | `dpmpp_2m` / `karras` | 20-30 | 5-7 | `sd15-wai-illustrious` |
 
 style presetはこの表の値を持っているため、checkpointに合うものを選べば
 sampler / scheduler / cfg / stepsをSpec側で書き直す必要はない。
@@ -78,6 +80,9 @@ sampler / scheduler / cfg / stepsをSpec側で書き直す必要はない。
 - **`anylora` はLoRAを載せる土台としてニュートラルに作られている。** 単体で使うより
   `model.loras` と組み合わせる方が本来の用途。`sd15-anylora` はLoRAの画風と競合しないよう
   `anime coloring` を入れていない
+- **`waiIllustriousSD15_v1` は配布元がsampler / cfg / stepsの推奨を出していない。**
+  表の値は蒸留元のIllustrious系に倣った暫定。品質タグの記法もIllustrious系に合わせ、
+  Pony系の `score_9` 記法は使わない
 - **checkpointを決めていない段階では `anime-soft` / `anime-detailed` を使う。**
   負荷で選ぶ汎用preset (`anime-soft` が下描き、`anime-detailed` が仕上げ) として残してある
 - **`AnythingXL_xl.safetensors` はSDXL系。** 同じ `checkpoints/` に置かれているが、

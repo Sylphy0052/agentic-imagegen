@@ -166,6 +166,8 @@ SD1.5系は配置済みのcheckpointごとに1つ用意してある。SDXL系は
 | `sd15-darksushi` | `darkSushiMixMix_225D` | `dpmpp_sde` / `karras` | 7.5 | 30 |
 | `sd15-hassaku` | `hassakuSD15_v13` | `ddim` / `normal` | 8.0 | 20 |
 | `sd15-chilloutmix` | `chilloutmix_NiPrunedFp16Fix` (写実寄り) | `dpmpp_sde` / `karras` | 7.0 | 20 |
+| `sd15-perfectdeliberate` | `perfectdeliberate_v20` | `dpmpp_2m` / `karras` | 6.5 | 30 |
+| `sd15-wai-illustrious` | `waiIllustriousSD15_v1` | `dpmpp_2m` / `karras` | 6.0 | 28 |
 | `sdxl-illustrious` | SDXL (Illustrious系 / AnythingXL) | `euler_ancestral` / `normal` | 7.0 | 30 |
 | `sdxl-animagine` | SDXL (Animagine XL系) | `euler_ancestral` / `normal` | 6.0 | 25 |
 | `sdxl-shiratakimix` | SDXL (ShiratakiMix XL系) | `dpmpp_3m_sde` / `karras` | 7.5 | 28 |
