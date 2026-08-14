@@ -103,8 +103,10 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
   学習内容に依存するため流用しない。SD1.5系は `sd15-<通称>` がcheckpointと1対1で対応し、
   そのcheckpointの推奨 sampler / scheduler / cfg / steps を持つ。
   SDXL系はfine-tuneの系統で選び、DiT系は `anima-base` を使う。
-  checkpointを決めていない段階では汎用の `anime-soft` (steps 20の下描き向け) と
-  `anime-detailed` (steps 30・negativeを積んだ仕上げ向け) を負荷で使い分ける
+  checkpointを決めていない段階は `hassakuSD15_v13.safetensors` + `sd15-hassaku` を既定にする
+  (9種のSD1.5系を同一条件で比較した結果。根拠は
+  [既定のcheckpointを決める](docs/prompting-guide.md#既定のcheckpointを決める))。
+  負荷を下げたいときだけ汎用の `anime-soft` (steps 20の下描き向け) へ落とす
   (一覧は [presets](docs/spec-reference.md#presets))
 - **併用できない組み合わせがある。** hires fixとIPAdapter、DiT系モデルと
   LoRA / ControlNet / IPAdapterは指定するとその場で拒否される。

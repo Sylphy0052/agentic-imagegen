@@ -164,7 +164,7 @@ SD1.5系は配置済みのcheckpointごとに1つ用意してある。SDXL系は
 | `sd15-anylora` | `anyloraCheckpoint_bakedvaeBlessedFp16` | `dpmpp_2m_sde` / `exponential` | 7.0 | 30 |
 | `sd15-cetusmix` | `cetusMix_Whalefall2` | `dpmpp_2m` / `karras` | 6.0 | 24 |
 | `sd15-darksushi` | `darkSushiMixMix_225D` | `dpmpp_sde` / `karras` | 7.5 | 30 |
-| `sd15-hassaku` | `hassakuSD15_v13` | `ddim` / `normal` | 8.0 | 20 |
+| `sd15-hassaku` | `hassakuSD15_v13` (既定) | `dpmpp_2m_sde` / `exponential` | 7.0 | 30 |
 | `sd15-chilloutmix` | `chilloutmix_NiPrunedFp16Fix` (写実寄り) | `dpmpp_sde` / `karras` | 7.0 | 20 |
 | `sd15-perfectdeliberate` | `perfectdeliberate_v20` | `dpmpp_2m` / `karras` | 6.5 | 30 |
 | `sd15-wai-illustrious` | `waiIllustriousSD15_v1` | `dpmpp_2m` / `karras` | 6.0 | 28 |
@@ -180,8 +180,12 @@ sampler / scheduler / cfg / stepsをSpec側で書き直す必要はない。
 値の根拠と各モデルの傾向は
 [prompting-guide.md](prompting-guide.md#配置済みのsd15系モデル) を参照。
 
-`anime-soft` / `anime-detailed` はcheckpointを決めていない段階の汎用preset。
-負荷で選ぶ (`anime-soft`が下描き、`anime-detailed`が仕上げ)。
+checkpointを決めていない段階の既定は `sd15-hassaku` (対応するcheckpointは
+`hassakuSD15_v13.safetensors`)。根拠は
+[prompting-guide.md](prompting-guide.md#既定のcheckpointを決める) を参照。
+
+`anime-soft` / `anime-detailed` は負荷を下げたいときの汎用preset。
+`anime-soft`が下描き、`anime-detailed`が仕上げ。
 
 SDXL向けの3つはcheckpointのfine-tune系統で選ぶ。系統ごとの違いは
 [prompting-guide.md](prompting-guide.md#モデルごとの推奨設定) を参照。

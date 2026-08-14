@@ -86,8 +86,10 @@ A1111で運用したときの実績設定 (`dpmpp_2m_sde` / `exponential` / cfg 
 - **`waiIllustriousSD15_v1` は配布元がsampler / cfg / stepsの推奨を出していない。**
   表の値は蒸留元のIllustrious系に倣った暫定。品質タグの記法もIllustrious系に合わせ、
   Pony系の `score_9` 記法は使わない
-- **checkpointを決めていない段階では `anime-soft` / `anime-detailed` を使う。**
-  負荷で選ぶ汎用preset (`anime-soft` が下描き、`anime-detailed` が仕上げ) として残してある
+- **checkpointを決めていない段階は `hassakuSD15_v13` + `sd15-hassaku` を使う。**
+  後述の[既定のcheckpointを決める](#既定のcheckpointを決める)を参照。
+  `anime-soft` / `anime-detailed` は負荷を下げたいときの汎用preset
+  (`anime-soft` が下描き、`anime-detailed` が仕上げ) として残してある
 - **`AnythingXL_xl.safetensors` はSDXL系。** 同じ `checkpoints/` に置かれているが、
   SD1.5向けのstyle presetと設定を流用しない。目安は後述の
   [SDXL / Illustrious系](#sdxl--illustrious系-novaanimexl_ilv190など)を参照
@@ -293,6 +295,45 @@ preset本体は [presets/styles/sdxl-illustrious.yaml](../presets/styles/sdxl-il
 
 Anima向けのstyle presetは [presets/styles/anima-base.yaml](../presets/styles/anima-base.yaml)
 にある。
+
+## 既定のcheckpointを決める
+
+checkpointを指定されていないときは `hassakuSD15_v13.safetensors` + `sd15-hassaku` を使う。
+
+配置済みのSD1.5系9種を、同一プロンプト・同一seed (545078971)・同一設定
+(`dpmpp_2m_sde` / `exponential` / cfg 7.0 / steps 30 / 512x768 -> hires x2.0 /
+clip skip 2 / 外部VAE) で1枚ずつ生成して比べた結果による (2026-08-15)。
+
+| checkpoint | 高周波比 | 所見 |
+| --- | ---: | --- |
+| `hassakuSD15_v13` | 0.068 | 指定した服装・小物への追従が最も良い。破綻なし |
+| `anyloraCheckpoint_bakedvaeBlessedFp16` | 0.058 | 最も平滑。LoRAの土台向けで単体では平坦 |
+| `meinamix_v12Final` | 0.062 | 破綻はないが暗く沈みやすい |
+| `abyssorangemix3AOM3_aom3a1b` | 0.065 | 彩度が高い |
+| `perfectdeliberate_v20` | 0.074 | 厚塗り |
+| `darkSushiMixMix_225D` | 0.077 | 2.25D |
+| `counterfeitV30_v30` | 0.084 | 明るい。背景の描き込みが厚い |
+| `cetusMix_Whalefall2` | 0.088 | 最も線が立つ |
+| `chilloutmix_NiPrunedFp16Fix` | 0.044 | 写実寄り。アニメ品質タグと打ち消し合う |
+
+高周波比はエッジ強度が閾値を超えた画素の割合で、破綻の検出に使う目安。
+正常な範囲は0.04-0.09で、これを大きく超えるものは絵が壊れている
+(VAE不整合を起こした `waiIllustriousSD15_v1` は0.296だった)。
+数値は破綻の有無しか見ていないため、順位付けには使わない。採用の決め手は
+「指定した服装・小物がそのまま出るか」で、そこに最も忠実だったのがhassakuだった。
+
+`sd15-hassaku` は配布元推奨の `ddim` / `normal` / steps 20 / cfg 8 ではなく、
+この比較で使った設定を持つ。既定として使う場合もSpec側に次の2つを書く。
+
+```yaml
+model:
+  checkpoint: hassakuSD15_v13.safetensors
+  clip_skip: 2
+  vae: vaeKlF8Anime2_klF8Anime2VAE.safetensors
+```
+
+`waiIllustriousSD15_v1` だけは `model.vae` を書いてはいけない。このcheckpointは
+SDXL系のVAEを内蔵しており、SD1.5用の外部VAEへ差し替えると出力が極彩色のノイズになる。
 
 ## A1111から設定を移す
 
