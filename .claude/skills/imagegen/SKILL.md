@@ -87,8 +87,10 @@ SD1.5系は `sd15-<通称>` がcheckpointと1対1で対応し、そのモデル�
 sampler / scheduler / cfg / stepsを持つ。SDXL系はfine-tuneの系統で選ぶ
 (Illustrious系とAnythingXLは `sdxl-illustrious`、Animagine XL系は `sdxl-animagine`、
 ShiratakiMix XL系は `sdxl-shiratakimix`)。Anima系は `anima-base`。
-checkpointを決めていない段階では汎用の `anime-soft` (steps 20) と
-`anime-detailed` (steps 30、negativeを積んで破綻を抑える) を負荷で使い分ける。
+checkpointを決めていない段階は `hassakuSD15_v13.safetensors` + `sd15-hassaku` を既定にする
+(9種のSD1.5系を同一条件で比較した結果。あわせて `model.clip_skip: 2` と
+`model.vae: vaeKlF8Anime2_klF8Anime2VAE.safetensors` を書く)。
+負荷を下げたいときだけ汎用の `anime-soft` (steps 20) へ落とす。
 どのcheckpointにどのpresetを使うかは `ls presets/styles` と
 [配置済みのSD1.5系モデル](../../../docs/prompting-guide.md#配置済みのsd15系モデル)の表で確認する。
 一覧と連結・優先順位の規則は

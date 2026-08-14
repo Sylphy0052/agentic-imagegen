@@ -30,11 +30,13 @@ PROMPTING_GUIDE = PROJECT_ROOT / "docs" / "prompting-guide.md"
 #: 「7前後」と書かれた推奨に対して許容する幅。
 AROUND_TOLERANCE = 0.2
 
-#: sampler / schedulerを配布元の推奨ではなく、同じcheckpointをA1111で運用したときの
-#: 実績設定から採っているstyle preset。実際に生成した絵と突き合わせて選んだ値のため、
-#: 推奨表と食い違っていてよい (経緯は docs/prompting-guide.md の「A1111から設定を移す」)。
-#: cfgとstepsは推奨レンジ内に収める。
-A1111_VERIFIED_STYLES = frozenset({"sd15-anylora", "sd15-meinamix"})
+#: sampler / scheduler / cfg / stepsを配布元の推奨ではなく、実機で生成した絵から選んだ
+#: style preset。推奨表と食い違っていてよい。
+#: sd15-anylora / sd15-meinamix は同じcheckpointをA1111で運用したときの実績設定
+#: (docs/prompting-guide.md の「A1111から設定を移す」)。
+#: sd15-hassaku はSD1.5系9種を同一条件で比較して既定に選んだときの設定
+#: (同「既定のcheckpointを決める」)。
+MEASURED_SETTING_STYLES = frozenset({"sd15-anylora", "sd15-hassaku", "sd15-meinamix"})
 
 
 def _strip_code(cell: str) -> str:
@@ -147,12 +149,14 @@ def test_preset_follows_recommended_settings(row: list[str]) -> None:
     """採用値が配布元・利用者の推奨から外れていないこと。"""
     _checkpoint, _tendency, sampler_cell, steps_cell, cfg_cell, name_cell = row[:6]
     name = _strip_code(name_cell)
+    if name in MEASURED_SETTING_STYLES:
+        return
+
     generation = _load(name).generation
     sampler, scheduler = _split_sampler(sampler_cell)
 
-    if name not in A1111_VERIFIED_STYLES:
-        assert generation.sampler == sampler
-        assert generation.scheduler == scheduler
+    assert generation.sampler == sampler
+    assert generation.scheduler == scheduler
 
     for label, value, cell in (
         ("steps", generation.steps, steps_cell),

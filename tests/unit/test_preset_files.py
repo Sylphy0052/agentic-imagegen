@@ -91,7 +91,6 @@ SHARED_PROMPT_STYLES = frozenset(
         "sd15-cetusmix",
         "sd15-counterfeit",
         "sd15-darksushi",
-        "sd15-hassaku",
         "sd15-perfectdeliberate",
     }
 )
@@ -100,11 +99,19 @@ SHARED_PROMPT_STYLES = frozenset(
 #: sd15-anylora と sd15-meinamix は同じcheckpointをA1111で運用したときの実績プロンプトを
 #: そのまま持ち込む (negative embedding を含む。docs/prompting-guide.md の
 #: 「A1111から設定を移す」を参照)。
+#: sd15-hassaku はcheckpoint未決時の既定として同じ実績プロンプトを使う
+#: (同「既定のcheckpointを決める」)。
 #: sd15-chilloutmix は写実寄りのモデルのため語彙ごと差し替える。
 #: sd15-wai-illustrious はIllustrious系のタグ記法に合わせて very aesthetic を足し、
 #: 代わりに anime coloring を外す。
 DIVERGENT_PROMPT_STYLES = frozenset(
-    {"sd15-anylora", "sd15-chilloutmix", "sd15-meinamix", "sd15-wai-illustrious"}
+    {
+        "sd15-anylora",
+        "sd15-chilloutmix",
+        "sd15-hassaku",
+        "sd15-meinamix",
+        "sd15-wai-illustrious",
+    }
 )
 
 
