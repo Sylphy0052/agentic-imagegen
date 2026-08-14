@@ -93,13 +93,15 @@ SHARED_PROMPT_STYLES = frozenset(
         "sd15-darksushi",
         "sd15-hassaku",
         "sd15-meinamix",
+        "sd15-perfectdeliberate",
     }
 )
 
 #: プロンプトを共有しない理由があるSD1.5系のstyle preset。
 #: sd15-anylora はLoRAの画風と競合させないため品質タグだけに絞る。
 #: sd15-chilloutmix は写実寄りのモデルのため語彙ごと差し替える。
-DIVERGENT_PROMPT_STYLES = frozenset({"sd15-anylora", "sd15-chilloutmix"})
+#: sd15-wai-illustrious はIllustrious系のタグ記法に合わせて very aesthetic を足す。
+DIVERGENT_PROMPT_STYLES = frozenset({"sd15-anylora", "sd15-chilloutmix", "sd15-wai-illustrious"})
 
 
 def _sd15_styles() -> set[str]:
