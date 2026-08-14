@@ -53,6 +53,10 @@ _VERTICAL_ROTATED_CHARS: Final = frozenset(
     "ー〜～−—―‐-（）()「」『』【】〔〕〈〉《》［］[]｛｝{}…‥：；"
 )
 
+#: ルビの文字サイズ。親文字 (layer.size) に対する比率。日本語組版で
+#: 一般的な「親文字の半分」を採る。
+_RUBY_SIZE_RATIO: Final = 0.5
+
 
 @dataclass(frozen=True, slots=True)
 class ResolvedFont:
@@ -79,30 +83,57 @@ class ComposeResult:
 class TextCell:
     """縦書き1列・横書き1行を構成する最小単位。
 
-    通常は1文字=1セルだが、縦中横 (`tate_chu_yoko=True`) では複数文字が
-    1セルへまとまる。折り返し・行間/字送りの計算はすべてセル単位で行うことで、
-    縦中横セルを文字の途中で分割しないようにする。
+    通常は1文字=1セルだが、縦中横 (`tate_chu_yoko=True`) とルビ付き
+    (`ruby` が空でない) では複数文字が1セルへまとまる。折り返しはセル単位で
+    行うことで、縦中横セルやルビの掛かる親文字を途中で分割しないようにする。
+
+    縦中横は複数文字を字送り1つぶんへ収めるのに対し、ルビ付きセルは親文字を
+    1文字ずつ並べたままルビを添えるだけなので、占める字送りの数が異なる
+    (`rows`)。
     """
 
     text: str
     tate_chu_yoko: bool = False
+    ruby: str = ""
+
+    @property
+    def rows(self) -> int:
+        """このセルが占める字送りの数。
+
+        縦中横は何文字でも1セル (字送り1つ) へ収める。それ以外は1文字1字送りで、
+        ルビ付きセルだけが複数文字を持ちうる。
+        """
+        if self.tate_chu_yoko:
+            return 1
+        return len(self.text)
 
 
 def _content_to_cell_paragraphs(content: str | tuple[TextSegment, ...]) -> list[list[TextCell]]:
     """content を段落 (`\\n` 区切り) ごとのセル列へ正規化する。
 
     文字列指定は1文字=1セルとして展開し、既存の縦書き (1文字1セル) の挙動と
-    完全に一致させる。セグメント列指定は `tate_chu_yoko=True` のセグメントを
-    1セグメント=1セルとし、`False` のセグメントは文字列指定と同じく1文字ずつ
-    1セルへ展開したうえで隣接するセグメントを同じ段落として連結する。
+    完全に一致させる。セグメント列指定は `tate_chu_yoko=True` のセグメントと
+    ルビ付きのセグメントを1セグメント=1セルとし、どちらでもないセグメントは
+    文字列指定と同じく1文字ずつ1セルへ展開したうえで隣接するセグメントを
+    同じ段落として連結する。
+
+    ルビ付きセグメントを1セルへまとめるのは、ルビを親文字の全長へ均等割りする
+    ためにその全長を1つの描画単位として持つ必要があるため。改行は domain 側で
+    拒否済みのため、段落を跨ぐ親文字は来ない。
     """
     if isinstance(content, str):
         return [[TextCell(text=char) for char in paragraph] for paragraph in content.split("\n")]
 
     paragraphs: list[list[TextCell]] = [[]]
     for segment in content:
-        if segment.tate_chu_yoko:
-            paragraphs[-1].append(TextCell(text=segment.text, tate_chu_yoko=True))
+        if segment.tate_chu_yoko or segment.ruby is not None:
+            paragraphs[-1].append(
+                TextCell(
+                    text=segment.text,
+                    tate_chu_yoko=segment.tate_chu_yoko,
+                    ruby=segment.ruby or "",
+                )
+            )
             continue
         for index, part in enumerate(segment.text.split("\n")):
             if index > 0:
@@ -391,7 +422,9 @@ def _wrap_layer(
     if layer.direction == "vertical":
         advance = _vertical_advance(layer)
         return _wrap_cell_lines(
-            paragraphs, measure=lambda cells: len(cells) * advance, max_width=limit
+            paragraphs,
+            measure=lambda cells: sum(cell.rows for cell in cells) * advance,
+            max_width=limit,
         )
     return _wrap_cell_lines(
         paragraphs,
@@ -409,14 +442,41 @@ def _vertical_advance(layer: TextLayer) -> int:
     return layer.size
 
 
+def _ruby_size(layer: TextLayer) -> int:
+    """ルビの文字サイズ (px)。"""
+    return max(1, round(layer.size * _RUBY_SIZE_RATIO))
+
+
+def _ruby_band_width(layer: TextLayer, lines: Sequence[list[TextCell]]) -> int:
+    """列幅のうちルビへ充てる帯の幅 (px)。ルビが1つも無ければ 0。
+
+    レイヤ内に1つでもルビがあれば、ルビの付かない列も含めて**全列を一律**で
+    広げる。列ごとに幅を変えると列の間隔が揃わず、縦組みとして読みにくくなる。
+    """
+    if layer.direction != "vertical":
+        return 0
+    if not any(cell.ruby for line in lines for cell in line):
+        return 0
+    return _ruby_size(layer)
+
+
+def _vertical_column_width(layer: TextLayer, lines: Sequence[list[TextCell]]) -> tuple[int, int]:
+    """縦書きの (親文字帯の幅, 列全体の幅) を返す。
+
+    列は右から左へ進み、列の右側がルビ帯になる。
+    """
+    glyph_band = _line_height(layer)
+    return glyph_band, glyph_band + _ruby_band_width(layer, lines)
+
+
 def _block_size(
     layer: TextLayer, font: ImageFont.FreeTypeFont, lines: Sequence[list[TextCell]]
 ) -> tuple[int, int]:
     if layer.direction == "vertical":
-        column_width = _line_height(layer)
-        # rows はセル数 (縦中横セルも1セルとして数える)。tate_chu_yokoの
-        # 有無にかかわらず、同じセル数なら同じ高さになる。
-        rows = max((len(line) for line in lines), default=0)
+        _, column_width = _vertical_column_width(layer, lines)
+        # rows は字送りの数。縦中横セルは何文字でも1、ルビ付きセルは親文字の
+        # 文字数ぶんを数えるため、ルビの有無で列の高さは変わらない。
+        rows = max((sum(cell.rows for cell in line) for line in lines), default=0)
         return column_width * len(lines), _vertical_advance(layer) * rows
 
     width = max(
@@ -544,45 +604,167 @@ def _draw_vertical(
     Pillow は縦書きを持たないため自前で並べる。列は右から左へ進める。
     句読点・小書き文字は右上へ寄せ、長音や括弧などの約物は時計回りに90度回転させ、
     縦中横セル (`tate_chu_yoko=True`) は数文字を横に組んで1セルへ収める
-    (常時適用、GenerationSpec 側にON/OFFの指定はない)。ルビは対象外。
+    (常時適用、GenerationSpec 側にON/OFFの指定はない)。
+
+    ルビ付きセル (`ruby` が空でない) は、親文字を通常どおり1文字ずつ並べたうえで、
+    列の右側のルビ帯へルビを添える。ルビ帯は `_ruby_band_width` が全列一律で
+    確保するため、ルビの有無で列の間隔は変わらない。
     """
-    column_width = _line_height(layer)
+    glyph_band, column_width = _vertical_column_width(layer, lines)
     advance = _vertical_advance(layer)
     for column, line in enumerate(lines):
         x = origin[0] + block[0] - (column + 1) * column_width
-        column_offset = _align_offset(layer.align, block[1], advance * len(line))
-        for index, cell in enumerate(line):
-            y = origin[1] + column_offset + index * advance
-            cell_center = (x + column_width / 2, y + advance / 2)
+        column_offset = _align_offset(
+            layer.align, block[1], advance * sum(cell.rows for cell in line)
+        )
+        row = 0
+        for cell in line:
+            y = origin[1] + column_offset + row * advance
             if cell.tate_chu_yoko:
                 _draw_tate_chu_yoko_cell(
                     canvas,
                     font,
                     cell.text,
-                    cell_center,
-                    column_width,
+                    (x + glyph_band / 2, y + advance / 2),
+                    glyph_band,
                     advance,
                     fill,
                     stroke_width,
                     stroke_fill,
                 )
-                continue
-            char = cell.text
-            if char in _VERTICAL_ROTATED_CHARS:
-                _draw_rotated_vertical_char(
-                    canvas, layer, font, char, cell_center, advance, fill, stroke_width, stroke_fill
+            else:
+                for index, char in enumerate(cell.text):
+                    _draw_vertical_char(
+                        canvas,
+                        draw,
+                        font,
+                        char,
+                        (x, y + index * advance),
+                        band_width=glyph_band,
+                        size=layer.size,
+                        advance=advance,
+                        fill=fill,
+                        stroke_width=stroke_width,
+                        stroke_fill=stroke_fill,
+                    )
+            if cell.ruby:
+                _draw_ruby(
+                    canvas,
+                    draw,
+                    font,
+                    cell.ruby,
+                    layer=layer,
+                    band=(x + glyph_band, column_width - glyph_band),
+                    span=(y, cell.rows * advance),
+                    fill=fill,
+                    stroke_width=stroke_width,
+                    stroke_fill=stroke_fill,
                 )
-                continue
-            centered = (column_width - font.getlength(char)) / 2
-            dx, dy = _vertical_glyph_offset(char, layer.size)
-            draw.text(
-                (x + centered + dx, y + dy),
-                char,
-                font=font,
-                fill=fill,
-                stroke_width=stroke_width,
-                stroke_fill=stroke_fill,
-            )
+            row += cell.rows
+
+
+def _draw_vertical_char(
+    canvas: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    font: ImageFont.FreeTypeFont,
+    char: str,
+    position: tuple[float, float],
+    *,
+    band_width: int,
+    size: int,
+    advance: int,
+    fill: tuple[int, int, int, int],
+    stroke_width: int,
+    stroke_fill: tuple[int, int, int, int] | None,
+) -> None:
+    """縦書きの1文字を、幅 `band_width` の帯の中央へ置く。
+
+    親文字にもルビにも同じ規則 (約物の回転・句読点や小書き文字の位置補正) を
+    当てるため、`size` / `advance` を引数で受けてレイヤのフォントサイズから
+    切り離してある。
+    """
+    x, y = position
+    if char in _VERTICAL_ROTATED_CHARS:
+        _draw_rotated_vertical_char(
+            canvas,
+            font,
+            char,
+            (x + band_width / 2, y + advance / 2),
+            size=size,
+            advance=advance,
+            fill=fill,
+            stroke_width=stroke_width,
+            stroke_fill=stroke_fill,
+        )
+        return
+    centered = (band_width - font.getlength(char)) / 2
+    dx, dy = _vertical_glyph_offset(char, size)
+    draw.text(
+        (x + centered + dx, y + dy),
+        char,
+        font=font,
+        fill=fill,
+        stroke_width=stroke_width,
+        stroke_fill=stroke_fill,
+    )
+
+
+def _draw_ruby(
+    canvas: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    font: ImageFont.FreeTypeFont,
+    ruby: str,
+    *,
+    layer: TextLayer,
+    band: tuple[float, int],
+    span: tuple[float, int],
+    fill: tuple[int, int, int, int],
+    stroke_width: int,
+    stroke_fill: tuple[int, int, int, int] | None,
+) -> None:
+    """親文字の右のルビ帯へ、ルビを縦に並べて描く。
+
+    `band` は (帯の左端x, 帯の幅)、`span` は (親文字の上端y, 親文字の高さ)。
+
+    ルビが親文字の高さへ収まる場合は親文字の全長へ**均等割り**する
+    (JIS X 4051 のモノルビと同じ振り方)。収まらない場合は詰めずに、
+    親文字の前後へ均等に**はみ出す**。同じ列で隣り合うセルにもルビがあると
+    はみ出したぶんが重なりうるが、ルビを詰めて読めなくするよりは良いと判断した。
+    """
+    if not ruby:
+        return
+
+    band_left, band_width = band
+    top, height = span
+    size = _ruby_size(layer)
+    ruby_font = font.font_variant(size=size)
+    # 親文字と同じ比率で縁取りを細くする。親文字ぶんの太さのままでは
+    # 半分の大きさのルビが縁取りで潰れる。
+    ruby_stroke = round(stroke_width * _RUBY_SIZE_RATIO)
+
+    total = len(ruby) * size
+    if total <= height:
+        pitch = height / len(ruby)
+        first_center = top + pitch / 2
+    else:
+        pitch = float(size)
+        first_center = top + height / 2 - total / 2 + size / 2
+
+    for index, char in enumerate(ruby):
+        center = first_center + index * pitch
+        _draw_vertical_char(
+            canvas,
+            draw,
+            ruby_font,
+            char,
+            (band_left, center - size / 2),
+            band_width=band_width,
+            size=size,
+            advance=size,
+            fill=fill,
+            stroke_width=ruby_stroke,
+            stroke_fill=stroke_fill,
+        )
 
 
 def _vertical_glyph_offset(char: str, size: int) -> tuple[float, float]:
@@ -603,10 +785,11 @@ def _vertical_glyph_offset(char: str, size: int) -> tuple[float, float]:
 
 def _draw_rotated_vertical_char(
     canvas: Image.Image,
-    layer: TextLayer,
     font: ImageFont.FreeTypeFont,
     char: str,
     cell_center: tuple[float, float],
+    *,
+    size: int,
     advance: int,
     fill: tuple[int, int, int, int],
     stroke_width: int,
@@ -617,8 +800,10 @@ def _draw_rotated_vertical_char(
     1文字ぶんの正方形タイルへ文字を (stroke込みで) 描き、タイルごと回転してから
     親キャンバスへ合成する。stroke_width / stroke_fill をタイルへ描く段階で
     渡さないと、縁取りだけ回転せず残ってしまう。
+
+    ルビからも呼ぶため、文字サイズはレイヤではなく `size` で受ける。
     """
-    tile_side = layer.size * 2 + stroke_width * 2
+    tile_side = size * 2 + stroke_width * 2
     tile = Image.new("RGBA", (tile_side, tile_side), (0, 0, 0, 0))
     tile_draw = ImageDraw.Draw(tile)
     tile_draw.text(

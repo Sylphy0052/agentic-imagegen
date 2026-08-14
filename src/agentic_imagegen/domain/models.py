@@ -190,6 +190,10 @@ MAX_TEXT_CONTENT_LENGTH: Final = 500
 #: これを超えると1セル分の幅へ収まらず可読性が落ちる。
 MAX_TATE_CHU_YOKO_LENGTH: Final = 4
 
+#: 1セグメントへ添えられるルビの文字数の上限。親文字より長いルビは前後へはみ出す
+#: 組版のため、親文字の長さとは独立に抑える。
+MAX_RUBY_LENGTH: Final = 20
+
 #: フォントサイズの上限。解像度の上限に対して十分大きい。
 MAX_FONT_SIZE: Final = 512
 
@@ -651,20 +655,45 @@ class BoxSpec(_StrictModel):
 
 
 class TextSegment(_StrictModel):
-    """縦中横などセグメント単位で組版を変える場合の1区間。
+    """縦中横・ルビなどセグメント単位で組版を変える場合の1区間。
 
     `TextLayer.content` へ文字列の代わりにこの列を渡すと、`tate_chu_yoko=True` の
-    区間だけ縦書き中で数文字を横に組んで1セルへ収める (「令和7年」の「7」など)。
-    ルビは対象外 (列幅が可変になり別の設計変更が要るため、今回は入れない)。
+    区間だけ縦書き中で数文字を横に組んで1セルへ収め (「令和7年」の「7」など)、
+    `ruby` を持つ区間は親文字の右へ小さい文字を添える (「五月雨」に「さみだれ」など)。
+    どちらも縦書き専用で、`direction: horizontal` では拒否する。
+
+    ルビの文字数は親文字と揃っていなくてよい。短ければ親文字の全長へ均等割りし、
+    長ければ親文字の前後へはみ出す (`services.compose` が担う)。
     """
 
     text: str = Field(min_length=1)
     tate_chu_yoko: bool = False
+    #: 親文字 (`text`) へ添えるルビ。改行は含められない。
+    ruby: Annotated[str, Field(min_length=1, max_length=MAX_RUBY_LENGTH)] | None = None
 
     @field_validator("text")
     @classmethod
     def _reject_control_characters_in_text(cls, value: str) -> str:
         return _reject_control_characters(value)
+
+    @field_validator("ruby")
+    @classmethod
+    def _reject_control_characters_in_ruby(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        # 親文字と違いルビは1行へ収める組版のため、改行も許さない。
+        if "\n" in value:
+            raise ValueError("rubyに改行は含められません")
+        return _reject_control_characters(value)
+
+    @model_validator(mode="after")
+    def _validate_ruby(self) -> TextSegment:
+        if self.ruby is None:
+            return self
+        # 親文字が段落 (列) を跨ぐと、ルビをどちらの列へ添えるかが決まらない。
+        if "\n" in self.text:
+            raise ValueError("rubyを添えるセグメントのtextに改行は含められません")
+        return self
 
     @model_validator(mode="after")
     def _validate_tate_chu_yoko(self) -> TextSegment:
@@ -688,7 +717,7 @@ class TextLayer(_StrictModel):
 
     contentは文字列、またはTextSegmentの並びで指定する。文字列指定は従来どおり
     横書き・縦書きとも1文字1セルとして扱う。セグメント列は縦中横 (`tate_chu_yoko`)
-    を使いたいときだけ使う書き方で、区切り記号を使ったインライン記法
+    やルビ (`ruby`) を使いたいときだけ使う書き方で、区切り記号を使ったインライン記法
     (青空文庫式`｜漢字《かんじ》`等) は採らない。`_VERTICAL_ROTATED_CHARS`が
     区切り記号候補すべてと衝突するため。
     """
@@ -748,6 +777,11 @@ class TextLayer(_StrictModel):
             segment.tate_chu_yoko for segment in self.content
         ):
             raise ValueError("direction: horizontalではtate_chu_yokoを指定できません")
+
+        if self.direction == "horizontal" and any(
+            segment.ruby is not None for segment in self.content
+        ):
+            raise ValueError("direction: horizontalではrubyを指定できません")
 
         return self
 
