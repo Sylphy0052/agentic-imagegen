@@ -148,6 +148,17 @@ class TestSubmitBatch:
         with pytest.raises(InvalidGenerationSpec):
             submit_batch([oversized], settings=settings, project_root=tmp_path, registry=registry)
 
+    def test_requires_backend_factory_when_runner_omitted(
+        self, settings: Settings, tmp_path: Path, registry: JobRegistry[list[BatchOutcome]]
+    ) -> None:
+        """runnerを省略する場合はbackend_factoryが必須になる。
+
+        composition root (mcp_server) は必ずbackend_factoryを渡す契約になっている。
+        両方省略されるのは呼び出し側の配線ミスなので、ジョブにせずここで例外にする。
+        """
+        with pytest.raises(ValueError, match="backend_factory"):
+            submit_batch([VALID_SPEC], settings=settings, project_root=tmp_path, registry=registry)
+
 
 class TestGetBatchStatus:
     async def test_reports_running(

@@ -10,7 +10,6 @@ from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
 from typing import Any
 
-from agentic_imagegen.adapters.comfyui.client import ComfyUIClient
 from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.domain.policy import validate_against_limits
@@ -18,6 +17,7 @@ from agentic_imagegen.domain.results import GenerationResult
 from agentic_imagegen.errors import ImageGenError, InvalidGenerationSpec
 from agentic_imagegen.services.batch import BatchItem, BatchOutcome, BatchRunner, expand_seeds
 from agentic_imagegen.services.batch import run_batch as run_batch_items
+from agentic_imagegen.services.catalog import CatalogBackendFactory, GenerationBackendFactory
 from agentic_imagegen.services.generation import generate
 from agentic_imagegen.services.jobs import JobRegistry, JobStatus
 from agentic_imagegen.services.spec_loader import parse_spec
@@ -32,85 +32,103 @@ def list_workflows() -> list[str]:
     return sorted(ALLOWED_WORKFLOWS)
 
 
-async def list_models(settings: Settings) -> list[str]:
+async def list_models(settings: Settings, *, backend_factory: CatalogBackendFactory) -> list[str]:
     """ComfyUIが持っているcheckpoint名を返す。"""
-    async with ComfyUIClient(settings) as client:
+    async with backend_factory(settings) as client:
         return list(await client.available_checkpoints())
 
 
-async def list_loras(settings: Settings) -> list[str]:
+async def list_loras(settings: Settings, *, backend_factory: CatalogBackendFactory) -> list[str]:
     """ComfyUIが持っているLoRA名を返す。"""
-    async with ComfyUIClient(settings) as client:
+    async with backend_factory(settings) as client:
         return list(await client.available_loras())
 
 
-async def list_controlnets(settings: Settings) -> list[str]:
+async def list_controlnets(
+    settings: Settings, *, backend_factory: CatalogBackendFactory
+) -> list[str]:
     """ComfyUIが持っているControlNetモデル名を返す。"""
-    async with ComfyUIClient(settings) as client:
+    async with backend_factory(settings) as client:
         return list(await client.available_controlnets())
 
 
-async def list_ipadapters(settings: Settings) -> list[str]:
+async def list_ipadapters(
+    settings: Settings, *, backend_factory: CatalogBackendFactory
+) -> list[str]:
     """ComfyUIが持っているIPAdapterモデル名を返す。
 
     カスタムノードが未導入なら空になる。その場合 reference は使えない。
     """
-    async with ComfyUIClient(settings) as client:
+    async with backend_factory(settings) as client:
         return list(await client.available_ipadapters())
 
 
-async def list_clip_visions(settings: Settings) -> list[str]:
+async def list_clip_visions(
+    settings: Settings, *, backend_factory: CatalogBackendFactory
+) -> list[str]:
     """ComfyUIが持っているCLIP Visionモデル名を返す。"""
-    async with ComfyUIClient(settings) as client:
+    async with backend_factory(settings) as client:
         return list(await client.available_clip_visions())
 
 
-async def list_diffusion_models(settings: Settings) -> list[str]:
+async def list_diffusion_models(
+    settings: Settings, *, backend_factory: CatalogBackendFactory
+) -> list[str]:
     """ComfyUIが持っているUNet単体のモデル名を返す。
 
     DiT系モデルはUNetとtext encoder / VAEが別ファイルで、checkpointとは別に置く。
     ここに出る名前を model.unet へ指定する。
     """
-    async with ComfyUIClient(settings) as client:
+    async with backend_factory(settings) as client:
         return list(await client.available_diffusion_models())
 
 
-async def list_text_encoders(settings: Settings) -> list[str]:
+async def list_text_encoders(
+    settings: Settings, *, backend_factory: CatalogBackendFactory
+) -> list[str]:
     """ComfyUIが持っているtext encoder名を返す。model.clip へ指定する。"""
-    async with ComfyUIClient(settings) as client:
+    async with backend_factory(settings) as client:
         return list(await client.available_text_encoders())
 
 
-async def list_vaes(settings: Settings) -> list[str]:
+async def list_vaes(settings: Settings, *, backend_factory: CatalogBackendFactory) -> list[str]:
     """ComfyUIが持っているVAE名を返す。model.vae へ指定する。"""
-    async with ComfyUIClient(settings) as client:
+    async with backend_factory(settings) as client:
         return list(await client.available_vaes())
 
 
-async def list_upscale_models(settings: Settings) -> list[str]:
+async def list_upscale_models(
+    settings: Settings, *, backend_factory: CatalogBackendFactory
+) -> list[str]:
     """ComfyUIが持っているアップスケールモデル名を返す。
 
     generation.upscale.model へ指定する。1つも置いていなければ空になり、
     その場合はlatent拡大 (model未指定) だけが使える。
     """
-    async with ComfyUIClient(settings) as client:
+    async with backend_factory(settings) as client:
         return list(await client.available_upscale_models())
 
 
-async def list_embeddings(settings: Settings) -> list[str]:
+async def list_embeddings(
+    settings: Settings, *, backend_factory: CatalogBackendFactory
+) -> list[str]:
     """ComfyUIが持っているTextual Inversion embedding名 (拡張子なし) を返す。
 
     prompt中の `embedding:<name>` の `<name>` にはここに出る名前だけを指定する。
     """
-    async with ComfyUIClient(settings) as client:
+    async with backend_factory(settings) as client:
         return list(await client.available_embeddings())
 
 
 async def _default_runner(
-    spec: GenerationSpec, *, settings: Settings, project_root: Path
+    spec: GenerationSpec,
+    *,
+    settings: Settings,
+    project_root: Path,
+    backend_factory: GenerationBackendFactory,
 ) -> GenerationResult:
     """実際にComfyUIへ接続して生成する。テストではここを差し替える。"""
-    async with ComfyUIClient(settings) as client:
+    async with backend_factory(settings) as client:
         return await generate(spec, settings, backend=client, project_root=project_root)
 
 
@@ -121,6 +139,7 @@ def submit_generation(
     project_root: Path,
     registry: JobRegistry[GenerationResult],
     runner: Runner | None = None,
+    backend_factory: GenerationBackendFactory | None = None,
 ) -> dict[str, Any]:
     """Specを検証したうえで生成を投入し、job_idを返す。
 
@@ -129,6 +148,10 @@ def submit_generation(
 
     検証はここで済ませる。不正なSpecはジョブにせず例外にすることで、
     「投入はできたが即座に失敗する」状態を作らない。
+
+    runner を省略した場合は backend_factory からバックエンドを開いて生成する
+    (composition root である mcp_server が渡す)。runner を渡すテストでは
+    backend_factory は使わないため省略できる。
     """
     if not isinstance(spec, dict):
         raise InvalidGenerationSpec("Specはマッピングである必要があります")
@@ -136,7 +159,12 @@ def submit_generation(
     parsed = parse_spec(spec, presets_root=settings.presets_root, project_root=project_root)
     validate_against_limits(parsed, settings)
 
-    execute = runner if runner is not None else _default_runner_for(settings, project_root)
+    if runner is not None:
+        execute = runner
+    else:
+        if backend_factory is None:
+            raise ValueError("runner を省略する場合は backend_factory が必要です")
+        execute = _default_runner_for(settings, project_root, backend_factory)
 
     async def factory() -> GenerationResult:
         return await execute(parsed)
@@ -149,9 +177,13 @@ def submit_generation(
     }
 
 
-def _default_runner_for(settings: Settings, project_root: Path) -> Runner:
+def _default_runner_for(
+    settings: Settings, project_root: Path, backend_factory: GenerationBackendFactory
+) -> Runner:
     async def run(spec: GenerationSpec) -> GenerationResult:
-        return await _default_runner(spec, settings=settings, project_root=project_root)
+        return await _default_runner(
+            spec, settings=settings, project_root=project_root, backend_factory=backend_factory
+        )
 
     return run
 
@@ -164,6 +196,7 @@ def submit_batch(
     project_root: Path,
     registry: JobRegistry[list[BatchOutcome]],
     runner: BatchRunner | None = None,
+    backend_factory: GenerationBackendFactory | None = None,
 ) -> dict[str, Any]:
     """複数のSpecを検証したうえで一括生成を投入し、job_idを返す。
 
@@ -171,14 +204,24 @@ def submit_batch(
     1件でも不正なら1件も投入しない。途中まで生成された状態を作らないため。
 
     seedsを指定するとSpecごとに各seedを当てたものへ展開する。
+
+    runner を省略した場合は backend_factory からバックエンドを開いて生成する
+    (composition root である mcp_server が渡す)。runner を渡すテストでは
+    backend_factory は使わないため省略できる。
     """
     items = _batch_items(specs, seeds=seeds, settings=settings, project_root=project_root)
+    if runner is None and backend_factory is None:
+        raise ValueError("runner を省略する場合は backend_factory が必要です")
 
     async def factory() -> list[BatchOutcome]:
         if runner is not None:
             return await run_batch_items(items, runner=runner)
+        if backend_factory is None:
+            # 直前で runner / backend_factory のどちらか一方を必須にしているため、
+            # 通常はここへ到達しない。mypyがNoneを排除できるように明示しておく。
+            raise ValueError("runner を省略する場合は backend_factory が必要です")
         # バッチ全体で1つの接続を使い回す (CLIの batch と同じ扱い)
-        async with ComfyUIClient(settings) as client:
+        async with backend_factory(settings) as client:
 
             async def run(item: BatchItem) -> GenerationResult:
                 return await generate(
