@@ -9,12 +9,9 @@ from typing import Any
 import pytest
 
 from agentic_imagegen.adapters.comfyui.workflow import IMG2IMG_BINDING, build_workflow
-from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.domain.policy import resolve_source_image
-from agentic_imagegen.domain.results import HealthStatus, ImageRef
 from agentic_imagegen.errors import InvalidGenerationSpec, WorkflowValidationError
-from agentic_imagegen.services.generation import generate
 from agentic_imagegen.workflows.injector import load_workflow_template, prepare_workflow
 
 PNG = b"\x89PNG\r\n\x1a\n"
@@ -125,53 +122,7 @@ class TestSourceImagePolicy:
             resolve_source_image("link.png", root, max_bytes=1024)
 
 
-class _FakeBackend:
-    def __init__(self) -> None:
-        self.uploaded: Path | None = None
-        self.submitted: dict[str, Any] | None = None
-
-    async def submit(self, workflow: dict[str, Any]) -> str:
-        self.submitted = workflow
-        return "prompt-1"
-
-    async def wait_for_completion(self, prompt_id: str, *, timeout: float | None = None) -> None:
-        return None
-
-    async def fetch_outputs(self, prompt_id: str) -> tuple[ImageRef, ...]:
-        return (ImageRef(filename="out.png", subfolder="", type="output"),)
-
-    async def download(self, ref: ImageRef) -> bytes:
-        return PNG
-
-    async def health(self) -> HealthStatus:
-        return HealthStatus(base_url="http://127.0.0.1:8188", comfyui_version="0.32.0", devices=())
-
-    async def upload_image(self, path: Path) -> str:
-        self.uploaded = path
-        return f"imagegen_test_{path.name}"
-
-
-async def test_generate_uploads_source_image(tmp_path: Path) -> None:
-    (tmp_path / "inputs").mkdir()
-    (tmp_path / "inputs" / "ref.png").write_bytes(PNG)
-    backend = _FakeBackend()
-    settings = Settings(
-        comfyui_base_url="http://127.0.0.1:8188",
-        max_width=2048,
-        max_height=2048,
-        max_pixels=4194304,
-        max_batch=4,
-        timeout_seconds=30,
-        output_root=Path("outputs"),
-    )
-
-    result = await generate(_spec(), settings, backend=backend, project_root=tmp_path)
-
-    assert backend.uploaded == (tmp_path / "inputs" / "ref.png").resolve()
-    assert backend.submitted is not None
-    load_image = IMG2IMG_BINDING.nodes["source_image"].node_id
-    assert backend.submitted[load_image]["inputs"]["image"] == "imagegen_test_ref.png"
-
-    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
-    assert metadata["workflow"] == "img2img"
-    assert metadata["spec"]["source"]["denoise"] == 0.45
+#: generate() を介したソース画像アップロード〜Workflow投入までの結線は
+#: ComfyUIアダプタの責務へ移った (Issue #31)。
+#: 対応するテストは tests/unit/test_comfyui_execute.py の
+#: test_execute_uploads_source_image_and_injects_it_into_workflow を参照。

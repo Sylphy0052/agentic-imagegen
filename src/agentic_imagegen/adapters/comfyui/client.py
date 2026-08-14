@@ -22,6 +22,13 @@ import websockets
 from websockets.exceptions import WebSocketException
 
 from agentic_imagegen.config import Settings
+from agentic_imagegen.domain.embeddings import (
+    extract_embedding_names,
+    extract_unresolvable_embedding_refs,
+    strip_embedding_extension,
+)
+from agentic_imagegen.domain.models import GenerationSpec
+from agentic_imagegen.domain.policy import resolve_source_image
 from agentic_imagegen.domain.results import HealthStatus, ImageRef
 from agentic_imagegen.errors import (
     ComfyUIUnavailable,
@@ -31,6 +38,8 @@ from agentic_imagegen.errors import (
     OutputNotFound,
     WorkflowSubmissionError,
 )
+from agentic_imagegen.services.generation import BackendOutput
+from agentic_imagegen.workflows.injector import prepare_workflow
 
 logger: Final = logging.getLogger(__name__)
 
@@ -71,6 +80,7 @@ class ComfyUIClient:
         settings: Settings,
         *,
         transport: httpx.AsyncBaseTransport | None = None,
+        workflows_dir: Path | None = None,
     ) -> None:
         self._settings = settings
         self._base_url = settings.comfyui_base_url.rstrip("/")
@@ -80,6 +90,9 @@ class ComfyUIClient:
             timeout=httpx.Timeout(settings.timeout_seconds),
             transport=transport,
         )
+        # 実運用では常にNoneで、Workflowテンプレート同梱ディレクトリを使う。
+        # テストで実テンプレートに依存しないFixtureへ差し替えるための拡張点。
+        self._workflows_dir = workflows_dir
 
     @property
     def base_url(self) -> str:
@@ -125,6 +138,141 @@ class ComfyUIClient:
 
         logger.debug("ComfyUI health ok: url=%s version=%s", self._base_url, version)
         return HealthStatus(base_url=self._base_url, comfyui_version=version, devices=devices)
+
+    async def execute(
+        self, spec: GenerationSpec, *, project_root: Path, timeout: float | None = None
+    ) -> BackendOutput:
+        """Specに従ってComfyUI上で画像を生成し、結果をバイト列として返す。
+
+        services.generation.generate() から GenerationBackend Protocol越しに呼ばれる。
+        ComfyUIの非同期キュー前提の段取り (embedding検証・入力画像アップロード・
+        Workflow組み立て・投入・実行監視・出力取得) をすべてここへ閉じ込め、
+        呼び出し元へはバックエンドに依存しない結果だけを返す。
+        """
+        await self._validate_embeddings(spec)
+
+        source_image_name = await self._upload_spec_image(
+            spec.source.image if spec.source is not None else None,
+            project_root,
+            label="source",
+        )
+        control_image_name = await self._upload_spec_image(
+            spec.control.image if spec.control is not None else None,
+            project_root,
+            label="control",
+        )
+        reference_image_name = await self._upload_spec_image(
+            spec.reference.image if spec.reference is not None else None,
+            project_root,
+            label="reference",
+        )
+        prepared = prepare_workflow(
+            spec,
+            workflows_dir=self._workflows_dir,
+            project_root=project_root,
+            source_image_name=source_image_name,
+            control_image_name=control_image_name,
+            reference_image_name=reference_image_name,
+        )
+        logger.info(
+            "generation start: workflow=%s prefix=%s seed=%s",
+            prepared.workflow_name,
+            spec.output.prefix,
+            prepared.seed,
+        )
+
+        prompt_id = await self.submit(prepared.workflow)
+        await self.wait_for_completion(prompt_id, timeout=timeout)
+        refs = await self.fetch_outputs(prompt_id)
+
+        images = tuple([await self.download(ref) for ref in refs])
+        suffixes = tuple(Path(ref.filename).suffix or ".png" for ref in refs)
+
+        backend_info = await self._collect_backend_info()
+
+        return BackendOutput(
+            images=images,
+            seed=prepared.seed,
+            request_id=prompt_id,
+            info={
+                "workflow": prepared.workflow_name,
+                "workflow_hash": prepared.template_hash,
+                "backend": backend_info,
+            },
+            suffixes=suffixes,
+        )
+
+    async def _validate_embeddings(self, spec: GenerationSpec) -> None:
+        """promptで参照しているembeddingがComfyUIに実在するか検証する。
+
+        ComfyUI自身は未配置のembeddingを見つけても例外を出さず、警告ログを残して
+        黙って無視するだけ (生成そのものは成功するがembeddingは効かない)。
+        それではユーザーが気づけないため、投入前にここで検出する。
+
+        prompt中に `embedding:` 記法が無ければComfyUIへ問い合わせない
+        (無駄な往復を避ける)。
+        """
+        unresolvable = extract_unresolvable_embedding_refs(
+            spec.prompt.positive, spec.prompt.negative
+        )
+        if unresolvable:
+            raise InvalidGenerationSpec(
+                "ComfyUIが解決しない書き方のembedding参照があります: "
+                f"{', '.join(unresolvable)} "
+                "(embedding: の直前に空白が要ります。"
+                "`1girl,embedding:name` ではなく `1girl, embedding:name` と書きます)"
+            )
+
+        referenced = extract_embedding_names(spec.prompt.positive, spec.prompt.negative)
+        if not referenced:
+            return
+
+        available = set(await self.available_embeddings())
+        missing = [name for name in referenced if strip_embedding_extension(name) not in available]
+        if missing:
+            raise InvalidGenerationSpec(
+                "未配置のembeddingが指定されています: "
+                f"{', '.join(missing)} "
+                f"(配置済み: {', '.join(sorted(available)) if available else 'なし'})"
+            )
+
+    async def _upload_spec_image(
+        self, relative_path: str | None, project_root: Path, *, label: str
+    ) -> str | None:
+        """入力画像を検証し、ComfyUIへアップロードして参照名を返す。
+
+        LoadImageが参照できるのはComfyUIのinput配下だけなので、リポジトリ内の画像は
+        そのままでは使えない。img2imgの入力画像・ControlNetのcontrol画像・
+        IPAdapterの参照画像で共通の手順。
+        """
+        if relative_path is None:
+            return None
+
+        path = resolve_source_image(
+            relative_path, project_root, max_bytes=self._settings.max_source_bytes
+        )
+        try:
+            name = await self.upload_image(path)
+        except InvalidGenerationSpec as exc:
+            # upload_imageはファイル名しか知らない。どのフィールドの指定だったかはここで補う
+            raise InvalidGenerationSpec(f"{label}.image を読み込めません: {relative_path}") from exc
+        logger.info("%s image uploaded: %s -> %s", label, relative_path, name)
+        return name
+
+    async def _collect_backend_info(self) -> dict[str, Any] | None:
+        """metadataへ残す実行基盤の情報を集める。
+
+        ここでの失敗は生成そのものを巻き戻す理由にならない (画像は既に取得済み)。
+        記録を諦めるだけにして、理由はログへ残す。
+        """
+        try:
+            status = await self.health()
+        except Exception:
+            logger.warning(
+                "実行基盤の情報を取得できませんでした。metadataへは記録しません", exc_info=True
+            )
+            return None
+        return {"comfyui_version": status.comfyui_version, "devices": list(status.devices)}
 
     async def available_checkpoints(self) -> tuple[str, ...]:
         """利用可能なcheckpoint名の一覧を取得する。
