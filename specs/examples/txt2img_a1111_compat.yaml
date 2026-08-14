@@ -1,0 +1,42 @@
+# A1111 (Stable Diffusion web UI) の実運用設定へ揃えたtxt2img。
+#
+# style presetには prompt と generation しか書けないため、絵柄を決める残りの3つ
+# (clip_skip / 外部VAE / hires fix) をSpec側で指定する。この3つを省くと
+# 同じcheckpointでも絵柄が変わる。経緯は docs/prompting-guide.md の
+# 「A1111から設定を移す」を参照。
+#
+# 同じseedを指定してもA1111と同じ構図にはならない。初期ノイズをA1111はCPUで、
+# ComfyUIはGPUで作るため、ノイズのパターン自体が別物になる。揃うのは絵柄まで。
+
+version: "1"
+task: txt2img
+
+presets:
+  style: sd15-meinamix
+
+prompt:
+  positive: >
+    1girl, solo, standing, full body, looking at viewer,
+    brown hair, high ponytail, brown eyes,
+    sports bra, black leggings, running shoes,
+    smile, dynamic pose, simple white background
+
+generation:
+  width: 512
+  height: 768
+  seed: -1
+  upscale:
+    model: RealESRGAN_x4plus_anime_6B.pth
+    model_scale: 4.0
+    scale: 2.0
+    denoise: 0.65
+    steps: 20
+    method: lanczos
+
+model:
+  checkpoint: meinamix_v12Final.safetensors
+  clip_skip: 2
+  vae: vaeKlF8Anime2_klF8Anime2VAE.safetensors
+
+output:
+  prefix: a1111_compat

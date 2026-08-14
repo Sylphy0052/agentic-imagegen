@@ -3,24 +3,36 @@
 # 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
 # 照明はシーンの一部としてscene側で指定する。
 #
-# 配布元・利用者が挙げている推奨は steps 20-60 / cfg 4-9 / dpmpp_2m + karras
-# (一覧は docs/prompting-guide.md の「配置済みのSD1.5系モデル」)。
-# 幅が広いモデルのため、CPU / XPU推論の所要時間を踏まえて steps 30 / cfg 6.5 を既定にした。
-# プロンプトが短くてもまとまる性質があり、品質タグを積み増す必要は薄い。
+# 値の出どころは、同じcheckpoint (sha256先頭10桁 a5e5a941a3) をA1111 v1.10.1で
+# 運用したときの実績設定 (生成画像のPNG infoから復元)。配布元が挙げる推奨域
+# (steps 20-60 / cfg 4-9) の中に収まっている。
+#
+# sampler に dpmpp_2m_sde を選んでいるため、steps を 20 より下げない。
+# SDE系は低stepsで収束せず絵が破綻する。低負荷で流したいときは
+# Spec側で sampler: euler_ancestral などへ上書きする。
+#
+# このpresetだけでは絵柄は揃わない。preset に書けるのは prompt と generation だけで、
+# 次の3つはSpec側に書く必要がある (書き方は docs/prompting-guide.md の
+# 「A1111から設定を移す」を参照)。
+#   model.clip_skip: 2
+#   model.vae: vaeKlF8Anime2_klF8Anime2VAE.safetensors
+#   generation.upscale: RealESRGAN_x4plus_anime_6B.pth / scale 2.0 / denoise 0.65 / steps 20
 
-description: meinamix向けのアニメ調。短いプロンプトでもまとまる既定設定
+description: meinamix向けのアニメ調。A1111での実績設定を持ち込んだ既定
 
 prompt:
   positive: >
-    masterpiece, best quality, absurdres, highres, anime coloring
+    masterpiece, best quality, ultra-detailed, highres
 
   negative: >
-    worst quality, low quality, lowres, bad anatomy, bad hands, extra digits,
-    blurry, jpeg artifacts, text, watermark, signature, monochrome, sketch, 3d,
-    multiple views
+    embedding:negativeXL_D, nsfw, super deformed, bad anatomy, bad hands,
+    extra fingers, worst quality, low quality, normal quality, lowres, blurry,
+    jpeg artifacts, watermark, text, logo, signature, speech bubble, 3d,
+    photorealistic, harsh lighting, lens flare, film grain, realistic,
+    monochrome, censored, multiple views
 
 generation:
-  sampler: dpmpp_2m
-  scheduler: karras
-  cfg: 6.5
+  sampler: dpmpp_2m_sde
+  scheduler: exponential
+  cfg: 7.0
   steps: 30

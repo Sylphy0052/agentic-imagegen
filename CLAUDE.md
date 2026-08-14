@@ -75,6 +75,7 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
 | [txt2img_sdxl.yaml](specs/examples/txt2img_sdxl.yaml) | SDXL / Illustrious系のcheckpointを使う場合 |
 | [txt2img_anima.yaml](specs/examples/txt2img_anima.yaml) | DiT系モデル (Anima) を使う場合 |
 | [text_overlay.yaml](specs/examples/text_overlay.yaml) | 生成後に日本語テキストを合成する場合 |
+| [txt2img_a1111_compat.yaml](specs/examples/txt2img_a1111_compat.yaml) | A1111での設定 (clip skip・外部VAE・hires fix) を写して絵柄を揃える場合 |
 
 モデルごとにプロンプトの書き方が違う (タグ語彙・語順・重み付けの効き方・品質タグの記法)。
 どのモデルで何を書くかは [docs/prompting-guide.md](docs/prompting-guide.md) を参照する。

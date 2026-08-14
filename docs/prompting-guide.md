@@ -72,6 +72,9 @@ Specの書き方そのものは [spec-reference.md](spec-reference.md)、失敗�
 
 style presetはこの表の値を持っているため、checkpointに合うものを選べば
 sampler / scheduler / cfg / stepsをSpec側で書き直す必要はない。
+ただし `sd15-meinamix` と `sd15-anylora` の2つだけは表の値ではなく、同じcheckpointを
+A1111で運用したときの実績設定 (`dpmpp_2m_sde` / `exponential` / cfg 7.0 / steps 30) を持つ。
+経緯は後述の[A1111から設定を移す](#a1111から設定を移す)を参照。
 
 - **cfgの実用域はモデルごとに違う。** `counterfeitV30` の8-10と `cetusMix` の4-8では、
   同じ7でも意味が変わる。別のcheckpointのstyle presetを流用するときはcfgとstepsを見直す
@@ -97,9 +100,12 @@ sampler / scheduler / cfg / stepsをSpec側で書き直す必要はない。
   1のままでも破綻はしないが、配布元のサンプル画像へ絵柄を寄せたい場合は差が出る
 - **外部VAEの差し替えを前提にするモデルが多い。** `model.vae` へファイル名を書くと
   checkpoint同梱のVAEの代わりに使う ([model](spec-reference.md#model))。
-  配置済みは `kl-f8-anime2.ckpt` と `vae-ft-mse-840000-ema-pruned.safetensors` で、
-  実在するものは `list_vaes` で確認する。
-  `anylora` はVAEを焼き込み済みのため差し替え不要
+  配置済みは `vaeKlF8Anime2_klF8Anime2VAE.safetensors` / `kl-f8-anime2.ckpt` /
+  `vae-ft-mse-840000-ema-pruned.safetensors` で、実在するものは `list_vaes` で確認する。
+  アニメ調のSD1.5系には `vaeKlF8Anime2_klF8Anime2VAE.safetensors` を使う
+  (`kl-f8-anime2.ckpt` は同名を騙る別ファイル。後述の[A1111から設定を移す](#a1111から設定を移す)を参照)。
+  `anylora` はVAEを焼き込み済みのため差し替えなくても動くが、
+  焼き込み済みのVAEと外部VAEでは彩度と線の締まりが変わる
 - **hires fixのアップスケーラは `R-ESRGAN 4x+Anime6B` が定番。**
   `generation.upscale.model` へ `RealESRGAN_x4plus_anime_6B.pth` を指定する
   ([generation.upscale](spec-reference.md#generationupscale-hires-fix))
@@ -287,6 +293,77 @@ preset本体は [presets/styles/sdxl-illustrious.yaml](../presets/styles/sdxl-il
 
 Anima向けのstyle presetは [presets/styles/anima-base.yaml](../presets/styles/anima-base.yaml)
 にある。
+
+## A1111から設定を移す
+
+A1111 (Stable Diffusion web UI) で気に入った絵ができているなら、その設定をSpecへ写せば
+同じ絵柄を再現できる。実際に4枚の生成画像から設定を復元し、絵柄が一致するところまで
+確認した手順を残す。
+
+### 生成画像から設定を読む
+
+A1111はPNGのテキストチャンクへ生成パラメータを丸ごと書き込む。
+
+```bash
+python3 -c "from PIL import Image; print(Image.open('inputs/ref.png').info['parameters'])"
+```
+
+読めるのは positive / negative / Steps / Sampler / Schedule type / CFG scale / Seed / Size /
+Model hash / Model / VAE hash / VAE / Denoising strength / Clip skip / Hires系の各値、
+それにA1111のVersion。ここに無い項目は既定値だったということ。
+
+- **LoRA・ADetailer・ControlNetを使っていれば必ず記録される。** 記載が無ければ使っていない
+- **`RNG` と `ENSD` が無ければ既定値。** 設定を変えた場合だけ書き込まれる
+- **Hires系の値 (`Hires upscale` / `Hires steps` / `Hires upscaler`) が無ければhires fixは未使用**
+
+### モデルの同一性をハッシュで確かめる
+
+同じファイル名でも中身が違うことがある。A1111が記録する `Model hash` / `VAE hash` は
+AutoV2 (ファイル全体のsha256の先頭10桁) のため、手元のファイルと直接照合できる。
+
+```bash
+sha256sum ~/ComfyUI/models/vae/*.safetensors | cut -c1-10
+```
+
+一致しなければ別のファイル。civitaiは
+`https://civitai.com/api/v1/model-versions/by-hash/<sha256先頭10桁>` でハッシュから
+元のファイルを引けるため、そこから正しいものを落とす。
+
+実例として、手元の `kl-f8-anime2.ckpt` (`df3c506e51`) は参考画像が使っていた
+`vaeKlF8Anime2_klF8Anime2VAE.safetensors` (`b8821a5d58`) とは別のファイルだった。
+名前が同じ系統でも中身が違い、これが絵柄の差の主因だった。
+
+### Specへ写す
+
+sampler / scheduler / cfg / steps とプロンプトはstyle presetへ入れられる。
+残りの3つはpresetに書く場所が無いため、Spec側に書く。
+
+| A1111の項目 | Specの書き場所 |
+| --- | --- |
+| Sampler / Schedule type / CFG scale / Steps | style presetの `generation` (またはSpecの `generation`) |
+| Clip skip | `model.clip_skip` |
+| VAE | `model.vae` |
+| Hires upscaler / upscale / steps / Denoising strength | `generation.upscale` |
+
+`model.clip_skip` を省くと1相当になり、2を前提にしたアニメ系モデルでは絵柄が変わる。
+書き方をまとめた例は
+[specs/examples/txt2img_a1111_compat.yaml](../specs/examples/txt2img_a1111_compat.yaml) にある。
+
+Textual Inversionのnegative embedding (`negativeXL_D` など) は
+プロンプト中へ `embedding:negativeXL_D` と書く
+(前述の[Textual Inversion embedding](#textual-inversion-embedding)を参照)。
+
+### 揃うものと揃わないもの
+
+上をすべて合わせると絵柄・塗り・線は一致する。構図とポーズは同じseedでも一致しない。
+
+- **初期ノイズの生成器が違う。** A1111はCPU、ComfyUIはGPUでノイズを作るため、
+  同じseedでもノイズのパターン自体が別物になる
+- **プロンプトの重み付けの正規化方式が違う。** `(word:1.2)` の効き方が完全には一致しない
+- **75トークンを超えた分の連結方法が違う。** 長いプロンプトほど差が出る
+
+構図まで含めて同じ絵が要るなら、A1111側の出力をそのまま使う。
+ComfyUI側では絵柄を合わせたうえでseedを振り直し、好みの構図を選び直す。
 
 ## ComfyUI workflowのベストプラクティス
 

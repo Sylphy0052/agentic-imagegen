@@ -158,10 +158,10 @@ SD1.5系は配置済みのcheckpointごとに1つ用意してある。SDXL系は
 
 | style preset | 対象 | sampler / scheduler | cfg | steps |
 | --- | --- | --- | --- | --- |
-| `sd15-meinamix` | `meinamix_v12Final` | `dpmpp_2m` / `karras` | 6.5 | 30 |
+| `sd15-meinamix` | `meinamix_v12Final` | `dpmpp_2m_sde` / `exponential` | 7.0 | 30 |
 | `sd15-counterfeit` | `counterfeitV30_v30` | `dpmpp_2m` / `karras` | 9.0 | 25 |
 | `sd15-aom3` | `abyssorangemix3AOM3_aom3a1b` | `dpmpp_sde` / `karras` | 7.0 | 25 |
-| `sd15-anylora` | `anyloraCheckpoint_bakedvaeBlessedFp16` | `dpmpp_2m` / `karras` | 7.0 | 25 |
+| `sd15-anylora` | `anyloraCheckpoint_bakedvaeBlessedFp16` | `dpmpp_2m_sde` / `exponential` | 7.0 | 30 |
 | `sd15-cetusmix` | `cetusMix_Whalefall2` | `dpmpp_2m` / `karras` | 6.0 | 24 |
 | `sd15-darksushi` | `darkSushiMixMix_225D` | `dpmpp_sde` / `karras` | 7.5 | 30 |
 | `sd15-hassaku` | `hassakuSD15_v13` | `ddim` / `normal` | 8.0 | 20 |
