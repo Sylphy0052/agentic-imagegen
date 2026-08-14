@@ -694,16 +694,20 @@ uv run imagegen compose inputs/base.png specs/generated/caption.yaml -o outputs/
 | `prefix` | string | `imagegen` | 出力ディレクトリ名の接頭辞。英数字始まりの`[A-Za-z0-9._-]`のみ |
 
 出力先が作業ルートの外を指す場合は拒否する。
-実際の出力は`<directory>/<YYYY-MM-DD>/<prefix>/`配下で、同じ日に同じprefixで再実行した場合は
-連番ディレクトリを作り既存の結果を上書きしない。
+実際の出力は`<directory>/<YYYY-MM-DD>/<HHMMSS>_<prefix>/`配下で、
+ディレクトリ名の先頭に実行時刻が付く。同じprefixで何度も試したときに、
+名前順がそのまま試した順になる。同じ秒に再実行した場合は連番ディレクトリを作り、
+既存の結果を上書きしない。
 
 ```text
 outputs/
 └── 2026-08-12/
-    └── blue_hair/
-        ├── image_0001.png
-        ├── image_0001_text.png   # text を指定した場合のみ
-        └── metadata.json
+    ├── 143052_blue_hair/
+    │   ├── image_0001.png
+    │   ├── image_0001_text.png   # text を指定した場合のみ
+    │   └── metadata.json
+    └── 143118_blue_hair/         # 同じprefixで撮り直した結果
+        └── ...
 ```
 
 ### metadata.json

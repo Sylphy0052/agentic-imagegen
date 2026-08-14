@@ -52,7 +52,7 @@ output:
 ### 2. 基準画像を `inputs/` へ置く
 
 ```bash
-cp outputs/<日付>/consistency_base/image_0001.png inputs/character.png
+cp outputs/<日付>/<時刻>_consistency_base/image_0001.png inputs/character.png
 ```
 
 ### 3. scene presetだけ差し替えて生成する

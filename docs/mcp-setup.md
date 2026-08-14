@@ -99,8 +99,8 @@ get_generation_status(job_id)
   -> {"status": "running", ...}
   -> {"status": "completed",
       "seed": 24680,
-      "files": ["outputs/2026-08-12/sample/image_0001.png"],
-      "metadata_path": "outputs/2026-08-12/sample/metadata.json",
+      "files": ["outputs/2026-08-12/143052_sample/image_0001.png"],
+      "metadata_path": "outputs/2026-08-12/143052_sample/metadata.json",
       "error": null, "exit_code": null}
 ```
 
