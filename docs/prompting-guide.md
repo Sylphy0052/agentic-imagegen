@@ -181,6 +181,36 @@ A1111 / Forgeでは品質タグを先頭へ置く書き方が通例だが、pres
 組み合わせた例は
 [specs/examples/txt2img_hires.yaml](../specs/examples/txt2img_hires.yaml) にある。
 
+### 指定した色と丈を出す
+
+「白のセーラー服に紺のプリーツスカート」のように服の色を指定すると、色が隣のアイテムへ
+流れる。SD1.5系は色語をアイテムへ結び付けきれないため、書き方で押さえる。
+以下は hassakuSD15_v13 / 512x768 -> hires x2.0 / seed 4本で確認した結果
+(2026-08-15)。
+
+- **色とアイテムを1タグにまとめ、重みを付ける。** `navy, pleated skirt` ではなく
+  `(navy pleated skirt:1.3)` と書く。色を独立したタグに置くと、その色が画面全体へ回る
+- **重みは1.2-1.4に収める。** 1.5を超えると形のほうが崩れる。押さえたい順に強くする
+  (最も流れやすいものを1.4、確実に出ているものは無指定でよい)
+- **同じ色語を何度も書かない。** 白を4箇所 (`white sailor uniform` / `white shirt` /
+  `white knee socks` / `white loafers`) に書くと白が過剰になり、他のアイテムの色を侵食する。
+  上位のタグ1つへ集約するか、重みの弱いものから色を落とす。
+  重複を減らすと、水色の髪が紺へ寄る崩れと水色のスカーフが濃紺化する崩れは消えた。
+  代わりに白の指定が弱まり、seed 4本のうち1本で白のセーラー服が紺になった。
+  色語を減らすほど良いのではなく、押さえたい色ごとに重みで序列を付ける
+- **誤って出る色をnegativeへ名指しする。** `white skirt, light blue skirt,
+  dark blue neckerchief, dark blue hair` のように、実際に出てしまった色をそのまま書く。
+  「起きうる誤り」を先回りで並べるのではなく、生成した絵を見てから足す
+- **丈はnegativeで決める。** `white knee socks` と書いても太もも丈になるため、
+  `thighhighs, over-knee socks` をnegativeへ入れる。この2語で膝下丈に固定できた
+
+**1枚で判定しない。** 色の命中はseedごとに揺れる。seedを4本振って
+`batch --seeds` で流し、何本命中したかで書き方を比べる。
+上記の対策をすべて入れても4本全部は揃わない。実測では靴下の丈と靴の色は4/4、
+上衣・スカート・スカーフの色は各3/4で、外れるseedが要素ごとに違った。
+確実に固定したい場合はプロンプトではなくキャラクタLoRAかIPAdapterを使う
+([character-consistency.md](../.claude/skills/imagegen/references/character-consistency.md))。
+
 ### hires fixの値
 
 512x768で構図を作り、`upscale.scale: 2.0`で1024x1536へ引き上げるのがSD1.5系の定番。
