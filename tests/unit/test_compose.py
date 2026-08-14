@@ -1107,3 +1107,211 @@ class TestComposeTextTateChuYoko:
         # 字形は ascender から descender まで 1em ぶんの高さを持つ。切れていれば
         # タイルに収まる分 (descender の食み出し分) だけ低くなる。
         assert (box[3] - box[1]) >= self.SIZE
+
+
+class TestComposeTextRuby:
+    """Issue #40 第3段: ルビ (`TextSegment.ruby`)。
+
+    縦中横と違い、ルビは列の幅を変える。レイヤ内に1つでもルビがあれば
+    **全列を一律で** ルビ帯のぶん広げ、列の間隔が揃うようにする。
+    親文字より短いルビは親文字の全長へ均等割りし、長いルビは親文字の
+    前後へはみ出す。
+    """
+
+    SIZE = 64
+
+    def _resolved(self, fonts_root: Path) -> compose_module.ResolvedFont:
+        return compose_module.ResolvedFont(name="test.ttf", path=fonts_root / "test.ttf", index=0)
+
+    def _block(self, layer: TextLayer, fonts_root: Path) -> tuple[int, int]:
+        font = compose_module._load_font(self._resolved(fonts_root), layer.size)
+        lines = compose_module._wrap_layer(layer, font, CANVAS)
+        return compose_module._block_size(layer, font, lines)
+
+    def _layer(self, **overrides: object) -> TextLayer:
+        base: dict[str, object] = {
+            "content": "雨",
+            "font": "test.ttf",
+            "size": self.SIZE,
+            "color": "#ff0000",
+            "direction": "vertical",
+            "anchor": "top-left",
+        }
+        base.update(overrides)
+        return TextLayer.model_validate(base)
+
+    def _glyph_band(self) -> int:
+        return round(self.SIZE * 1.2)  # _line_height と同じ計算 (line_spacing既定1.2)
+
+    def _ruby_band(self) -> int:
+        return round(self.SIZE * compose_module._RUBY_SIZE_RATIO)
+
+    def test_ruby_widens_every_column_uniformly(self, fonts_root: Path) -> None:
+        # ルビの付かない列も同じ幅になること (列の間隔を揃えるため)。
+        # 前後の空白は str_strip_whitespace で落ちるため、改行はセグメントの
+        # 途中へ置いて2列にする。
+        plain = self._layer(content=[{"text": "雨"}, {"text": "の\n夜"}])
+        ruby = self._layer(content=[{"text": "雨", "ruby": "あめ"}, {"text": "の\n夜"}])
+
+        plain_width, _ = self._block(plain, fonts_root)
+        ruby_width, _ = self._block(ruby, fonts_root)
+
+        assert plain_width == self._glyph_band() * 2
+        assert ruby_width == (self._glyph_band() + self._ruby_band()) * 2
+
+    def test_ruby_does_not_change_column_height(self, fonts_root: Path) -> None:
+        # 親文字1文字は1セル。ルビの有無・長さで字送りの数は変わらない。
+        plain = self._layer(content="五月雨")
+        ruby = self._layer(content=[{"text": "五月雨", "ruby": "さみだれ"}])
+
+        assert self._block(plain, fonts_root)[1] == self._block(ruby, fonts_root)[1]
+
+    def test_segment_content_without_ruby_keeps_previous_block_size(self, fonts_root: Path) -> None:
+        # ルビを1つも使わなければ列幅は従来のまま (後方互換の回帰テスト)。
+        plain = self._layer(content="五月雨")
+        segments = self._layer(content=[{"text": "五月"}, {"text": "雨"}])
+
+        assert self._block(plain, fonts_root) == self._block(segments, fonts_root)
+
+    def test_ruby_is_drawn_in_the_band_right_of_the_parent_glyphs(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        output = base_image.parent / "out.png"
+
+        compose_text(
+            image=base_image,
+            spec=_spec(
+                content=[{"text": "五月雨", "ruby": "さみだれ"}],
+                direction="vertical",
+                anchor="top-left",
+                size=self.SIZE,
+            ),
+            fonts_root=fonts_root,
+            output=output,
+        )
+
+        # 1列だけなので、列の左側が親文字帯・右側がルビ帯になる。
+        band = _column_bounding_box(
+            output, self._glyph_band(), self._glyph_band() + self._ruby_band()
+        )
+        assert band is not None
+
+    def test_short_ruby_is_distributed_over_the_parent_span(
+        self, base_image: Path, fonts_root: Path
+    ) -> None:
+        # 親3文字にルビ2文字。均等割りでは親文字の全長へ等間隔に散るため、
+        # ルビ帯の描画は親文字の範囲へ収まり、かつ先頭へ寄らない。
+        output = base_image.parent / "out.png"
+
+        compose_text(
+            image=base_image,
+            spec=_spec(
+                content=[{"text": "五月雨", "ruby": "さめ"}],
+                direction="vertical",
+                anchor="top-left",
+                size=self.SIZE,
+            ),
+            fonts_root=fonts_root,
+            output=output,
+        )
+
+        parent = _column_bounding_box(output, 0, self._glyph_band())
+        ruby = _column_bounding_box(
+            output, self._glyph_band(), self._glyph_band() + self._ruby_band()
+        )
+        assert parent is not None
+        assert ruby is not None
+        span = self.SIZE * 3
+        # 頭揃えなら上端は親文字と揃う。均等割りでは1文字目の中心が span/4 に来るため、
+        # ルビの上端は親文字の上端より下がる。
+        assert ruby[1] > parent[1]
+        # 2文字目の中心は span*3/4。ルビの下端も親文字の範囲へ収まる。
+        assert ruby[3] < parent[1] + span
+
+    def test_long_ruby_overflows_the_parent_span(self, base_image: Path, fonts_root: Path) -> None:
+        # 親1文字にルビ5文字。詰めずに前後へはみ出す。
+        output = base_image.parent / "out.png"
+
+        compose_text(
+            image=base_image,
+            spec=_spec(
+                content=[{"text": "廛", "ruby": "ちゃぶだい"}],
+                direction="vertical",
+                anchor="center",
+                size=self.SIZE,
+            ),
+            fonts_root=fonts_root,
+            output=output,
+        )
+
+        box = _bounding_box(output)
+        assert box is not None
+        # 親文字は1セル (字送り1つぶん) しかないのに、ルビ5文字ぶんの高さへ広がる。
+        assert (box[3] - box[1]) > self.SIZE
+
+    def test_wrap_does_not_split_a_ruby_segment(self, fonts_root: Path) -> None:
+        # ルビ付きセグメントは1セル。折り返しでセルの途中は割れない。
+        # 親文字3文字 + 「の」で4セル分。3セル分の高さで折り返せば、
+        # ルビ付きセグメントが割れない限り列は ["五月雨"] / ["の", "頃"] になる。
+        layer = self._layer(
+            content=[{"text": "五月雨", "ruby": "さみだれ"}, {"text": "の頃"}],
+            max_width=float(self.SIZE * 3),
+        )
+        font = compose_module._load_font(self._resolved(fonts_root), layer.size)
+
+        lines = compose_module._wrap_layer(layer, font, CANVAS)
+
+        assert [[cell.text for cell in line] for line in lines] == [["五月雨"], ["の", "頃"]]
+
+    def test_ruby_with_tate_chu_yoko(self, base_image: Path, fonts_root: Path) -> None:
+        # 縦中横セルへのルビ。1セルぶんの高さへ均等割りする。
+        output = base_image.parent / "out.png"
+
+        compose_text(
+            image=base_image,
+            spec=_spec(
+                content=[{"text": "7", "ruby": "なな", "tate_chu_yoko": True}],
+                direction="vertical",
+                anchor="top-left",
+                size=self.SIZE,
+            ),
+            fonts_root=fonts_root,
+            output=output,
+        )
+
+        band = _column_bounding_box(
+            output, self._glyph_band(), self._glyph_band() + self._ruby_band()
+        )
+        assert band is not None
+
+    def test_stroke_is_applied_to_ruby(self, base_image: Path, fonts_root: Path) -> None:
+        plain = base_image.parent / "plain.png"
+        stroked = base_image.parent / "stroked.png"
+        content = [{"text": "雨", "ruby": "あめ"}]
+
+        compose_text(
+            image=base_image,
+            spec=_spec(content=content, direction="vertical", anchor="top-left", size=self.SIZE),
+            fonts_root=fonts_root,
+            output=plain,
+        )
+        compose_text(
+            image=base_image,
+            spec=_spec(
+                content=content,
+                direction="vertical",
+                anchor="top-left",
+                size=self.SIZE,
+                stroke={"width": 4, "color": "#00ff00"},
+            ),
+            fonts_root=fonts_root,
+            output=stroked,
+        )
+
+        band_x = (self._glyph_band(), self._glyph_band() + self._ruby_band())
+        plain_band = _column_bounding_box(plain, *band_x)
+        stroked_band = _column_bounding_box(stroked, *band_x)
+        assert plain_band is not None
+        assert stroked_band is not None
+        # 縁取りのぶんルビの描画範囲が広がる
+        assert (stroked_band[3] - stroked_band[1]) > (plain_band[3] - plain_band[1])

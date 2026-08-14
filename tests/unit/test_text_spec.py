@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from agentic_imagegen.domain.models import (
     MAX_DIMENSION,
     MAX_FONT_SIZE,
+    MAX_RUBY_LENGTH,
     MAX_TATE_CHU_YOKO_LENGTH,
     MAX_TEXT_CONTENT_LENGTH,
     MAX_TEXT_LAYERS,
@@ -334,6 +335,86 @@ class TestTextLayerContentSegments:
     def test_rejects_empty_segment_sequence(self) -> None:
         with pytest.raises(ValidationError):
             TextLayer.model_validate(_layer(content=[], direction="vertical"))
+
+
+class TestTextSegmentRuby:
+    """Issue #40 第3段: ルビ (`TextSegment.ruby`) の検証規則。"""
+
+    def test_ruby_defaults_to_none(self) -> None:
+        segment = TextSegment.model_validate({"text": "五月雨"})
+
+        assert segment.ruby is None
+
+    def test_accepts_ruby(self) -> None:
+        layer = TextLayer.model_validate(
+            _layer(
+                content=[{"text": "五月雨", "ruby": "さみだれ"}, {"text": "の頃"}],
+                direction="vertical",
+            )
+        )
+
+        assert layer.content == (
+            TextSegment(text="五月雨", ruby="さみだれ"),
+            TextSegment(text="の頃"),
+        )
+
+    def test_rejects_empty_ruby(self) -> None:
+        with pytest.raises(ValidationError):
+            TextSegment.model_validate({"text": "雨", "ruby": ""})
+
+    def test_rejects_control_characters_in_ruby(self) -> None:
+        with pytest.raises(ValidationError, match="制御文字"):
+            TextSegment.model_validate({"text": "雨", "ruby": "あ\x00め"})
+
+    def test_rejects_newline_in_ruby(self) -> None:
+        with pytest.raises(ValidationError, match="改行"):
+            TextSegment.model_validate({"text": "雨", "ruby": "あ\nめ"})
+
+    def test_rejects_ruby_over_max_length(self) -> None:
+        ruby = "あ" * (MAX_RUBY_LENGTH + 1)
+        with pytest.raises(ValidationError, match=str(MAX_RUBY_LENGTH)):
+            TextSegment.model_validate({"text": "雨", "ruby": ruby})
+
+    def test_accepts_ruby_at_max_length(self) -> None:
+        ruby = "あ" * MAX_RUBY_LENGTH
+        segment = TextSegment.model_validate({"text": "雨", "ruby": ruby})
+
+        assert segment.ruby == ruby
+
+    def test_rejects_newline_in_parent_text_of_ruby_segment(self) -> None:
+        # 親文字が段落 (列) を跨ぐと、ルビをどちらの列へ添えるかが決まらない。
+        with pytest.raises(ValidationError, match="改行"):
+            TextSegment.model_validate({"text": "雨\n夜", "ruby": "あめ"})
+
+    def test_rejects_ruby_with_horizontal_direction(self) -> None:
+        with pytest.raises(ValidationError, match="horizontal"):
+            TextLayer.model_validate(
+                _layer(content=[{"text": "雨", "ruby": "あめ"}], direction="horizontal")
+            )
+
+    def test_accepts_ruby_with_tate_chu_yoko(self) -> None:
+        # 縦中横セルへルビを添える指定は拒否しない (1セルの高さは変わらないため、
+        # 均等割りの対象がセル1つになるだけ)。
+        layer = TextLayer.model_validate(
+            _layer(
+                content=[{"text": "7", "ruby": "なな", "tate_chu_yoko": True}],
+                direction="vertical",
+            )
+        )
+
+        assert isinstance(layer.content, tuple)
+        assert layer.content[0].ruby == "なな"
+
+    def test_ruby_is_not_counted_in_content_length(self) -> None:
+        # contentの長さ上限は親文字だけで数える。ルビはセグメント単位の
+        # MAX_RUBY_LENGTH で別に抑える。
+        segments = [
+            {"text": "あ", "ruby": "い" * MAX_RUBY_LENGTH} for _ in range(MAX_TEXT_CONTENT_LENGTH)
+        ]
+        layer = TextLayer.model_validate(_layer(content=segments, direction="vertical"))
+
+        assert isinstance(layer.content, tuple)
+        assert len(layer.content) == MAX_TEXT_CONTENT_LENGTH
 
 
 class TestTextSpec:
