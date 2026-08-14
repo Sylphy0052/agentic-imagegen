@@ -134,6 +134,18 @@ Presets: character=anime-girl-blue, style=anime-soft
 ### 生成
 
 ```bash
+scripts/comfyui-session.sh generate specs/examples/txt2img.yaml
+```
+
+`scripts/comfyui-session.sh` はComfyUIを起動し、生成し、必ず停止する
+(失敗しても停止する)。ComfyUIを常駐させたままモデルを何本も切り替えると
+XPUのアロケータが断片化し、空き容量が十分でも数十MiBの確保に失敗するようになるため、
+1回の生成ごとにプロセスを立て直す。既に起動しているComfyUIがある場合はそれを使い、
+停止もしない。`batch` / `validate` / `health` も同じように渡せる。
+
+ComfyUIを自分で起動しているなら、CLIを直接呼んでもよい。
+
+```bash
 uv run imagegen generate specs/examples/txt2img.yaml
 ```
 
@@ -159,8 +171,8 @@ uv run imagegen generate specs/examples/txt2img.yaml --timeout 600
 複数のSpecをまとめて実行する。seed掃引もできる。
 
 ```bash
-uv run imagegen batch specs/generated/a.yaml specs/generated/b.yaml
-uv run imagegen batch specs/generated/a.yaml --seeds 111,222,333
+scripts/comfyui-session.sh batch specs/generated/a.yaml specs/generated/b.yaml
+scripts/comfyui-session.sh batch specs/generated/a.yaml --seeds 111,222,333
 ```
 
 ```text

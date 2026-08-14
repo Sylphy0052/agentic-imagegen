@@ -50,10 +50,11 @@ txt2img / preset / LoRA / img2img / MCP Server / ControlNet / IPAdapter / hires 
    uv run imagegen validate specs/generated/<name>.yaml
    ```
 
-4. **generateを実行する**
+4. **generateを実行する** — 必ず `scripts/comfyui-session.sh` 経由で実行する
+   (ComfyUIを起動し、生成し、必ず停止する)
 
    ```bash
-   uv run imagegen generate specs/generated/<name>.yaml
+   scripts/comfyui-session.sh generate specs/generated/<name>.yaml
    ```
 
 5. **結果を確認する** — exit codeが0であること、出力ファイルが存在すること
@@ -124,8 +125,8 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
 同じSpecでseedを変えて何枚か出したい場合や、複数のSpecを流したい場合は `batch` を使う。
 
 ```bash
-uv run imagegen batch specs/generated/a.yaml --seeds 111,222,333
-uv run imagegen batch specs/generated/a.yaml specs/generated/b.yaml
+scripts/comfyui-session.sh batch specs/generated/a.yaml --seeds 111,222,333
+scripts/comfyui-session.sh batch specs/generated/a.yaml specs/generated/b.yaml
 ```
 
 - 1件失敗しても残りは続き、最後にサマリが出る
@@ -143,6 +144,10 @@ uv run imagegen batch specs/generated/a.yaml specs/generated/b.yaml
 - **validationを迂回しない。** `validate` をスキップしたり、検証を緩めて通したりしない
 - **巨大解像度・大量batchを実行しない。** CPU推論のため負荷が直接時間に跳ね返る
 - **ComfyUI APIへCLI/Coreを迂回して直接curlしない。** 障害切り分けが崩れる
+- **ComfyUIを常駐させたまま生成を繰り返さない。** 生成は `scripts/comfyui-session.sh` 経由で行い、
+  1回ごとにComfyUIを起動して停止する。常駐させるとXPUのアロケータが断片化し、
+  空き容量が十分でも数十MiBの確保に失敗する (exit 7 / XPU out of memory)。
+  Claude Codeが生成する場合も同じ (`uv run imagegen generate` を直接叩かない)
 
 ## 設計上守ること
 

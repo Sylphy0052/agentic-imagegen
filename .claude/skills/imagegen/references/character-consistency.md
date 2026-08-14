@@ -151,7 +151,7 @@ weightを下げて背景を振り切ろうとすると、先に服装や顔立�
 構図違いを何枚か出す場合は、Specを人数分作って `batch` で流す。
 
 ```bash
-uv run imagegen batch \
+scripts/comfyui-session.sh batch \
   specs/generated/consistency-library.yaml \
   specs/generated/consistency-night.yaml
 ```
