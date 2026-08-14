@@ -26,6 +26,25 @@ from agentic_imagegen.workflows.injector import ALLOWED_WORKFLOWS, resolve_workf
 #: 生成の実体。テストではComfyUIへ接続しないものへ差し替える。
 type Runner = Callable[[GenerationSpec], Awaitable[GenerationResult]]
 
+#: 列挙系の問い合わせ。接続済みのバックエンドから一覧を1つ取り出す。
+type CatalogQuery = Callable[[ComfyUIClient], Awaitable[Sequence[str]]]
+
+
+def _connect(settings: Settings) -> ComfyUIClient:
+    """バックエンドへの接続を作る。
+
+    このモジュールがバックエンド具象をインスタンス化する唯一の場所。
+    2つ目のバックエンドを足すときの差し替え点になる (Issue #31)。
+    テストでもここを差し替えれば接続なしで動く。
+    """
+    return ComfyUIClient(settings)
+
+
+async def _catalog(settings: Settings, query: CatalogQuery) -> list[str]:
+    """バックエンドへ接続して一覧を1つ取り出す。列挙系の共通経路。"""
+    async with _connect(settings) as client:
+        return list(await query(client))
+
 
 def list_workflows() -> list[str]:
     """実行を許可しているWorkflowテンプレート名を返す。"""
@@ -34,20 +53,17 @@ def list_workflows() -> list[str]:
 
 async def list_models(settings: Settings) -> list[str]:
     """ComfyUIが持っているcheckpoint名を返す。"""
-    async with ComfyUIClient(settings) as client:
-        return list(await client.available_checkpoints())
+    return await _catalog(settings, lambda client: client.available_checkpoints())
 
 
 async def list_loras(settings: Settings) -> list[str]:
     """ComfyUIが持っているLoRA名を返す。"""
-    async with ComfyUIClient(settings) as client:
-        return list(await client.available_loras())
+    return await _catalog(settings, lambda client: client.available_loras())
 
 
 async def list_controlnets(settings: Settings) -> list[str]:
     """ComfyUIが持っているControlNetモデル名を返す。"""
-    async with ComfyUIClient(settings) as client:
-        return list(await client.available_controlnets())
+    return await _catalog(settings, lambda client: client.available_controlnets())
 
 
 async def list_ipadapters(settings: Settings) -> list[str]:
@@ -55,14 +71,12 @@ async def list_ipadapters(settings: Settings) -> list[str]:
 
     カスタムノードが未導入なら空になる。その場合 reference は使えない。
     """
-    async with ComfyUIClient(settings) as client:
-        return list(await client.available_ipadapters())
+    return await _catalog(settings, lambda client: client.available_ipadapters())
 
 
 async def list_clip_visions(settings: Settings) -> list[str]:
     """ComfyUIが持っているCLIP Visionモデル名を返す。"""
-    async with ComfyUIClient(settings) as client:
-        return list(await client.available_clip_visions())
+    return await _catalog(settings, lambda client: client.available_clip_visions())
 
 
 async def list_diffusion_models(settings: Settings) -> list[str]:
@@ -71,20 +85,17 @@ async def list_diffusion_models(settings: Settings) -> list[str]:
     DiT系モデルはUNetとtext encoder / VAEが別ファイルで、checkpointとは別に置く。
     ここに出る名前を model.unet へ指定する。
     """
-    async with ComfyUIClient(settings) as client:
-        return list(await client.available_diffusion_models())
+    return await _catalog(settings, lambda client: client.available_diffusion_models())
 
 
 async def list_text_encoders(settings: Settings) -> list[str]:
     """ComfyUIが持っているtext encoder名を返す。model.clip へ指定する。"""
-    async with ComfyUIClient(settings) as client:
-        return list(await client.available_text_encoders())
+    return await _catalog(settings, lambda client: client.available_text_encoders())
 
 
 async def list_vaes(settings: Settings) -> list[str]:
     """ComfyUIが持っているVAE名を返す。model.vae へ指定する。"""
-    async with ComfyUIClient(settings) as client:
-        return list(await client.available_vaes())
+    return await _catalog(settings, lambda client: client.available_vaes())
 
 
 async def list_upscale_models(settings: Settings) -> list[str]:
@@ -93,8 +104,7 @@ async def list_upscale_models(settings: Settings) -> list[str]:
     generation.upscale.model へ指定する。1つも置いていなければ空になり、
     その場合はlatent拡大 (model未指定) だけが使える。
     """
-    async with ComfyUIClient(settings) as client:
-        return list(await client.available_upscale_models())
+    return await _catalog(settings, lambda client: client.available_upscale_models())
 
 
 async def list_embeddings(settings: Settings) -> list[str]:
@@ -102,15 +112,14 @@ async def list_embeddings(settings: Settings) -> list[str]:
 
     prompt中の `embedding:<name>` の `<name>` にはここに出る名前だけを指定する。
     """
-    async with ComfyUIClient(settings) as client:
-        return list(await client.available_embeddings())
+    return await _catalog(settings, lambda client: client.available_embeddings())
 
 
 async def _default_runner(
     spec: GenerationSpec, *, settings: Settings, project_root: Path
 ) -> GenerationResult:
-    """実際にComfyUIへ接続して生成する。テストではここを差し替える。"""
-    async with ComfyUIClient(settings) as client:
+    """実際にバックエンドへ接続して生成する。テストではここを差し替える。"""
+    async with _connect(settings) as client:
         return await generate(spec, settings, backend=client, project_root=project_root)
 
 
@@ -178,7 +187,7 @@ def submit_batch(
         if runner is not None:
             return await run_batch_items(items, runner=runner)
         # バッチ全体で1つの接続を使い回す (CLIの batch と同じ扱い)
-        async with ComfyUIClient(settings) as client:
+        async with _connect(settings) as client:
 
             async def run(item: BatchItem) -> GenerationResult:
                 return await generate(

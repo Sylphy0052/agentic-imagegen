@@ -5,12 +5,14 @@ MCP層は薄いアダプタに留め、ロジックはここでテストでき�
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from agentic_imagegen.config import Settings
+from agentic_imagegen.services import mcp_tools
 from agentic_imagegen.services.mcp_tools import (
     list_workflows,
     validate_generation,
@@ -141,6 +143,100 @@ class TestListWorkflows:
         assert names == sorted(names)
         # 代表例。軸の組み合わせが名前へどう並ぶかを目で見て分かるようにしておく
         assert {"txt2img", "txt2img_controlnet", "txt2img_controlnet_raw"} <= set(names)
+
+
+class FakeCatalogClient:
+    """列挙系テスト用のバックエンド代替。
+
+    `mcp_tools._connect` の差し替え先。HTTPは行わず、呼ばれたメソッド名から
+    固定値を組み立てて返すため、toolとバックエンドのメソッドの対応も検証できる。
+    """
+
+    def __init__(self) -> None:
+        self.entered = 0
+        self.exited = 0
+
+    async def __aenter__(self) -> FakeCatalogClient:
+        self.entered += 1
+        return self
+
+    async def __aexit__(self, *exc_info: object) -> bool:
+        self.exited += 1
+        return False
+
+    def __getattr__(self, name: str) -> Callable[[], Awaitable[tuple[str, ...]]]:
+        if not name.startswith("available_"):
+            raise AttributeError(name)
+
+        async def query() -> tuple[str, ...]:
+            return (f"{name}-1", f"{name}-2")
+
+        return query
+
+
+#: 列挙系tool -> それが問い合わせるバックエンドのメソッド名。
+CATALOG_CASES: list[tuple[Any, str]] = [
+    (mcp_tools.list_models, "available_checkpoints"),
+    (mcp_tools.list_loras, "available_loras"),
+    (mcp_tools.list_controlnets, "available_controlnets"),
+    (mcp_tools.list_ipadapters, "available_ipadapters"),
+    (mcp_tools.list_clip_visions, "available_clip_visions"),
+    (mcp_tools.list_diffusion_models, "available_diffusion_models"),
+    (mcp_tools.list_text_encoders, "available_text_encoders"),
+    (mcp_tools.list_vaes, "available_vaes"),
+    (mcp_tools.list_upscale_models, "available_upscale_models"),
+    (mcp_tools.list_embeddings, "available_embeddings"),
+]
+
+
+class TestCatalog:
+    """列挙系がバックエンド接続を1か所 (`_connect`) 経由にしていること。"""
+
+    @pytest.mark.parametrize(("tool", "method"), CATALOG_CASES)
+    @pytest.mark.asyncio
+    async def test_returns_names_from_backend(
+        self,
+        tool: Any,
+        method: str,
+        settings: Settings,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        fake = FakeCatalogClient()
+        monkeypatch.setattr(mcp_tools, "_connect", lambda _settings: fake)
+
+        names = await tool(settings)
+
+        assert names == [f"{method}-1", f"{method}-2"]
+        assert isinstance(names, list)
+
+    @pytest.mark.parametrize(("tool", "method"), CATALOG_CASES)
+    @pytest.mark.asyncio
+    async def test_closes_connection(
+        self,
+        tool: Any,
+        method: str,
+        settings: Settings,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """接続は使い終わったら閉じる。"""
+        fake = FakeCatalogClient()
+        monkeypatch.setattr(mcp_tools, "_connect", lambda _settings: fake)
+
+        await tool(settings)
+
+        assert fake.entered == 1
+        assert fake.exited == 1
+
+    def test_covers_every_catalog_tool(self) -> None:
+        """列挙系を足したらこのテーブルへも足す。
+
+        バックエンドへ接続しない `list_workflows` だけを除いた全件を並べる。
+        """
+        exported = {
+            name for name in dir(mcp_tools) if name.startswith("list_") and name != "list_workflows"
+        }
+
+        assert {tool.__name__ for tool, _ in CATALOG_CASES} == exported
 
 
 class TestValidateReportsAdvancedOptions:
