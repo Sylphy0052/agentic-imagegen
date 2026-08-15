@@ -27,6 +27,7 @@ txt2img / preset / LoRA / img2img / MCP Server / ControlNet / IPAdapter / hires 
 | [docs/spec-reference.md](docs/spec-reference.md) | GenerationSpecの全フィールド仕様。値域・既定値・組み合わせ規則・metadata.json |
 | [.claude/skills/imagegen/SKILL.md](.claude/skills/imagegen/SKILL.md) | 画像生成要求を受けたときの手順 |
 | [.claude/skills/prompt-builder/SKILL.md](.claude/skills/prompt-builder/SKILL.md) | プロンプトの組み立てとタグの実在確認の手順 |
+| [evals/README.md](evals/README.md) | skillの判断を退行検出するevalの回し方。台帳は `evals/evals.json` |
 | [README.md](README.md) | プロジェクトの紹介、セットアップ、CLIの使い方 |
 | [docs/](docs/) | 環境構築とモデル別の運用知識 |
 
@@ -203,6 +204,8 @@ uv run mypy src
   README / CLAUDE.md / SKILL.mdへ同じ内容を転記しない
 - 日本語の漢字・カナとASCIIの間に空白を入れない (OK: `Claude Code入門` / NG: `Claude Code 入門`)
 - 絵文字を使わない
+- skillの手順や判断を直したときは `evals/evals.json` の該当caseを回す。
+  判断の退行はテストでは落ちない (手順: [evals/README.md](evals/README.md))
 
 ## ディレクトリ
 
@@ -221,6 +224,7 @@ uv run mypy src
 | `inputs/` | img2imgの入力画像 (git管理外) |
 | `fonts/` | テキスト合成に使うフォント (git管理外) |
 | `outputs/` | 生成結果 (git管理外) |
+| `evals/` | skillの判断を退行検出するeval台帳 |
 
 ## 環境変数
 

@@ -1,0 +1,232 @@
+{
+  "version": "1",
+  "description": "skillの判断を退行検出するためのeval集。画像は生成せず、Specの中身・叩いたコマンド・質問したかどうかだけを見る。手順は evals/README.md を参照。",
+  "cases": [
+    {
+      "id": "readable-japanese-uses-text-layer",
+      "skill": "imagegen",
+      "query": "「本日休業」と読める札を持った女の子の画像を作って",
+      "expected_behaviors": [
+        "text.layers へ「本日休業」を入れる",
+        "使うフォントが実在するかを imagegen catalog の fonts で確かめる",
+        "フォントが無ければ docs/fonts-setup.md の手順を案内する"
+      ],
+      "forbidden_behaviors": [
+        "prompt.positive へ日本語を書いて生成に任せる",
+        "フォントの実在を確かめないまま generate へ進む"
+      ],
+      "references": ["docs/spec-reference.md", "docs/fonts-setup.md"],
+      "tags": ["routing"]
+    },
+    {
+      "id": "same-character-new-scene-uses-reference",
+      "skill": "imagegen",
+      "query": "さっきの子で、今度は図書館にいる場面を出して",
+      "expected_behaviors": [
+        "基準画像を1枚作って inputs/ へ置き、reference.image に指定する",
+        "character presetだけでは顔立ちまでは固定できないと伝える",
+        "scene presetを library-daylight へ差し替える"
+      ],
+      "forbidden_behaviors": [
+        "presetだけ差し替えて同じキャラだと報告する",
+        "基準画像を作らずに reference を省く"
+      ],
+      "presets": { "scene": "library-daylight" },
+      "references": [".claude/skills/imagegen/references/character-consistency.md"],
+      "tags": ["routing"]
+    },
+    {
+      "id": "one-line-request-asks-before-spec",
+      "skill": "imagegen",
+      "query": "猫の画像を作って",
+      "expected_behaviors": [
+        "Specを書く前に AskUserQuestion で聞く",
+        "一問一答にする",
+        "checkpointの推奨案を hassakuSD15_v13.safetensors にする",
+        "画風の推奨案を sd15-hassaku にする"
+      ],
+      "forbidden_behaviors": [
+        "推測でcheckpointと解像度を埋めて generate まで進む",
+        "モデル・解像度・画風を1回の質問へまとめる",
+        "seed / steps / cfg / sampler まで聞く"
+      ],
+      "presets": { "style": "sd15-hassaku" },
+      "tags": ["routing"]
+    },
+    {
+      "id": "concrete-request-skips-questions",
+      "skill": "imagegen",
+      "query": "anime-girl-blue と rooftop-sunset のpresetで、512x768の縦長を1枚出して",
+      "expected_behaviors": [
+        "質問せずにSpecを作る",
+        "指定されたpresetをそのまま使う",
+        "解像度を要求どおり 512x768 にする"
+      ],
+      "forbidden_behaviors": [
+        "要求文で決まっている項目を AskUserQuestion で聞き直す",
+        "presetを勝手に別のものへ置き換える"
+      ],
+      "presets": { "character": "anime-girl-blue", "scene": "rooftop-sunset" },
+      "tags": ["routing", "over-asking"]
+    },
+    {
+      "id": "style-preset-carries-clip-skip-and-vae",
+      "skill": "imagegen",
+      "query": "hassakuで女の子の立ち絵を1枚出して",
+      "expected_behaviors": [
+        "presets.style へ sd15-hassaku を指定する",
+        "Spec側に書くモデル指定は model.checkpoint だけにする",
+        "validate の Workflow が txt2img_vae になることを確認する"
+      ],
+      "forbidden_behaviors": [
+        "model.clip_skip や model.vae をSpecへ直書きする",
+        "style presetを使わずに素のパラメータで組む",
+        "外部VAEの当て忘れに触れないまま生成する"
+      ],
+      "presets": { "style": "sd15-hassaku" },
+      "references": ["docs/spec-reference.md"],
+      "tags": ["regression:98"]
+    },
+    {
+      "id": "inventory-check-uses-catalog",
+      "skill": "imagegen",
+      "query": "今使えるcheckpointとLoRAを教えて",
+      "expected_behaviors": [
+        "uv run imagegen catalog を1回叩く",
+        "Backend行が api か filesystem かを読んで、値の確からしさを添える"
+      ],
+      "forbidden_behaviors": [
+        "ls ~/ComfyUI/models/... を種別ごとに並べる",
+        "一覧を見るためだけにComfyUIを起動する"
+      ],
+      "tags": ["regression:99"]
+    },
+    {
+      "id": "incompatible-combination-is-refused",
+      "skill": "imagegen",
+      "query": "参照画像の顔立ちを保ったまま、hires fixで2倍に上げて出して",
+      "expected_behaviors": [
+        "hires fixとIPAdapterは併用できないと生成前に伝える",
+        "どちらを外すかの選択肢を出す",
+        "generateを実行しない"
+      ],
+      "forbidden_behaviors": [
+        "両方入りのSpecで generate を叩いて失敗させる",
+        "併用できない旨に触れず片方を黙って落とす"
+      ],
+      "references": ["docs/spec-reference.md"],
+      "tags": ["safety"]
+    },
+    {
+      "id": "img2img-omits-resolution",
+      "skill": "imagegen",
+      "query": "inputs/base.png を下絵にして、水彩っぽく描き直して",
+      "expected_behaviors": [
+        "task を img2img にして source.image を指定する",
+        "denoise を描き直しの強さに合わせて決める"
+      ],
+      "forbidden_behaviors": [
+        "generation.width / generation.height を書く",
+        "入力画像の実在を確かめずに generate へ進む"
+      ],
+      "references": ["docs/spec-reference.md"],
+      "tags": ["spec-shape"]
+    },
+    {
+      "id": "generation-goes-through-session-script",
+      "skill": "imagegen",
+      "query": "さっき作ったSpecで生成して",
+      "expected_behaviors": [
+        "scripts/comfyui-session.sh generate 経由で実行する",
+        "出力パスとseedを報告する"
+      ],
+      "forbidden_behaviors": [
+        "uv run imagegen generate を直に叩く",
+        "ComfyUIを起動したまま次の生成へ進む",
+        "出力をパイプの読み手が先に閉じるコマンドへ繋いで実行結果を読み違える"
+      ],
+      "references": ["CLAUDE.md"],
+      "tags": ["safety"]
+    },
+    {
+      "id": "dit-model-rejects-lora",
+      "skill": "imagegen",
+      "query": "AnimaでLoRAを2つ効かせて出して",
+      "expected_behaviors": [
+        "DiT系モデルはLoRAと併用できないと生成前に伝える",
+        "LoRAを外すか、SD1.5 / SDXL系へ切り替える選択肢を出す",
+        "Animaで進める場合は anima-base を使う"
+      ],
+      "forbidden_behaviors": [
+        "model.unet と model.loras を同時に書いたSpecで validate を試す",
+        "LoRAを黙って落として生成する"
+      ],
+      "presets": { "style": "anima-base" },
+      "references": ["docs/spec-reference.md"],
+      "tags": ["safety"]
+    },
+    {
+      "id": "sd15-avoids-score-tags",
+      "skill": "prompt-builder",
+      "query": "hassaku (SD1.5) で高品質な女の子のプロンプトを作って",
+      "expected_behaviors": [
+        "SD1.5系の品質タグの記法で書く",
+        "75トークン以内へ収める",
+        "danbooruタグ主体で組む"
+      ],
+      "forbidden_behaviors": [
+        "score_9 / score_8_up のようなPony系の記法を書く",
+        "自然文の長い説明文で埋める"
+      ],
+      "references": ["docs/prompting-guide.md"],
+      "tags": ["model-family"]
+    },
+    {
+      "id": "tags-are-verified-before-use",
+      "skill": "prompt-builder",
+      "query": "和風の巫女服で神社の境内にいる女の子のプロンプトを作って",
+      "expected_behaviors": [
+        "tagcheck.py でタグの実在を確認する",
+        "実在しないタグは置換表に沿って置き換えるか削除する",
+        "置換も削除もできないタグは何を落としたか報告する"
+      ],
+      "forbidden_behaviors": [
+        "実在を確かめずに思いついたタグを並べる",
+        "存在しないタグを残したまま完成として渡す"
+      ],
+      "references": [".claude/skills/prompt-builder/references/tag-replacements.md"],
+      "tags": ["grounding"]
+    },
+    {
+      "id": "color-and-length-are-written-per-garment",
+      "skill": "prompt-builder",
+      "query": "白いシャツと赤いロングスカートの子のプロンプトを作って",
+      "expected_behaviors": [
+        "色と丈を服ごとに1つのトークンへまとめる",
+        "色が別の服へ移らない語順にする"
+      ],
+      "forbidden_behaviors": [
+        "色だけを独立したトークンとして並べる",
+        "丈の指定を落として単に skirt と書く"
+      ],
+      "references": ["docs/prompting-guide.md"],
+      "tags": ["regression:97"]
+    },
+    {
+      "id": "token-budget-is-checked",
+      "skill": "prompt-builder",
+      "query": "夕焼けの海辺で犬と散歩する少女、風になびく髪、逆光、細かい砂の質感、遠くにヨット、雲の階調、レンズフレア、映画的な色調で、できるだけ細かく描写したプロンプトにして",
+      "expected_behaviors": [
+        "トークン数を数えて系統ごとの上限と突き合わせる",
+        "上限を超える場合は優先度の低い語から落とす",
+        "何を落としたかを報告する"
+      ],
+      "forbidden_behaviors": [
+        "上限を超えたまま完成として渡す",
+        "数えずに大丈夫だと述べる"
+      ],
+      "references": ["docs/prompting-guide.md"],
+      "tags": ["grounding"]
+    }
+  ]
+}
