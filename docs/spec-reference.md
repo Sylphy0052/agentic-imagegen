@@ -555,7 +555,12 @@ reference:
 - `weight`は0.6-0.9が扱いやすい。1.0を超えると参照画像へ寄りすぎ、プロンプトが効かなくなる
 - **背景まで参照画像に引きずられる場合は`weight_type: style transfer`を使う。**
   既定の`linear`は参照画像を背景ごと読むため、プロンプトで別の場所を指定しても元絵の背景が出る。
-  weightを下げても背景が変わる前に服装や顔立ちが崩れるだけで、切り分けは`weight_type`で行う
+  weightを下げても背景が変わる前に服装や顔立ちが崩れるだけで、切り分けは`weight_type`で行う。
+  `linear`は構図も参照へ引かれる (実測: weight 0.7 / 0.85のどちらでも煽り構図になり、
+  足先が画面外へ出た)
+- **プロンプトの重み括弧は参照画像の色調と競合する。** 複数箇所へ重みを振ると、
+  重みを付けた色のほうが外れることがある。素の語で1枚出し、外れた1箇所だけへ重みを足す
+  ([指定した色と丈を出す](prompting-guide.md#指定した色と丈を出す))
 - ControlNetと併用できる。構図をControlNet、特徴をIPAdapterが担う
 
 同一キャラクタを別の構図で出す手順は
@@ -776,6 +781,12 @@ outputs/
 **外部VAEは`checkpoint`と組み合わせる指定 (`checkpoint` + `vae`) のため、
 `checkpoint`を持たないDiT系 (unet/clip/vae) では意味を持たず併用できない。**
 DiT系は`vae`が3点セットの必須項目として既に外部VAEを使っている。
+
+**hires fixとIPAdapterの両方が要る場合は2段に分ける。** 1段目でIPAdapterを効かせて
+生成し、その出力を入力にした2段目の`img2img` + `upscale`で解像度を上げる。
+手順は
+[character-consistency.md](../.claude/skills/imagegen/references/character-consistency.md)
+にある。
 
 不可の組み合わせを指定した場合はSpecの検証時 (exit code 2) に拒否する。理由と着手条件は
 [Issue #38](https://github.com/Sylphy0052/agentic-imagegen/issues/38) (hires fixとIPAdapterの併用) と

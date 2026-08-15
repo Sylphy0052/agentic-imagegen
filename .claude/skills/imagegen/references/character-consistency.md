@@ -130,12 +130,67 @@ ControlNetが構図を決めるため、この場合scene presetは使わなく�
 | `weight: 0.8` (既定の `linear`) | 顔立ち・服装は保たれるが、背景が夕焼けの屋上のまま。sceneが効かない |
 | `weight: 0.5` (既定の `linear`) | 背景は半分だけ図書館になる。服装のディテールが崩れる (赤いタイが紺のリボンへ変わった) |
 | `weight: 0.8` + `weight_type: style transfer` | 背景は図書館、顔立ち・髪・制服の色は維持。**これを使う** |
+| `weight: 0.7` / `0.85` (既定の `linear`) | 背景が基準画像のままなのに加え、構図まで引かれて煽りになり、足先が画面外へ出た |
 
 weightを下げて背景を振り切ろうとすると、先に服装や顔立ちが崩れる。
 背景を変えたいときはweightではなく `weight_type` で切り分ける。
 
 `style transfer` でも顔立ちが揺れる場合だけ `weight` を0.9-1.0へ上げる。
 1.0を超えるとpromptが効かなくなる。
+
+## 解像度を上げる (2段運用)
+
+**IPAdapterとhires fixは併用できない** ([組み合わせの可否](../../../../docs/spec-reference.md#組み合わせの可否))。
+解像度を上げるには2段に分ける。
+
+1. IPAdapterを効かせて512x768を生成する (`upscale` は書かない)
+2. その出力を `inputs/` へ置き、`img2img` + `upscale` で仕上げる (`reference` は書かない)
+
+```bash
+scripts/comfyui-session.sh generate specs/generated/scene-base.yaml
+cp outputs/<日付>/<時刻>_scene_base/image_0001.png inputs/scene-base.png
+scripts/comfyui-session.sh generate specs/generated/scene-up.yaml
+```
+
+2段目のSpecは1段目とプロンプト・checkpoint・VAE・clip skipを揃え、
+`source.denoise` を0.4前後にする。顔立ちと色は1段目の絵から引き継がれるため、
+2段目でIPAdapterを使わなくても崩れない。
+
+```yaml
+task: img2img
+
+source:
+  image: inputs/scene-base.png
+  denoise: 0.4
+
+generation:
+  seed: <1段目と同じ値>
+  upscale:
+    model: RealESRGAN_x4plus_anime_6B.pth
+    model_scale: 4.0
+    scale: 1.5
+    denoise: 0.4
+    steps: 20
+    method: lanczos
+```
+
+- `upscale.scale` は1.0より大きい値しか指定できない。拡大を最小にしたい場合は1.5にする
+- **色の修正を2段目でやらない。** `denoise` 0.4では既に塗られている色が塗り替わらず、
+  2段目のプロンプトへ重みを足しても効かない (実測: 紺になった靴を
+  `(white loafers:1.3)` へ上げても紺のままだった)。色は1段目で直す
+
+## 色が指定どおりに出ないとき
+
+IPAdapterを使うと、参照画像の色調とプロンプトの重み括弧が競合する。
+
+- **複数箇所へ同時に重みを振らない。** 4箇所へ重みを付けた版では
+  `(white sailor uniform:1.3)` と書いた上衣が紺になった。同じseedで重みを全部外した版は
+  上衣が白で出た
+- **外れた1箇所だけへ重みを足す。** 靴だけ `(white loafers:1.2)` にした版は、
+  上衣・スカーフ・スカート・靴下・靴のすべてが指定どおりになった
+- 順序は「素の語で1枚 -> 外れた箇所を見る -> その箇所だけ重みを足して撃ち直す」。
+  書き方の実測値は
+  [指定した色と丈を出す](../../../../docs/prompting-guide.md#指定した色と丈を出す) を参照
 
 ## うまくいかないとき
 
