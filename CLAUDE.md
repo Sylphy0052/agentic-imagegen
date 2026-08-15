@@ -120,6 +120,8 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
 - **「どれがいいか比べて」と言われたら1回につき1軸だけ振る。**
   seedとプロンプトを固定し、条件が揃っているかを `metadata.json` で確かめる。手順は
   [.claude/skills/imagegen/references/ablation.md](.claude/skills/imagegen/references/ablation.md)
+- **「さっきの子で」「前回の設定で」と言われたら `uv run imagegen history` で引く。**
+  出力パス・実際に使われたseed・checkpoint・presetが `metadata.json` から出る。推測で当てない
 - **「さっきの子で別の場面を」と言われたら基準画像を作り `reference` に指定する。**
   presetだけでは顔立ちまでは固定できない。手順は
   [.claude/skills/imagegen/references/character-consistency.md](.claude/skills/imagegen/references/character-consistency.md)

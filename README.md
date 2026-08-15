@@ -141,6 +141,24 @@ scripts/comfyui-session.sh catalog
 
 `--json` で機械可読な形も出せる。
 
+### 直近の生成を引く
+
+`outputs/` の `metadata.json` を読んで、新しい順に出す。ComfyUIへは接続しない。
+
+```bash
+uv run imagegen history --limit 5
+uv run imagegen history --prefix yui
+uv run imagegen history --json
+```
+
+```text
+2026-08-15 11:00  img2img  seed 271828182
+  hassakuSD15_v13.safetensors  <- inputs/yui-ref-f.png  x1.5
+  outputs/2026-08-15/105506_yui_ref_f_up/image_0001.png
+```
+
+「さっきの子で別の場面を」のような依頼で、基準画像と使ったseedを記録から引くために使う。
+
 ### Specの検証
 
 ComfyUIへは接続せず、Specだけを検証する。

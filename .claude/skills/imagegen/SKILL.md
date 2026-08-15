@@ -53,6 +53,16 @@ cd ~/ComfyUI && ./.venv/bin/python main.py --listen 127.0.0.1 --port 8188
 手で起動したComfyUIが動いている間は `scripts/comfyui-session.sh` はそれを使い、
 停止もしない。
 
+**「さっきの子」「前回の設定で」と言われたら記録から引く。** 推測で当てない。
+
+```bash
+uv run imagegen history --limit 5
+uv run imagegen history --prefix yui
+```
+
+出力パス・実際に使われたseed・checkpoint・presetがそのまま出る。
+基準画像はここに出たパスを `inputs/` へ置いて使う。
+
 ### 2. presetを選ぶか、新しく作る
 
 要求に合うpresetがあれば名前で参照する。軸は3つで、1軸につき1つまで。
