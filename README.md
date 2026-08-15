@@ -158,6 +158,45 @@ uv run imagegen history --json
 ```
 
 「さっきの子で別の場面を」のような依頼で、基準画像と使ったseedを記録から引くために使う。
+キャラクタを台帳へ登録してあるなら、次の `character` のほうが確実に引ける。
+
+### キャラクタ台帳
+
+同じキャラクタを別の場面で出すには、character preset・style preset・checkpoint・
+基準画像・seedの5つが揃っている必要がある。`registry/characters/<name>.yaml` へ書いておくと
+名前で引ける。ComfyUIへは接続しない。
+
+```yaml
+# registry/characters/aoi.yaml
+description: 青い髪の少女
+preset: anime-girl-blue                 # presets/characters/ のファイル名
+style: sd15-hassaku                     # presets/styles/ のファイル名
+checkpoint: hassakuSD15_v13.safetensors # 基準画像を作ったcheckpoint
+reference: inputs/aoi.png               # IPAdapterへ渡す基準画像
+seed: 777001                            # 基準画像を作ったときのseed
+notes: 制服は赤いタイ
+```
+
+```bash
+uv run imagegen character list
+uv run imagegen character show aoi
+uv run imagegen character show aoi --json
+```
+
+```text
+Character: aoi
+Description: 青い髪の少女
+Preset: anime-girl-blue
+Style: sd15-hassaku
+Checkpoint: hassakuSD15_v13.safetensors
+Reference: inputs/aoi.png
+Seed: 777001
+```
+
+台帳は生成には関与しない。Specへ書き写す値を1か所へまとめるだけで、
+`preset` / `style` / `reference` が実在するかは引くたびに確かめる。欠けていれば
+標準エラーへ `warning:` が出る (exit codeは0のまま)。置き場は
+`IMAGEGEN_REGISTRY_ROOT` で差し替えられる。
 
 ### Specの検証
 

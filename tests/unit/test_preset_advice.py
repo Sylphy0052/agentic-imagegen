@@ -87,7 +87,6 @@ class TestStylePresetGiven:
         assert "sd15-meinamix" in warnings[0]
         assert "sd15-hassaku" in warnings[0]
 
-
     def test_mismatched_preset_without_an_alternative(self, presets_root: Path) -> None:
         """行き先が無くても、噛み合っていないことは伝える。"""
         warnings = style_warnings(

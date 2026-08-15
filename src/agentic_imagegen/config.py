@@ -29,6 +29,8 @@ DEFAULT_TIMEOUT_SECONDS: Final = 300
 DEFAULT_OUTPUT_ROOT: Final = "outputs"
 DEFAULT_PRESETS_ROOT: Final = "presets"
 DEFAULT_FONTS_ROOT: Final = "fonts"
+#: キャラクタ台帳の置き場。生成には関与せず、手掛かりを引くためだけに読む。
+DEFAULT_REGISTRY_ROOT: Final = "registry"
 #: ComfyUIの置き場。models配下を直接見るときだけ使う。
 DEFAULT_COMFYUI_HOME: Final = "~/ComfyUI"
 #: 上をホーム展開した既定値。dataclassの既定でメソッド呼び出しを行わないためここで解く。
@@ -96,6 +98,8 @@ class Settings:
     #: ComfyUIの置き場。ComfyUIへ到達できないときに models配下を直接見るために使う。
     #: 生成そのものはHTTP越しに行うため、通常の経路では参照しない。
     comfyui_home: Path = DEFAULT_COMFYUI_HOME_PATH
+    #: キャラクタ台帳の探索ルート。
+    registry_root: Path = Path(DEFAULT_REGISTRY_ROOT)
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -111,6 +115,10 @@ class Settings:
         fonts_root = os.environ.get("IMAGEGEN_FONTS_ROOT", DEFAULT_FONTS_ROOT).strip()
         if not fonts_root:
             raise InvalidConfiguration("IMAGEGEN_FONTS_ROOT に空文字は指定できません")
+
+        registry_root = os.environ.get("IMAGEGEN_REGISTRY_ROOT", DEFAULT_REGISTRY_ROOT).strip()
+        if not registry_root:
+            raise InvalidConfiguration("IMAGEGEN_REGISTRY_ROOT に空文字は指定できません")
 
         comfyui_home = os.environ.get("COMFYUI_HOME", DEFAULT_COMFYUI_HOME).strip()
         if not comfyui_home:
@@ -133,6 +141,7 @@ class Settings:
             ),
             fonts_root=Path(fonts_root),
             comfyui_home=Path(comfyui_home).expanduser(),
+            registry_root=Path(registry_root),
         )
 
 

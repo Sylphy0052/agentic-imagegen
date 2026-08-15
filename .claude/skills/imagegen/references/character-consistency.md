@@ -61,6 +61,31 @@ cp <出力パス> inputs/character.png
 セッションを跨いだあとも同じ。`--prefix` にキャラの名前を入れて、
 直近でそのキャラを出した生成のパスとseedを引く。
 
+### 2.5. 台帳へ登録する
+
+以降も同じキャラを出すなら、ここで `registry/characters/<name>.yaml` へ書く。
+`history` は生成の記録であり、どの1枚を基準に選んだかまでは残らない。
+
+```yaml
+# registry/characters/aoi.yaml
+description: 青い髪の少女
+preset: anime-girl-blue
+style: sd15-hassaku
+checkpoint: hassakuSD15_v13.safetensors
+reference: inputs/character.png
+seed: 777001
+notes: 制服は赤いタイ
+```
+
+次からは名前で引ける。基準画像やpresetが消えていれば `warning:` が出る。
+
+```bash
+uv run imagegen character show aoi
+```
+
+**checkpointとstyle presetも台帳へ書く。** 顔立ちは画風とcheckpointにも依存するため、
+基準画像だけを引き継いでcheckpointを変えると別人に見える。
+
 ### 3. scene presetだけ差し替えて生成する
 
 `character` presetはそのまま残し、`reference` に基準画像を指定する。
