@@ -8,6 +8,7 @@ MCP導入後もローカルデバッグ・CI・障害切り分けのために残
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -25,9 +26,10 @@ from agentic_imagegen.domain.policy import (
     resolve_source_image,
     validate_against_limits,
 )
-from agentic_imagegen.domain.results import GenerationResult, HealthStatus
+from agentic_imagegen.domain.results import CatalogSnapshot, GenerationResult, HealthStatus
 from agentic_imagegen.errors import ComfyUIUnavailable, ImageGenError, InvalidGenerationSpec
 from agentic_imagegen.services.batch import BatchItem, BatchOutcome, expand_seeds, run_batch
+from agentic_imagegen.services.catalog import CATALOG_KINDS, collect_catalog
 from agentic_imagegen.services.compose import compose_text
 from agentic_imagegen.services.generation import TEXT_SUFFIX, generate, resolve_fonts_root
 from agentic_imagegen.services.spec_loader import load_spec, load_text_spec
@@ -89,6 +91,40 @@ def health(verbose: VerboseOption = False) -> None:
             typer.echo(f"Version: {status.comfyui_version}")
         if status.devices:
             typer.echo(f"Devices: {', '.join(status.devices)}")
+
+
+@app.command()
+def catalog(
+    as_json: Annotated[bool, typer.Option("--json", help="機械可読な形で出力する")] = False,
+    verbose: VerboseOption = False,
+) -> None:
+    """使えるモデル・preset・フォントを一覧する。
+
+    ComfyUIへ到達できればそこから、できなければ COMFYUI_HOME 配下の
+    modelsディレクトリから読む。探索のためだけにComfyUIを起動しなくてよい。
+    """
+    _configure_logging(verbose)
+
+    with _handled_errors():
+        settings = Settings.from_env()
+        project_root = Path.cwd()
+        status = _probe_health(settings)
+        snapshot = asyncio.run(
+            collect_catalog(
+                settings,
+                backend_factory=ComfyUIClient,
+                comfyui_home=settings.comfyui_home,
+                presets_root=_resolve_root(settings.presets_root, project_root),
+                fonts_root=resolve_fonts_root(settings, project_root),
+            )
+        )
+
+        if as_json:
+            payload = _catalog_payload(snapshot, settings, status)
+            typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+            return
+
+        _print_catalog(snapshot, settings, status)
 
 
 @app.command()
@@ -217,6 +253,87 @@ def compose_image(
             project_root=project_root,
         )
         typer.echo(str(result.output))
+
+
+def _resolve_root(root: Path, project_root: Path) -> Path:
+    """相対指定の探索ルートを作業ルート基準の絶対パスへ解く。"""
+    return root if root.is_absolute() else project_root / root
+
+
+#: checkpointを決めていないときの既定。対応するstyle presetを添えて示す。
+DEFAULT_CHECKPOINT: Final = "hassakuSD15_v13.safetensors"
+DEFAULT_STYLE_PRESET: Final = "sd15-hassaku"
+
+
+def _probe_health(settings: Settings) -> HealthStatus | None:
+    """catalog の先頭に添える実行基盤の情報。到達できなければ None。
+
+    所要時間がXPUとCPUで一桁違うため、在庫と同じ画面で見えないと選定に使えない。
+    """
+    try:
+        return asyncio.run(_check_health(settings))
+    except ComfyUIUnavailable:
+        return None
+
+
+def _catalog_payload(
+    snapshot: CatalogSnapshot, settings: Settings, status: HealthStatus | None
+) -> dict[str, object]:
+    return {
+        "source": snapshot.source,
+        "base_url": settings.comfyui_base_url,
+        "version": status.comfyui_version if status else None,
+        "devices": list(status.devices) if status else [],
+        "models": {name: list(names) for name, names in snapshot.models.items()},
+        "presets": {axis: list(names) for axis, names in snapshot.presets.items()},
+        "fonts": list(snapshot.fonts),
+    }
+
+
+def _print_catalog(
+    snapshot: CatalogSnapshot, settings: Settings, status: HealthStatus | None
+) -> None:
+    """人が読む形で一覧を出す。
+
+    先頭に取得元を出す。`filesystem` はComfyUIを起動せずに見た結果で、
+    カスタムノード由来の種別が実際に使えるかまでは分からない。
+    """
+    if snapshot.source == "api":
+        typer.echo(f"Backend: api ({settings.comfyui_base_url})")
+    else:
+        typer.echo("Backend: unavailable (filesystem fallback)")
+        typer.echo(f"ComfyUI home: {settings.comfyui_home}")
+
+    if status and status.comfyui_version:
+        typer.echo(f"Version: {status.comfyui_version}")
+    if status and status.devices:
+        typer.echo(f"Devices: {', '.join(status.devices)}")
+
+    presets = " / ".join(f"{axis} {len(names)}" for axis, names in snapshot.presets.items())
+    typer.echo(f"Presets: {presets}")
+
+    for axis, names in snapshot.presets.items():
+        typer.echo(f"\npresets/{axis} ({len(names)})")
+        _echo_names(names)
+
+    for kind in CATALOG_KINDS:
+        names = snapshot.models.get(kind.name, ())
+        typer.echo(f"\n{kind.name} ({len(names)})")
+        _echo_names(names, annotate=kind.name == "checkpoints")
+
+    typer.echo(f"\nfonts ({len(snapshot.fonts)})")
+    _echo_names(snapshot.fonts)
+
+
+def _echo_names(names: tuple[str, ...], *, annotate: bool = False) -> None:
+    if not names:
+        typer.echo("  (なし)")
+        return
+    for name in names:
+        suffix = ""
+        if annotate and name == DEFAULT_CHECKPOINT:
+            suffix = f"  <- 既定 ({DEFAULT_STYLE_PRESET})"
+        typer.echo(f"  {name}{suffix}")
 
 
 def _relative_to_root(path: Path, project_root: Path) -> str:

@@ -227,6 +227,7 @@ uv run mypy src
 | 変数 | 既定値 | 用途 |
 | --- | --- | --- |
 | `COMFYUI_BASE_URL` | `http://127.0.0.1:8188` | ComfyUI接続先 |
+| `COMFYUI_HOME` | `~/ComfyUI` | ComfyUIの置き場。`catalog` がComfyUIへ到達できないときにmodels配下を直接見る |
 | `IMAGEGEN_MAX_WIDTH` | 2048 | 幅の上限 |
 | `IMAGEGEN_MAX_HEIGHT` | 2048 | 高さの上限 |
 | `IMAGEGEN_MAX_PIXELS` | 4194304 | 総pixel数の上限 (batch込み) |

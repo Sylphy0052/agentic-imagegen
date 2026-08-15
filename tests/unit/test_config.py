@@ -1,5 +1,7 @@
 """Settings (環境変数由来の設定) のテスト。"""
 
+from pathlib import Path
+
 import pytest
 
 from agentic_imagegen.config import Settings
@@ -16,6 +18,8 @@ ENV_KEYS = [
     "IMAGEGEN_PRESETS_ROOT",
     "IMAGEGEN_MAX_SOURCE_BYTES",
     "IMAGEGEN_MAX_UPSCALED_PIXELS",
+    "IMAGEGEN_FONTS_ROOT",
+    "COMFYUI_HOME",
 ]
 
 
@@ -100,4 +104,29 @@ def test_invalid_numeric_env(monkeypatch: pytest.MonkeyPatch, key: str, value: s
 def test_invalid_base_url(monkeypatch: pytest.MonkeyPatch, url: str) -> None:
     monkeypatch.setenv("COMFYUI_BASE_URL", url)
     with pytest.raises(InvalidConfiguration):
+        Settings.from_env()
+
+
+def test_comfyui_home_defaults_to_expanded_home() -> None:
+    """既定の `~/ComfyUI` はホームを展開した絶対パスで持つ。
+
+    展開しないままだと、ComfyUIへ到達できないときのフォールバックで
+    `~/ComfyUI` という名前のディレクトリを探しに行く。
+    """
+    settings = Settings.from_env()
+
+    assert settings.comfyui_home.is_absolute()
+    assert settings.comfyui_home.name == "ComfyUI"
+
+
+def test_comfyui_home_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("COMFYUI_HOME", "/opt/ComfyUI")
+
+    assert Settings.from_env().comfyui_home == Path("/opt/ComfyUI")
+
+
+def test_empty_comfyui_home_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("COMFYUI_HOME", "   ")
+
+    with pytest.raises(InvalidConfiguration, match="COMFYUI_HOME"):
         Settings.from_env()

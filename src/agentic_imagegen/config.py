@@ -29,6 +29,10 @@ DEFAULT_TIMEOUT_SECONDS: Final = 300
 DEFAULT_OUTPUT_ROOT: Final = "outputs"
 DEFAULT_PRESETS_ROOT: Final = "presets"
 DEFAULT_FONTS_ROOT: Final = "fonts"
+#: ComfyUIの置き場。models配下を直接見るときだけ使う。
+DEFAULT_COMFYUI_HOME: Final = "~/ComfyUI"
+#: 上をホーム展開した既定値。dataclassの既定でメソッド呼び出しを行わないためここで解く。
+DEFAULT_COMFYUI_HOME_PATH: Final = Path(DEFAULT_COMFYUI_HOME).expanduser()
 
 #: img2imgの入力画像として受け付ける最大バイト数 (32MiB)。
 #: 巨大画像はそのままの解像度で生成されるため、時間とメモリを直撃する。
@@ -89,6 +93,9 @@ class Settings:
     max_upscaled_pixels: int = DEFAULT_MAX_UPSCALED_PIXELS
     #: テキスト合成に使うフォントの探索ルート。
     fonts_root: Path = Path(DEFAULT_FONTS_ROOT)
+    #: ComfyUIの置き場。ComfyUIへ到達できないときに models配下を直接見るために使う。
+    #: 生成そのものはHTTP越しに行うため、通常の経路では参照しない。
+    comfyui_home: Path = DEFAULT_COMFYUI_HOME_PATH
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -104,6 +111,10 @@ class Settings:
         fonts_root = os.environ.get("IMAGEGEN_FONTS_ROOT", DEFAULT_FONTS_ROOT).strip()
         if not fonts_root:
             raise InvalidConfiguration("IMAGEGEN_FONTS_ROOT に空文字は指定できません")
+
+        comfyui_home = os.environ.get("COMFYUI_HOME", DEFAULT_COMFYUI_HOME).strip()
+        if not comfyui_home:
+            raise InvalidConfiguration("COMFYUI_HOME に空文字は指定できません")
 
         return cls(
             comfyui_base_url=_base_url("COMFYUI_BASE_URL", DEFAULT_BASE_URL),
@@ -121,6 +132,7 @@ class Settings:
                 "IMAGEGEN_MAX_UPSCALED_PIXELS", DEFAULT_MAX_UPSCALED_PIXELS
             ),
             fonts_root=Path(fonts_root),
+            comfyui_home=Path(comfyui_home).expanduser(),
         )
 
 

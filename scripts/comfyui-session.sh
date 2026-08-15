@@ -8,6 +8,7 @@
 # 使い方:
 #   scripts/comfyui-session.sh generate specs/generated/foo.yaml
 #   scripts/comfyui-session.sh batch specs/generated/a.yaml specs/generated/b.yaml
+#   scripts/comfyui-session.sh catalog
 #
 # 環境変数:
 #   COMFYUI_HOME      ComfyUIの場所 (既定: ~/ComfyUI)
@@ -15,6 +16,10 @@
 #   IMAGEGEN_TIMEOUT  生成のタイムアウト秒 (既定: 2400)
 #   COMFYUI_BOOT_TIMEOUT  起動待ちの上限秒 (既定: 300)
 #   COMFYUI_LOG_DIR   起動ログの置き場 (既定: ~/.cache/imagegen-logs)
+#
+# 出力を head などパイプの読み手が先に閉じるコマンドへ繋がない。
+# SIGPIPEで落ちてもComfyUIを残さないようにはしてあるが、途中経過が切れて
+# 実行結果を読み違える。全部見たいならファイルへリダイレクトする。
 #
 # 既に起動しているComfyUIがある場合はそれを使い、停止もしない
 # (手動で立ち上げて作業している最中に落とさないため)。
@@ -31,7 +36,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMFYUI_PID=""
 
 usage() {
-    echo "usage: $(basename "$0") <generate|batch|validate|health> [args...]" >&2
+    echo "usage: $(basename "$0") <generate|batch|validate|health|catalog> [args...]" >&2
     exit 2
 }
 
@@ -43,8 +48,10 @@ stop_comfyui() {
     [ -n "$COMFYUI_PID" ] || return 0
     kill -0 "$COMFYUI_PID" 2> /dev/null || return 0
 
-    echo "[comfyui-session] stopping ComfyUI (pid ${COMFYUI_PID})" >&2
+    # 先に止める。head などパイプの読み手が閉じている場合、
+    # ここでstderrへ書くと再びSIGPIPEを受けてkillへ到達しないまま落ちる。
     kill -TERM "$COMFYUI_PID" 2> /dev/null || true
+    echo "[comfyui-session] stopping ComfyUI (pid ${COMFYUI_PID})" 2> /dev/null >&2 || true
     for _ in $(seq 1 30); do
         kill -0 "$COMFYUI_PID" 2> /dev/null || return 0
         sleep 1
@@ -67,7 +74,7 @@ start_comfyui() {
     (cd "$COMFYUI_HOME" && exec ./.venv/bin/python main.py --listen 127.0.0.1 --port 8188) \
         > "$log" 2>&1 < /dev/null &
     COMFYUI_PID=$!
-    trap stop_comfyui EXIT INT TERM
+    trap stop_comfyui EXIT INT TERM HUP PIPE
 
     for _ in $(seq 1 "$COMFYUI_BOOT_TIMEOUT"); do
         if is_up; then
@@ -87,7 +94,7 @@ start_comfyui() {
 
 [ $# -ge 1 ] || usage
 case "$1" in
-    generate | batch | validate | health) ;;
+    generate | batch | validate | health | catalog) ;;
     *) usage ;;
 esac
 
