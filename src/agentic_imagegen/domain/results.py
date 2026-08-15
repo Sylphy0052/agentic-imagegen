@@ -5,8 +5,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,4 +47,23 @@ class GenerationResult:
     text_files: tuple[Path, ...] = ()
 
 
-__all__ = ["GenerationResult", "HealthStatus", "ImageRef"]
+@dataclass(frozen=True, slots=True)
+class CatalogSnapshot:
+    """使えるモデル・preset・フォントの一覧。
+
+    `source` は取得元。`api` はバックエンドが実際に読み込める名前で、
+    `filesystem` はComfyUIのmodelsディレクトリを直接見た結果。後者は
+    ComfyUIを起動せずに探せる代わりに、カスタムノード由来の種別 (IPAdapterなど)
+    が未導入かどうかまでは分からない。どちらで見た値かで信頼度が変わるため、
+    表示にも残す。
+    """
+
+    source: Literal["api", "filesystem"]
+    #: 種別名 (CATALOG_KINDS の name) から、その種別で使える名前の一覧へ。
+    models: Mapping[str, tuple[str, ...]]
+    #: presetの軸 (character / scene / style) から、preset名の一覧へ。
+    presets: Mapping[str, tuple[str, ...]]
+    fonts: tuple[str, ...]
+
+
+__all__ = ["CatalogSnapshot", "GenerationResult", "HealthStatus", "ImageRef"]

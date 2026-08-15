@@ -18,19 +18,33 @@ Workflowテンプレートは人間がComfyUI GUIで作成したものだけを�
 
 ## 手順
 
-### 1. ComfyUIの状態を確認する
+### 1. 実行基盤と在庫を確かめる
+
+存在しないcheckpointを指定しない。実在するものだけを使う。実行基盤と、
+checkpoint / LoRA / ControlNet / IPAdapter / CLIP Vision / DiT系の3点 / VAE /
+アップスケールモデル / embedding / preset / フォントを一度に出す。
 
 ```bash
-uv run imagegen health
+uv run imagegen catalog
 ```
 
-`Devices:` が `xpu:0` ならIntel GPU、`cpu` ならCPU推論。所要時間が大きく変わるため必ず見る。
+- `Devices:` が `xpu:0` ならIntel GPU、`cpu` ならCPU推論。所要時間が一桁変わる。
+  ComfyUIが起動しているときだけ出る
+- `Backend:` が取得元。`api` はComfyUIが実際に読み込める名前、
+  `filesystem` は未起動時のディレクトリ直読み。後者はカスタムノード由来の
+  種別 (IPAdapter) が実際に使えるかまでは分からないため、それらを使う要求では
+  `scripts/comfyui-session.sh catalog` で見直す
+- checkpointの既定 (`hassakuSD15_v13.safetensors`) には対応するstyle presetが付く
+- 種別が `(なし)` なら未配置。ControlNet / IPAdapterはカスタムノードごと未導入の疑いがある
+- フォントが `(なし)` でテキスト合成を求められている場合は
+  [docs/fonts-setup.md](../../../docs/fonts-setup.md) の手順を案内する
 
-未起動なら次で起動し、[docs/xpu-setup.md](../../../docs/xpu-setup.md) を案内する。
+どのcheckpointがどういう絵柄で、cfgとstepsの実用域がどこかは
+[配置済みのSD1.5系モデル](../../../docs/prompting-guide.md#配置済みのsd15系モデル)にまとめてある。
 
 生成は `scripts/comfyui-session.sh` 経由で行うため、事前の手動起動は要らない
-(スクリプトが起動し、生成し、停止する)。状態だけ見たいときや、手で立ち上げて
-デバッグしたいときは次を使う。
+(スクリプトが起動し、生成し、停止する)。手で立ち上げてデバッグしたいときだけ次を使う
+(起動しない場合は [docs/xpu-setup.md](../../../docs/xpu-setup.md) を案内する)。
 
 ```bash
 cd ~/ComfyUI && ./.venv/bin/python main.py --listen 127.0.0.1 --port 8188
@@ -39,30 +53,7 @@ cd ~/ComfyUI && ./.venv/bin/python main.py --listen 127.0.0.1 --port 8188
 手で起動したComfyUIが動いている間は `scripts/comfyui-session.sh` はそれを使い、
 停止もしない。
 
-### 2. 使えるcheckpointとpresetを確かめる
-
-存在しないcheckpointを指定しない。実在するものだけを使う。
-どのcheckpointがどういう絵柄で、cfgとstepsの実用域がどこかは
-[配置済みのSD1.5系モデル](../../../docs/prompting-guide.md#配置済みのsd15系モデル)にまとめてある。
-
-```bash
-ls ~/ComfyUI/models/checkpoints/
-ls ~/ComfyUI/models/loras/
-ls presets/characters presets/scenes presets/styles
-```
-
-DiT系モデル (Animaなど) はUNet単体で配布され、checkpointとは別の場所に置く。
-
-```bash
-ls ~/ComfyUI/models/diffusion_models/ ~/ComfyUI/models/text_encoders/ ~/ComfyUI/models/vae/
-```
-
-ControlNet / IPAdapterを使う場合は `~/ComfyUI/models/controlnet/`、
-`~/ComfyUI/models/ipadapter/`、`~/ComfyUI/models/clip_vision/` も見る。
-テキストを合成する場合は `ls fonts/` で実在するフォント名を確認する
-(空なら [docs/fonts-setup.md](../../../docs/fonts-setup.md) の手順を案内する)。
-
-### 3. presetを選ぶか、新しく作る
+### 2. presetを選ぶか、新しく作る
 
 要求に合うpresetがあれば名前で参照する。軸は3つで、1軸につき1つまで。
 
@@ -108,7 +99,7 @@ sceneだけ差し替える。プロンプトを一から書き直さない。
 顔立ちまで固定したい場合は [references/character-consistency.md](references/character-consistency.md)
 の手順で基準画像を作り `reference` に指定する。
 
-### 4. 一言だけの要求なら、Specを作る前に確認する
+### 3. 一言だけの要求なら、Specを作る前に確認する
 
 「猫の画像を作って」のように要求が一言で、モデル・解像度・画風が読み取れない場合は、
 推測で埋めずに **AskUserQuestion** で聞く。解像度やcheckpointは出来上がりと所要時間を
@@ -133,7 +124,7 @@ sceneだけ差し替える。プロンプトを一から書き直さない。
 要求から明らかな項目は聞かない。3項目のうち2つが要求文で決まっているなら、
 残る1つだけを聞く。
 
-### 5. Specを作る
+### 4. Specを作る
 
 `specs/generated/<内容が分かる名前>.yaml` へ保存する (git管理外)。
 
@@ -197,7 +188,7 @@ SDXL / Illustrious系は品質タグを先頭に置き `score_9` 系の記法は
 - 入力画像・参照画像・control画像は `inputs/` へ置く。生成前にComfyUIへ自動でアップロードされるため、
   `~/ComfyUI/input/` へ手で置かない
 
-### 6. validateする
+### 5. validateする
 
 ```bash
 uv run imagegen validate specs/generated/<name>.yaml
@@ -207,7 +198,7 @@ uv run imagegen validate specs/generated/<name>.yaml
 確認する。`text` を書いた場合は `Text:` 行にレイヤ数とフォント名が出る。
 検証を緩めて通すことはしない。
 
-### 7. generateする
+### 6. generateする
 
 ```bash
 scripts/comfyui-session.sh generate specs/generated/<name>.yaml
@@ -246,7 +237,7 @@ IPAdapter (`reference`) とhires fix (`generation.upscale`) は併用できな�
 uv run imagegen compose inputs/base.png specs/generated/caption.yaml
 ```
 
-### 8. 結果を報告する
+### 7. 結果を報告する
 
 exit codeが0であること、出力ファイルが存在することを確認したうえで、
 **生成された画像のパスとseed** を伝える。テキストを合成した場合は、

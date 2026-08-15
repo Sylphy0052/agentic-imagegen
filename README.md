@@ -105,6 +105,42 @@ Devices: xpu:0 Intel(R) Graphics [0x7d55]
 
 `Devices:` が `xpu:0` ならIntel GPU、`cpu` ならCPU推論で動いている。
 
+### 使えるモデルとpresetの一覧
+
+実行基盤と、checkpoint / LoRA / ControlNet / IPAdapter / VAE / アップスケールモデル /
+embedding、リポジトリ内のpreset・フォントをまとめて出す。
+
+```bash
+uv run imagegen catalog
+```
+
+```text
+Backend: unavailable (filesystem fallback)
+ComfyUI home: /home/user/ComfyUI
+Presets: character 3 / scene 5 / style 16
+
+presets/style (16)
+  anima-base
+  ...
+
+checkpoints (14)
+  hassakuSD15_v13.safetensors  <- 既定 (sd15-hassaku)
+  ...
+```
+
+`Devices:` と `Version:` はComfyUIが起動しているときだけ出る。
+`Backend:` が取得元。ComfyUIが起動していれば `api` (実際に読み込める名前) を、
+起動していなければ `COMFYUI_HOME` 配下の `models/` を直接見た結果を出す。
+探索のためだけにComfyUIを起動しなくてよい。ただしIPAdapterのようにカスタムノードへ
+依存する種別は、ファイルが置いてあっても実際に使えるとは限らない。正確に見るなら
+ComfyUIを起動して実行する。
+
+```bash
+scripts/comfyui-session.sh catalog
+```
+
+`--json` で機械可読な形も出せる。
+
 ### Specの検証
 
 ComfyUIへは接続せず、Specだけを検証する。
@@ -294,12 +330,11 @@ Spec作成から生成まで自動で実行される。
 
 実行される流れ:
 
-1. `imagegen health` で実行基盤を確認
-2. 使えるcheckpoint / LoRA / presetを確認
-3. GenerationSpecを作成し `specs/generated/` へ保存
-4. `uv run imagegen validate` で検証
-5. `uv run imagegen generate` で生成
-6. 出力パスとseedを返す
+1. `imagegen catalog` で実行基盤と使えるモデル / presetを確認
+2. GenerationSpecを作成し `specs/generated/` へ保存
+3. `uv run imagegen validate` で検証
+4. `uv run imagegen generate` で生成
+5. 出力パスとseedを返す
 
 「同じキャラで別の構図」のような依頼では、基準画像を1枚作って `reference` に指定したまま
 scene presetだけを差し替える (手順:
