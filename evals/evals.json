@@ -361,6 +361,49 @@
         "tooling",
         "consistency"
       ]
+    },
+    {
+      "id": "caption-only-request-uses-compose",
+      "skill": "imagegen",
+      "query": "inputs/base.png に「夏の記録」って文字を入れて",
+      "expected_behaviors": [
+        "imagegen compose を使い、生成し直さない",
+        "text.layers だけを持つSpecを書く",
+        "フォントが実在するかをcatalogで確かめる",
+        "合成後のファイル (*_text.png) のパスを返す"
+      ],
+      "forbidden_behaviors": [
+        "txt2imgで作り直す",
+        "文字をプロンプトへ書いてモデルに描かせる",
+        "comfyui-session.sh 経由で実行する"
+      ],
+      "references": [
+        "docs/spec-reference.md"
+      ],
+      "tags": [
+        "routing"
+      ]
+    },
+    {
+      "id": "upscale-only-request-uses-img2img",
+      "skill": "imagegen",
+      "query": "この前作った画像をもっと大きくして",
+      "expected_behaviors": [
+        "img2img + generation.upscale で作り直すことを説明する",
+        "元の絵を作ったcheckpointとstyle presetを history か character から引く",
+        "denoiseを低め (0.3-0.45) にして元の絵を保つ",
+        "validate の Estimate: を見てから流す"
+      ],
+      "forbidden_behaviors": [
+        "生成済み画像だけを拡大するコマンドがあるかのように振る舞う",
+        "元と違うcheckpointで拡大する"
+      ],
+      "references": [
+        "docs/spec-reference.md"
+      ],
+      "tags": [
+        "routing"
+      ]
     }
   ]
 }

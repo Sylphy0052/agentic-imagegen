@@ -1,6 +1,6 @@
 ---
 name: imagegen
-description: "自然言語の画像生成要求をGenerationSpecへ落とし込み、preset選択・validate・generateまで実行して出力パスとseedを返す。ComfyUI未起動時やエラー時は原因ごとの切り分けまで担う。Use when: 「〇〇な画像を生成して」「画像を作って」「イラストを生成」「同じキャラで別の構図」「presetを追加して」「どのモデルがいいか比べて」「設定を振って比較して」、/imagegen。"
+description: "自然言語の画像生成要求をGenerationSpecへ落とし込み、preset選択・validate・generateまで実行して出力パスとseedを返す。生成済み画像へのテキスト合成・拡大、過去の生成やキャラクタ台帳の照会も扱う。ComfyUI未起動時やエラー時は原因ごとの切り分けまで担う。Use when: 「〇〇な画像を生成して」「画像を作って」「イラストを生成」「同じキャラで別の構図」「presetを追加して」「どのモデルがいいか比べて」「設定を振って比較して」「この画像に文字を入れて」「この画像を大きくして」「さっきの子の設定を教えて」「どのモデルが入ってる？」、/imagegen。"
 allowed-tools: Read, Write, Bash, Glob, Grep, AskUserQuestion
 argument-hint: "[生成したい画像の説明]"
 ---
@@ -15,6 +15,20 @@ Workflowテンプレートは人間がComfyUI GUIで作成したものだけを�
 **Specのフィールド仕様 (値域・既定値・組み合わせ規則) は
 [docs/spec-reference.md](../../../docs/spec-reference.md) を一次情報とする。**
 このSKILLは要求を受けてから結果を返すまでの手順を扱う。
+
+## 要求の種類から入口を決める
+
+全部が生成の依頼ではない。生成しない要求で手順1から読み始めない。
+
+| 要求 | 行き先 |
+| --- | --- |
+| 「〇〇な画像を生成して」「イラストを作って」 | [手順](#手順) の1から順に |
+| 「さっきの子で別の場面を」 | [手順](#手順) の1 (台帳・記録から引く) |
+| 「この画像に文字を入れて」「キャプションを付けて」 | [生成済み画像へテキストだけ入れる](#生成済み画像へテキストだけ入れる) |
+| 「この画像を大きくして」「高解像度にして」 | [生成済み画像を大きくする](#生成済み画像を大きくする) |
+| 「前回どう作ったっけ」「あの子の設定は」 | [過去の生成とキャラクタを照会する](#過去の生成とキャラクタを照会する) |
+| 「どのモデルが入ってる」「LoRAの一覧」 | [手順](#手順) の1 (`catalog`) |
+| 「どれがいいか比べて」「設定を振って」 | [references/ablation.md](references/ablation.md) |
 
 ## 手順
 
@@ -267,12 +281,6 @@ IPAdapter (`reference`) とhires fix (`generation.upscale`) は併用できな�
 seedとプロンプトを固定し、条件が本当に揃っているかを `metadata.json` で確かめる。
 手順と、結論をどこへ書くかは [references/ablation.md](references/ablation.md) を参照。
 
-生成済みの画像へ後からテキストだけ入れる場合は `compose` を使う。入力画像は変更しない。
-
-```bash
-uv run imagegen compose inputs/base.png specs/generated/caption.yaml
-```
-
 ### 7. 結果を報告する
 
 exit codeが0であること、出力ファイルが存在することを確認したうえで、
@@ -284,6 +292,62 @@ seedに `-1` を指定した場合は実際に使われた値が `metadata.json`
 
 seedを振って比べた場合は、**どのseedを採ったか、指定した要素が何本中何本で命中したか**を
 併せて伝える。命中しなかった要素は黙って落とさず、外れた内容 (色が違う、丈が違う) を報告する。
+
+## 生成以外の要求
+
+### 生成済み画像へテキストだけ入れる
+
+「この画像に文字を入れて」と言われた場合は生成し直さない。`compose` は
+入力画像を変更せず、テキストを重ねた別ファイル (`*_text.png`) を書き出す。
+
+```bash
+uv run imagegen compose inputs/base.png specs/generated/caption.yaml
+```
+
+ComfyUIへは接続しないため `scripts/comfyui-session.sh` を経由しなくてよい。
+Specは `text.layers` だけを持つものを書く (書き方は
+[text](../../../docs/spec-reference.md#text-テキスト合成))。
+フォントが未配置なら `catalog` の `fonts` が `(なし)` になる。
+
+### 生成済み画像を大きくする
+
+「この画像を大きくして」と言われた場合はimg2imgで作り直す。生成済み画像だけを
+拡大するコマンドは持たない (アップスケールは生成パイプラインの中にある)。
+
+1. 対象の画像を `inputs/` へ置く
+2. `task: img2img` と `source.denoise` を低め (0.3-0.45) にして元の絵を保つ
+3. `generation.upscale.scale` で倍率を指定する。線を補間したいなら
+   `generation.upscale.model` にアップスケールモデルを指定する
+
+```yaml
+task: img2img
+source:
+  image: inputs/base.png
+  denoise: 0.35
+generation:
+  upscale:
+    scale: 2.0
+    denoise: 0.4
+    steps: 12
+```
+
+**元の絵を作ったcheckpointとstyle presetを揃える。** 変えると拡大のついでに
+絵柄まで変わる。分からない場合は次の照会で引く。
+拡大後の総pixel数には上限がある (`IMAGEGEN_MAX_UPSCALED_PIXELS`)。
+所要時間は倍以上に伸びるため、`validate` の `Estimate:` を見てから流す。
+
+### 過去の生成とキャラクタを照会する
+
+生成を伴わない照会だけの要求。ComfyUIへは接続しない。
+
+```bash
+uv run imagegen character list          # 台帳にいるキャラクタ
+uv run imagegen character show yui      # preset・checkpoint・基準画像・seed
+uv run imagegen history --limit 5       # 直近の生成
+uv run imagegen history --prefix yui    # 出力ディレクトリ名で絞る
+```
+
+答えるだけで済む要求に対して、確認なく生成を始めない。
 
 ## 失敗したとき
 
