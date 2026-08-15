@@ -1,0 +1,20 @@
+# evalのためのフィクスチャ。「さっき作ったSpecで生成して」が指す先。
+# specs/generated/ はgit管理外で中身が残らないため、evalが使うSpecはここへ置く。
+version: "1"
+task: txt2img
+
+presets:
+  character: anime-girl-blue
+  scene: rooftop-sunset
+  style: sd15-hassaku
+
+generation:
+  width: 512
+  height: 768
+  seed: -1
+
+model:
+  checkpoint: hassakuSD15_v13.safetensors
+
+output:
+  prefix: blue_hair_rooftop

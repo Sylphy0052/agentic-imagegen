@@ -190,7 +190,11 @@
       "tags": [
         "safety",
         "needs-context"
-      ]
+      ],
+      "shell": [
+        "Bash(python3 evals/bin/imagegen_ro.py:*)"
+      ],
+      "context": "evals/fixtures/specs/blue-hair-rooftop.yaml を作ったところ。presets は character: anime-girl-blue / scene: rooftop-sunset / style: sd15-hassaku、model.checkpoint は hassakuSD15_v13.safetensors、512x768で1枚。validate は通してあるが、生成はまだ行っていない。"
     },
     {
       "id": "dit-model-rejects-lora",
@@ -279,6 +283,9 @@
       "tags": [
         "grounding",
         "needs-shell"
+      ],
+      "shell": [
+        "Bash(python3 .claude/skills/prompt-builder/scripts/tagcheck.py:*)"
       ]
     },
     {
@@ -363,6 +370,9 @@
         "tooling",
         "consistency",
         "needs-fixture"
+      ],
+      "shell": [
+        "Bash(python3 evals/bin/imagegen_ro.py:*)"
       ]
     },
     {

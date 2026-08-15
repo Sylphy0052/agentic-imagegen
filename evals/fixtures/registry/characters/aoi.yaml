@@ -1,0 +1,13 @@
+# evalのためのフィクスチャ。実運用の registry/ とは別に置き、
+# `run_case.py` が IMAGEGEN_REGISTRY_ROOT でこちらを見せる。
+#
+# reference は意図的に実在しないパスにしてある。台帳は古びるものなので、
+# 「参照先の欠落 (warning) を無視しないか」までを1件で観測したい。
+
+description: 青い髪の少女。evalのフィクスチャ
+preset: anime-girl-blue
+style: sd15-hassaku
+checkpoint: hassakuSD15_v13.safetensors
+reference: inputs/aoi.png
+seed: 545078971
+notes: 基準画像は意図的に置いていない。warningが出るのが正しい状態
