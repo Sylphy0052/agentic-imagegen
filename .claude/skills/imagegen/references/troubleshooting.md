@@ -10,9 +10,9 @@ codeと例外クラスの対応は [CLAUDE.mdの「exit code」](../../../../CLA
 メッセージにフィールド名が出る。よくある原因:
 
 - `width` / `height` が8の倍数でない
-- `checkpoint` がComfyUIに存在しない。`ls ~/ComfyUI/models/checkpoints/` と突き合わせる
+- `checkpoint` がComfyUIに存在しない。`uv run imagegen catalog` の `checkpoints` と突き合わせる
 - `checkpoint` にPath Traversal (`..` / 絶対パス / 2階層以上のサブフォルダ) が含まれる
-- preset名が見つからない。`ls presets/characters presets/scenes presets/styles` で確認する
+- preset名が見つからない。`uv run imagegen catalog` の `presets/*` で確認する
 - preset名に使えない文字が入っている。英数字始まりで `[A-Za-z0-9._-]` のみ
 - `presets:` を書いたのに探索ルートが渡っていない。CLI経由なら通常起きない
 - 解像度やbatch_sizeが `IMAGEGEN_MAX_*` の上限を超えている
@@ -54,8 +54,10 @@ ComfyUIがWorkflowの投入を拒否した。カスタムノードとモデル�
 - IPAdapterを使う場合、[ComfyUI_IPAdapter_plus](https://github.com/cubiq/ComfyUI_IPAdapter_plus)
   が要る。未導入だと `IPAdapterModelLoader` などのノード自体が存在しない。
   `uv run python -c "..."` ではなくMCPの `list_ipadapters` で確認できる (空なら未導入)
-- モデル名が実在しないと拒否される。ControlNetは `ls ~/ComfyUI/models/controlnet/`、
-  IPAdapterは `ls ~/ComfyUI/models/ipadapter/` と `ls ~/ComfyUI/models/clip_vision/` で確認する
+- モデル名が実在しないと拒否される。`uv run imagegen catalog` の
+  `controlnets` / `ipadapters` / `clip_visions` で確認する。ただし `Backend:` が
+  `filesystem` の場合はカスタムノードの導入有無まで分からないため、
+  `scripts/comfyui-session.sh catalog` で見直す
 - IPAdapterモデルとCLIP Visionには対応関係がある。`ip-adapter-plus_sd15` には
   ViT-H (`CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors`) を使う
 - checkpointのアーキテクチャとも対応が要る。SD1.5用のIPAdapterをSDXLのcheckpointへ
