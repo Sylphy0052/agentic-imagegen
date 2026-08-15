@@ -797,6 +797,11 @@ DiT系は`vae`が3点セットの必須項目として既に外部VAEを使っ�
 [character-consistency.md](../.claude/skills/imagegen/references/character-consistency.md)
 にある。
 
+**この表はComfyUIバックエンド (既定) のもの。** `IMAGEGEN_BACKEND=diffusers` で動かす場合は
+ControlNet / IPAdapter / hires fix / 外部VAE / DiT系がバックエンド側で未対応となり、
+Specとしては正しくても生成の直前に拒否される
+([docs/diffusers-backend.md](diffusers-backend.md))。
+
 不可の組み合わせを指定した場合はSpecの検証時 (exit code 2) に拒否する。理由と着手条件は
 [Issue #38](https://github.com/Sylphy0052/agentic-imagegen/issues/38) (hires fixとIPAdapterの併用) と
 [Issue #39](https://github.com/Sylphy0052/agentic-imagegen/issues/39)

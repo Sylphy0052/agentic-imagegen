@@ -17,6 +17,19 @@ dependencies = [
 [project.optional-dependencies]
 # MCP Serverとして使う場合のみ必要。CLI利用者には入れさせない。
 mcp = ["mcp>=2.0"]
+# Diffusersバックエンドを使う場合のみ必要。ComfyUI経由で使う分には入れさせない。
+# torchは数GBあるため、既定では入らないようにextraへ分けている。
+diffusers = [
+    "torch>=2.13",
+    "diffusers>=0.39",
+    "transformers>=4.50",
+    "accelerate>=1.0",
+    "peft>=0.17",
+    "safetensors>=0.8",
+    # torchの推移的依存だがPyPIには無い。tool.uv.sources は直接依存にしか効かないため、
+    # ここへ明示して pytorch-xpu index から解決させる。
+    "triton-xpu>=3.7; sys_platform == 'linux'",
+]
 
 [project.scripts]
 imagegen = "agentic_imagegen.cli:app"
@@ -106,3 +119,20 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "raise NotImplementedError",
 ]
+
+# torch (XPU版) が依存する triton-xpu はPython 3.15向けのwheelをまだ出していない。
+# requires-python の上限を上げるとCLI利用者まで縛るため、解決対象の環境だけを絞る。
+[tool.uv]
+environments = ["python_version < '3.15'"]
+
+# torchはPyPIのものではなくIntel XPU向けのビルドを使う。
+# explicit = true にして、torch以外がこのindexから解決されないようにする。
+[[tool.uv.index]]
+name = "pytorch-xpu"
+url = "https://download.pytorch.org/whl/xpu"
+explicit = true
+
+# torchが依存する triton-xpu もPyPIには無く、同じindexからしか取れない。
+[tool.uv.sources]
+torch = [{ index = "pytorch-xpu" }]
+triton-xpu = [{ index = "pytorch-xpu" }]

@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import re
+import secrets
 from pathlib import PurePosixPath
 from typing import Annotated, Final, Literal
 
@@ -84,6 +85,18 @@ DIMENSION_MULTIPLE: Final = 8
 #: seed に -1 を指定した場合は実行時に乱数へ解決する。
 RANDOM_SEED: Final = -1
 MAX_SEED: Final = 2**63 - 1
+
+
+def resolve_seed(seed: int) -> int:
+    """seedが -1 ならランダムな値へ解決する。それ以外はそのまま返す。
+
+    「-1はランダム」はSpecの取り決めであり特定バックエンドの都合ではないため、
+    どのバックエンドからも同じ規則で使えるようここに置く。
+    """
+    if seed != RANDOM_SEED:
+        return seed
+    return secrets.randbelow(MAX_SEED + 1)
+
 
 ALLOWED_CHECKPOINT_SUFFIXES: Final = frozenset({".safetensors", ".ckpt"})
 

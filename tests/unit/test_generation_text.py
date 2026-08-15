@@ -12,9 +12,9 @@ from PIL import Image
 
 from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.models import GenerationSpec
-from agentic_imagegen.domain.results import HealthStatus, ImageRef
+from agentic_imagegen.domain.results import HealthStatus
 from agentic_imagegen.errors import TextCompositionError
-from agentic_imagegen.services.generation import generate
+from agentic_imagegen.services.generation import BackendOutput, generate
 
 PROMPT_ID = "b3f0a1c2-0000-4000-8000-000000000002"
 CANVAS: tuple[int, int] = (128, 96)
@@ -29,44 +29,46 @@ def _png_bytes() -> bytes:
 class FakeBackend:
     """実際のPNGを返すテスト用バックエンド。"""
 
-    def __init__(self, *, images: tuple[ImageRef, ...]) -> None:
-        self.images = images
+    def __init__(self, *, count: int = 1) -> None:
+        self.count = count
 
-    async def submit(self, workflow: dict[str, Any]) -> str:
-        return PROMPT_ID
-
-    async def wait_for_completion(self, prompt_id: str, *, timeout: float | None = None) -> None:
-        return None
-
-    async def fetch_outputs(self, prompt_id: str) -> tuple[ImageRef, ...]:
-        return self.images
-
-    async def download(self, ref: ImageRef) -> bytes:
-        return _png_bytes()
+    async def execute(
+        self, spec: GenerationSpec, *, project_root: Path, timeout: float | None = None
+    ) -> BackendOutput:
+        return BackendOutput(
+            images=tuple(_png_bytes() for _ in range(self.count)),
+            seed=1,
+            request_id=PROMPT_ID,
+            info={},
+            suffixes=(".png",) * self.count,
+        )
 
     async def health(self) -> HealthStatus:
         return HealthStatus(
             base_url="http://127.0.0.1:8188", comfyui_version="0.32.0", devices=("cpu",)
         )
 
-    async def upload_image(self, path: Path) -> str:
-        return path.name
-
 
 class PartiallyBrokenBackend(FakeBackend):
-    """指定したファイル名の画像として、画像として開けないバイト列を返すバックエンド。
+    """指定したindexの画像として、画像として開けないバイト列を返すバックエンド。
 
     batch_size > 1 での途中失敗 (2件目のテキスト合成が失敗する状況) を再現するために使う。
     """
 
-    def __init__(self, *, images: tuple[ImageRef, ...], broken_filenames: frozenset[str]) -> None:
-        super().__init__(images=images)
-        self._broken_filenames = broken_filenames
+    def __init__(self, *, count: int, broken_indexes: frozenset[int]) -> None:
+        super().__init__(count=count)
+        self._broken_indexes = broken_indexes
 
-    async def download(self, ref: ImageRef) -> bytes:
-        if ref.filename in self._broken_filenames:
-            return b"not an image"
-        return _png_bytes()
+    async def execute(
+        self, spec: GenerationSpec, *, project_root: Path, timeout: float | None = None
+    ) -> BackendOutput:
+        images = tuple(
+            b"not an image" if index in self._broken_indexes else _png_bytes()
+            for index in range(self.count)
+        )
+        return BackendOutput(
+            images=images, seed=1, request_id=PROMPT_ID, info={}, suffixes=(".png",) * self.count
+        )
 
 
 def _settings(tmp_path: Path, **overrides: Any) -> Settings:
@@ -100,7 +102,7 @@ def _text(**overrides: Any) -> dict[str, Any]:
 
 
 def _backend() -> FakeBackend:
-    return FakeBackend(images=(ImageRef(filename="a.png", subfolder="", type="output"),))
+    return FakeBackend(count=1)
 
 
 def _metadata(result: Any) -> dict[str, Any]:
@@ -116,7 +118,6 @@ class TestGenerateWithoutText:
             _settings(tmp_path),
             backend=_backend(),
             project_root=tmp_path,
-            workflows_dir=Path("workflows"),
         )
 
         assert result.text_files == ()
@@ -128,7 +129,6 @@ class TestGenerateWithoutText:
             _settings(tmp_path),
             backend=_backend(),
             project_root=tmp_path,
-            workflows_dir=Path("workflows"),
         )
 
         assert _metadata(result)["text"] is None
@@ -142,7 +142,6 @@ class TestGenerateWithText:
             _settings(tmp_path, fonts_root=fonts_root),
             backend=_backend(),
             project_root=tmp_path,
-            workflows_dir=Path("workflows"),
         )
 
         assert len(result.text_files) == 1
@@ -156,7 +155,6 @@ class TestGenerateWithText:
             _settings(tmp_path, fonts_root=fonts_root),
             backend=_backend(),
             project_root=tmp_path,
-            workflows_dir=Path("workflows"),
         )
 
         assert len(result.files) == 1
@@ -169,7 +167,6 @@ class TestGenerateWithText:
             _settings(tmp_path, fonts_root=fonts_root),
             backend=_backend(),
             project_root=tmp_path,
-            workflows_dir=Path("workflows"),
         )
 
         text = _metadata(result)["text"]
@@ -184,7 +181,6 @@ class TestGenerateWithText:
             _settings(tmp_path, fonts_root=fonts_root),
             backend=_backend(),
             project_root=tmp_path,
-            workflows_dir=Path("workflows"),
         )
 
         layers = _metadata(result)["spec"]["text"]["layers"]
@@ -203,7 +199,6 @@ class TestGenerateWithText:
             _settings(tmp_path, fonts_root=Path("assets/fonts")),
             backend=_backend(),
             project_root=tmp_path,
-            workflows_dir=Path("workflows"),
         )
 
         assert result.text_files[0].is_file()
@@ -218,7 +213,6 @@ class TestComposeFailure:
                 _settings(tmp_path, fonts_root=tmp_path / "absent"),
                 backend=_backend(),
                 project_root=tmp_path,
-                workflows_dir=Path("workflows"),
             )
 
     async def test_keeps_outputs_and_metadata(self, tmp_path: Path) -> None:
@@ -228,7 +222,6 @@ class TestComposeFailure:
                 _settings(tmp_path, fonts_root=tmp_path / "absent"),
                 backend=_backend(),
                 project_root=tmp_path,
-                workflows_dir=Path("workflows"),
             )
 
         images = sorted((tmp_path / "outputs").rglob("image_0001.png"))
@@ -243,13 +236,7 @@ class TestPartialComposeFailure:
     """batch_size > 1 で2枚目以降の合成が失敗しても、1枚目の成功分は残る。"""
 
     def _backend(self) -> PartiallyBrokenBackend:
-        return PartiallyBrokenBackend(
-            images=(
-                ImageRef(filename="a.png", subfolder="", type="output"),
-                ImageRef(filename="b.png", subfolder="", type="output"),
-            ),
-            broken_filenames=frozenset({"b.png"}),
-        )
+        return PartiallyBrokenBackend(count=2, broken_indexes=frozenset({1}))
 
     async def test_keeps_earlier_success_as_text_file(
         self, tmp_path: Path, fonts_root: Path
@@ -260,7 +247,6 @@ class TestPartialComposeFailure:
                 _settings(tmp_path, fonts_root=fonts_root),
                 backend=self._backend(),
                 project_root=tmp_path,
-                workflows_dir=Path("workflows"),
             )
 
         text_files = sorted((tmp_path / "outputs").rglob("*_text.png"))
@@ -275,7 +261,6 @@ class TestPartialComposeFailure:
                 _settings(tmp_path, fonts_root=fonts_root),
                 backend=self._backend(),
                 project_root=tmp_path,
-                workflows_dir=Path("workflows"),
             )
 
         metadata_path = sorted((tmp_path / "outputs").rglob("metadata.json"))[0]

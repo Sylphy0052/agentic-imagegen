@@ -21,6 +21,8 @@ ENV_KEYS = [
     "IMAGEGEN_FONTS_ROOT",
     "IMAGEGEN_REGISTRY_ROOT",
     "COMFYUI_HOME",
+    "IMAGEGEN_BACKEND",
+    "IMAGEGEN_MODELS_ROOT",
 ]
 
 
@@ -44,6 +46,51 @@ def test_defaults() -> None:
     assert settings.registry_root.name == "registry"
     assert settings.max_source_bytes == 32 * 1024 * 1024
     assert settings.max_upscaled_pixels == 16777216
+    # 既定はComfyUI。2つ目のバックエンドは明示的に選んだときだけ使う
+    assert settings.backend == "comfyui"
+    # モデルの置き場はバックエンドによっては不要なため、既定では持たない
+    assert settings.models_root is None
+
+
+class TestBackendSelection:
+    """どのバックエンドで生成するかの選択 (Issue #31)。"""
+
+    def test_diffusers_can_be_selected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("IMAGEGEN_BACKEND", "diffusers")
+
+        assert Settings.from_env().backend == "diffusers"
+
+    def test_value_is_case_insensitive_and_trimmed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("IMAGEGEN_BACKEND", "  Diffusers ")
+
+        assert Settings.from_env().backend == "diffusers"
+
+    def test_unknown_backend_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """名前を間違えたまま既定のComfyUIで動くと、切り替えたつもりが効かない。"""
+        monkeypatch.setenv("IMAGEGEN_BACKEND", "a1111")
+
+        with pytest.raises(InvalidConfiguration) as exc:
+            Settings.from_env()
+
+        assert "IMAGEGEN_BACKEND" in str(exc.value)
+        # 選べる値を示して、次に何を書けばよいか分かるようにする
+        assert "comfyui" in str(exc.value)
+        assert "diffusers" in str(exc.value)
+
+    def test_models_root_is_read(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("IMAGEGEN_MODELS_ROOT", "/home/user/ComfyUI/models")
+
+        settings = Settings.from_env()
+
+        assert settings.models_root == Path("/home/user/ComfyUI/models")
+
+    def test_empty_models_root_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("IMAGEGEN_MODELS_ROOT", "  ")
+
+        with pytest.raises(InvalidConfiguration) as exc:
+            Settings.from_env()
+
+        assert "IMAGEGEN_MODELS_ROOT" in str(exc.value)
 
 
 def test_override_from_env(monkeypatch: pytest.MonkeyPatch) -> None:

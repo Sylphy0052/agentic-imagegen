@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 from urllib.parse import urlparse
 
 from agentic_imagegen.errors import InvalidConfiguration
@@ -44,6 +44,46 @@ DEFAULT_MAX_SOURCE_BYTES: Final = 32 * 1024 * 1024
 BATCH_HARD_LIMIT: Final = 4
 
 _ALLOWED_SCHEMES: Final = frozenset({"http", "https"})
+
+#: 生成に使えるバックエンド。既定はComfyUI。
+BackendName = Literal["comfyui", "diffusers"]
+
+#: BackendName の実体。Literalの型引数からは実行時の集合を作れないため別に持つ。
+BACKEND_NAMES: Final[tuple[BackendName, ...]] = ("comfyui", "diffusers")
+
+DEFAULT_BACKEND: Final[BackendName] = "comfyui"
+
+
+def _backend(key: str, default: BackendName) -> BackendName:
+    """どのバックエンドで生成するかを読む。
+
+    名前を間違えたまま既定へ落とすと、切り替えたつもりが効かないまま
+    ComfyUIで生成されてしまう。知らない値は受け付けない。
+    """
+    raw = os.environ.get(key)
+    if raw is None:
+        return default
+    value = raw.strip().lower()
+    if not value:
+        return default
+    if value not in BACKEND_NAMES:
+        allowed = " / ".join(BACKEND_NAMES)
+        raise InvalidConfiguration(
+            f"{key} には {allowed} のいずれかを指定してください (指定値: {raw!r})"
+        )
+    # 上のinで絞り込み済みだが、型としては str のままなのでここで確定させる
+    return "diffusers" if value == "diffusers" else "comfyui"
+
+
+def _optional_path(key: str) -> Path | None:
+    """未設定を許すパス設定を読む。空文字は設定漏れとみなして拒否する。"""
+    raw = os.environ.get(key)
+    if raw is None:
+        return None
+    value = raw.strip()
+    if not value:
+        raise InvalidConfiguration(f"{key} に空文字は指定できません")
+    return Path(value)
 
 
 def _positive_int(key: str, default: int, *, maximum: int | None = None) -> int:
@@ -100,6 +140,11 @@ class Settings:
     comfyui_home: Path = DEFAULT_COMFYUI_HOME_PATH
     #: キャラクタ台帳の探索ルート。
     registry_root: Path = Path(DEFAULT_REGISTRY_ROOT)
+    #: どのバックエンドで生成するか。既定はComfyUI。
+    backend: BackendName = DEFAULT_BACKEND
+    #: モデルファイルの探索ルート (配下に checkpoints / loras が並ぶ想定)。
+    #: ComfyUIバックエンドはComfyUI側が解決するため使わない。未設定を許す。
+    models_root: Path | None = None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -142,7 +187,9 @@ class Settings:
             fonts_root=Path(fonts_root),
             comfyui_home=Path(comfyui_home).expanduser(),
             registry_root=Path(registry_root),
+            backend=_backend("IMAGEGEN_BACKEND", DEFAULT_BACKEND),
+            models_root=_optional_path("IMAGEGEN_MODELS_ROOT"),
         )
 
 
-__all__ = ["Settings"]
+__all__ = ["BACKEND_NAMES", "BackendName", "Settings"]

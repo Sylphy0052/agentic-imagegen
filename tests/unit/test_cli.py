@@ -84,12 +84,12 @@ def _write_spec(tmp_path: Path, content: str = VALID_SPEC) -> Path:
 
 
 def test_health_reachable(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cli, "ComfyUIClient", FakeClient)
+    monkeypatch.setattr(cli, "open_generation_backend", FakeClient)
 
     result = runner.invoke(cli.app, ["health"])
 
     assert result.exit_code == 0
-    assert "ComfyUI: reachable" in result.output
+    assert "comfyui: reachable" in result.output
     assert "http://127.0.0.1:8188" in result.output
 
 
@@ -97,7 +97,7 @@ def test_health_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
     def factory(*args: Any, **kwargs: Any) -> FakeClient:
         return FakeClient(health_error=ComfyUIUnavailable("接続できません"))
 
-    monkeypatch.setattr(cli, "ComfyUIClient", factory)
+    monkeypatch.setattr(cli, "open_generation_backend", factory)
 
     result = runner.invoke(cli.app, ["health"])
 
@@ -269,7 +269,7 @@ def _result(tmp_path: Path, *, with_text: bool = False) -> GenerationResult:
 
 
 def test_generate_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cli, "ComfyUIClient", FakeClient)
+    monkeypatch.setattr(cli, "open_generation_backend", FakeClient)
     monkeypatch.setattr(cli, "generate", _stub_generate(_result(tmp_path)))
 
     result = runner.invoke(cli.app, ["generate", str(_write_spec(tmp_path))])
@@ -283,7 +283,7 @@ def test_generate_reports_composed_text_images(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """テキスト合成の結果は生成そのままの画像と区別して出す。"""
-    monkeypatch.setattr(cli, "ComfyUIClient", FakeClient)
+    monkeypatch.setattr(cli, "open_generation_backend", FakeClient)
     monkeypatch.setattr(cli, "generate", _stub_generate(_result(tmp_path, with_text=True)))
 
     result = runner.invoke(cli.app, ["generate", str(_write_spec(tmp_path))])
@@ -317,7 +317,7 @@ def test_generate_error_exit_codes(
     error: Exception,
     expected_code: int,
 ) -> None:
-    monkeypatch.setattr(cli, "ComfyUIClient", FakeClient)
+    monkeypatch.setattr(cli, "open_generation_backend", FakeClient)
     monkeypatch.setattr(cli, "generate", _stub_generate(error))
 
     result = runner.invoke(cli.app, ["generate", str(_write_spec(tmp_path))])
@@ -328,7 +328,7 @@ def test_generate_error_exit_codes(
 def test_generate_unexpected_error_exit_code(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(cli, "ComfyUIClient", FakeClient)
+    monkeypatch.setattr(cli, "open_generation_backend", FakeClient)
     monkeypatch.setattr(cli, "generate", _stub_generate(RuntimeError("boom")))
 
     result = runner.invoke(cli.app, ["generate", str(_write_spec(tmp_path))])
@@ -343,7 +343,7 @@ def test_generate_timeout_option_is_passed(tmp_path: Path, monkeypatch: pytest.M
         captured.update(kwargs)
         return _result(tmp_path)
 
-    monkeypatch.setattr(cli, "ComfyUIClient", FakeClient)
+    monkeypatch.setattr(cli, "open_generation_backend", FakeClient)
     monkeypatch.setattr(cli, "generate", _generate)
 
     result = runner.invoke(cli.app, ["generate", str(_write_spec(tmp_path)), "--timeout", "42"])

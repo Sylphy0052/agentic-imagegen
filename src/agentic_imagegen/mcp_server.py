@@ -19,7 +19,7 @@ from typing import Any, Final
 from mcp.server.mcpserver import MCPServer
 
 from agentic_imagegen import __version__
-from agentic_imagegen.adapters.comfyui.client import ComfyUIClient
+from agentic_imagegen.backends import open_catalog_backend, open_generation_backend
 from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.results import GenerationResult
 from agentic_imagegen.services import mcp_tools
@@ -34,11 +34,12 @@ _registry: Final = JobRegistry[GenerationResult]()
 #: 一括生成のジョブ。結果の形が違うため単発とは別に持つ。
 _batch_registry: Final = JobRegistry[list[BatchOutcome]]()
 
-#: 実運用で使うバックエンドはComfyUI固定。ComfyUIClient(settings) は
-#: CatalogBackend / GenerationBackend のどちらのProtocolも構造的に満たすため、
-#: 列挙系・生成系のどちらのファクトリとしてもこの定数をそのまま渡せる。
-#: composition root (このファイル) だけがComfyUI具象を知っていればよい。
-_BACKEND_FACTORY: Final = ComfyUIClient
+#: 使うバックエンドは IMAGEGEN_BACKEND で決まる (既定はComfyUI)。
+#: 具象の選択は backends へ寄せ、composition root (このファイル) は
+#: 「どちらのファクトリを渡すか」だけを知る。列挙系と生成系で開くものが
+#: 違う場合があるため、ファクトリは2つに分けて渡す。
+_CATALOG_FACTORY: Final = open_catalog_backend
+_GENERATION_FACTORY: Final = open_generation_backend
 
 server: Final = MCPServer(
     name=SERVER_NAME,
@@ -79,19 +80,19 @@ def validate_generation(spec: dict[str, Any]) -> dict[str, Any]:
 @server.tool()
 async def list_models() -> list[str]:
     """ComfyUIが持っているcheckpoint名の一覧を返す。"""
-    return await mcp_tools.list_models(Settings.from_env(), backend_factory=_BACKEND_FACTORY)
+    return await mcp_tools.list_models(Settings.from_env(), backend_factory=_CATALOG_FACTORY)
 
 
 @server.tool()
 async def list_loras() -> list[str]:
     """ComfyUIが持っているLoRA名の一覧を返す。"""
-    return await mcp_tools.list_loras(Settings.from_env(), backend_factory=_BACKEND_FACTORY)
+    return await mcp_tools.list_loras(Settings.from_env(), backend_factory=_CATALOG_FACTORY)
 
 
 @server.tool()
 async def list_controlnets() -> list[str]:
     """ComfyUIが持っているControlNetモデル名の一覧を返す。"""
-    return await mcp_tools.list_controlnets(Settings.from_env(), backend_factory=_BACKEND_FACTORY)
+    return await mcp_tools.list_controlnets(Settings.from_env(), backend_factory=_CATALOG_FACTORY)
 
 
 @server.tool()
@@ -100,7 +101,7 @@ async def list_ipadapters() -> list[str]:
 
     空の場合はカスタムノードが未導入で、reference (IPAdapter) を使えない。
     """
-    return await mcp_tools.list_ipadapters(Settings.from_env(), backend_factory=_BACKEND_FACTORY)
+    return await mcp_tools.list_ipadapters(Settings.from_env(), backend_factory=_CATALOG_FACTORY)
 
 
 @server.tool()
@@ -109,7 +110,7 @@ async def list_clip_visions() -> list[str]:
 
     reference.clip_vision にはここに出る名前だけを指定する。
     """
-    return await mcp_tools.list_clip_visions(Settings.from_env(), backend_factory=_BACKEND_FACTORY)
+    return await mcp_tools.list_clip_visions(Settings.from_env(), backend_factory=_CATALOG_FACTORY)
 
 
 @server.tool()
@@ -119,20 +120,20 @@ async def list_diffusion_models() -> list[str]:
     DiT系モデル (Anima など) を使うときに model.unet へ指定する。
     """
     return await mcp_tools.list_diffusion_models(
-        Settings.from_env(), backend_factory=_BACKEND_FACTORY
+        Settings.from_env(), backend_factory=_CATALOG_FACTORY
     )
 
 
 @server.tool()
 async def list_text_encoders() -> list[str]:
     """ComfyUIが持っているtext encoder名の一覧を返す。model.clip へ指定する。"""
-    return await mcp_tools.list_text_encoders(Settings.from_env(), backend_factory=_BACKEND_FACTORY)
+    return await mcp_tools.list_text_encoders(Settings.from_env(), backend_factory=_CATALOG_FACTORY)
 
 
 @server.tool()
 async def list_vaes() -> list[str]:
     """ComfyUIが持っているVAE名の一覧を返す。model.vae へ指定する。"""
-    return await mcp_tools.list_vaes(Settings.from_env(), backend_factory=_BACKEND_FACTORY)
+    return await mcp_tools.list_vaes(Settings.from_env(), backend_factory=_CATALOG_FACTORY)
 
 
 @server.tool()
@@ -142,7 +143,7 @@ async def list_upscale_models() -> list[str]:
     generation.upscale.model へ指定する。空ならlatent拡大だけが使える。
     """
     return await mcp_tools.list_upscale_models(
-        Settings.from_env(), backend_factory=_BACKEND_FACTORY
+        Settings.from_env(), backend_factory=_CATALOG_FACTORY
     )
 
 
@@ -153,7 +154,7 @@ async def list_embeddings() -> list[str]:
     prompt中の `embedding:<name>` にはここに出る名前だけを指定する。
     未配置のembeddingを指定した場合は生成前に拒否される。
     """
-    return await mcp_tools.list_embeddings(Settings.from_env(), backend_factory=_BACKEND_FACTORY)
+    return await mcp_tools.list_embeddings(Settings.from_env(), backend_factory=_CATALOG_FACTORY)
 
 
 @server.tool()
@@ -176,7 +177,7 @@ async def generate_image(spec: dict[str, Any]) -> dict[str, Any]:
         settings=Settings.from_env(),
         project_root=project_root(),
         registry=_registry,
-        backend_factory=_BACKEND_FACTORY,
+        backend_factory=_GENERATION_FACTORY,
     )
 
 
@@ -201,7 +202,7 @@ async def generate_batch(
         settings=Settings.from_env(),
         project_root=project_root(),
         registry=_batch_registry,
-        backend_factory=_BACKEND_FACTORY,
+        backend_factory=_GENERATION_FACTORY,
     )
 
 

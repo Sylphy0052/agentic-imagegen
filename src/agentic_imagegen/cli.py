@@ -18,7 +18,7 @@ from typing import Annotated, Final
 import typer
 
 from agentic_imagegen import __version__
-from agentic_imagegen.adapters.comfyui.client import ComfyUIClient
+from agentic_imagegen.backends import open_catalog_backend, open_generation_backend
 from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.characters import Character
 from agentic_imagegen.domain.models import GenerationSpec
@@ -90,12 +90,12 @@ def health(verbose: VerboseOption = False) -> None:
         try:
             status = asyncio.run(_check_health(settings))
         except ComfyUIUnavailable as exc:
-            typer.echo("ComfyUI: unreachable", err=True)
+            typer.echo(f"{settings.backend}: unreachable", err=True)
             typer.echo(f"URL: {settings.comfyui_base_url}", err=True)
             typer.echo(str(exc), err=True)
             raise typer.Exit(exc.exit_code) from exc
 
-        typer.echo("ComfyUI: reachable")
+        typer.echo(f"{settings.backend}: reachable")
         typer.echo(f"URL: {status.base_url}")
         if status.comfyui_version:
             typer.echo(f"Version: {status.comfyui_version}")
@@ -122,7 +122,7 @@ def catalog(
         snapshot = asyncio.run(
             collect_catalog(
                 settings,
-                backend_factory=ComfyUIClient,
+                backend_factory=open_catalog_backend,
                 comfyui_home=settings.comfyui_home,
                 presets_root=_resolve_root(settings.presets_root, project_root),
                 fonts_root=resolve_fonts_root(settings, project_root),
@@ -632,7 +632,7 @@ async def _run_batch(
     items: list[BatchItem], settings: Settings, timeout: float | None
 ) -> list[BatchOutcome]:
     """バッチ全体で1つの接続を使い回す。"""
-    async with ComfyUIClient(settings) as client:
+    async with open_generation_backend(settings) as client:
 
         async def runner(item: BatchItem) -> GenerationResult:
             return await generate(
@@ -674,14 +674,14 @@ def _load_and_validate(spec_path: Path, settings: Settings) -> GenerationSpec:
 
 
 async def _check_health(settings: Settings) -> HealthStatus:
-    async with ComfyUIClient(settings) as client:
+    async with open_generation_backend(settings) as client:
         return await client.health()
 
 
 async def _run_generation(
     spec: GenerationSpec, settings: Settings, timeout: float | None
 ) -> GenerationResult:
-    async with ComfyUIClient(settings) as client:
+    async with open_generation_backend(settings) as client:
         return await generate(
             spec,
             settings,
