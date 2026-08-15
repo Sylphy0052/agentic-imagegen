@@ -89,7 +89,7 @@ checkpointを決めていない段階は `hassakuSD15_v13.safetensors` + `sd15-h
 (9種のSD1.5系を同一条件で比較した結果)。clip skipと外部VAEはstyle presetが持つため、
 Spec側に書くのは `model.checkpoint` だけでよい。
 負荷を下げたいときだけ汎用の `anime-soft` (steps 20) へ落とす。
-どのcheckpointにどのpresetを使うかは `ls presets/styles` と
+どのcheckpointにどのpresetを使うかは `catalog` の `presets/style` と
 [配置済みのSD1.5系モデル](../../../docs/prompting-guide.md#配置済みのsd15系モデル)の表で確認する。
 一覧と連結・優先順位の規則は
 [presets](../../../docs/spec-reference.md#presets) を参照。
@@ -117,9 +117,9 @@ sceneだけ差し替える。プロンプトを一から書き直さない。
 
 | 項目 | 選択肢の作り方 |
 | --- | --- |
-| モデル (checkpoint) | `ls ~/ComfyUI/models/checkpoints/` で実在するものから、要求に近い系統を推奨案にする。傾向は [配置済みのSD1.5系モデル](../../../docs/prompting-guide.md#配置済みのsd15系モデル) を見て書く |
+| モデル (checkpoint) | `catalog` の `checkpoints` にあるものから、要求に近い系統を推奨案にする。傾向は [配置済みのSD1.5系モデル](../../../docs/prompting-guide.md#配置済みのsd15系モデル) を見て書く |
 | 解像度・アスペクト | 縦長 512x768 / 正方形 512x512 / 横長 768x512 のように、CPU・XPUで現実的な範囲から出す。SDXL系を選んだ場合は1024x1024相当で出す |
-| 画風 (style preset) | `ls presets/styles` の実在するものから出す。checkpointが決まっていれば対応する `sd15-*` / `sdxl-*` / `anima-base` を推奨案にする |
+| 画風 (style preset) | `catalog` の `presets/style` にあるものから出す。checkpointが決まっていれば対応する `sd15-*` / `sdxl-*` / `anima-base` を推奨案にする |
 
 要求から明らかな項目は聞かない。3項目のうち2つが要求文で決まっているなら、
 残る1つだけを聞く。
