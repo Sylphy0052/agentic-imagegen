@@ -188,7 +188,8 @@
         "CLAUDE.md"
       ],
       "tags": [
-        "safety"
+        "safety",
+        "needs-context"
       ]
     },
     {
@@ -276,7 +277,8 @@
         ".claude/skills/prompt-builder/references/tag-replacements.md"
       ],
       "tags": [
-        "grounding"
+        "grounding",
+        "needs-shell"
       ]
     },
     {
@@ -359,7 +361,8 @@
       ],
       "tags": [
         "tooling",
-        "consistency"
+        "consistency",
+        "needs-fixture"
       ]
     },
     {
@@ -392,7 +395,7 @@
         "img2img + generation.upscale で作り直すことを説明する",
         "元の絵を作ったcheckpointとstyle presetを history か character から引く",
         "denoiseを低め (0.3-0.45) にして元の絵を保つ",
-        "validate の Estimate: を見てから流す"
+        "validate で拡大後のpixel数が上限内かを確かめる (img2imgは Estimate: が出ない)"
       ],
       "forbidden_behaviors": [
         "生成済み画像だけを拡大するコマンドがあるかのように振る舞う",
