@@ -6,8 +6,14 @@
 
 ## 観測条件
 
-`claude -p` を1 caseにつき1回起動した。渡したツールは `Read` / `Glob` / `Grep` / `Skill` だけで、
-生成もファイル書き込みもできない。「コマンドは実行せず、実行するはずのコマンドを書き出す」
+`claude -p` を1 caseにつき1回起動した。渡したツールは `Read` / `Glob` / `Grep` / `Skill` だけ。
+
+> **訂正 (同日、[needs- の採点](../2026-08-15-needs/SCORE.md)で判明)。**
+> この指定は効いていなかった。利用者のグローバル設定が `defaultMode: bypassPermissions`
+> かつallowリスト50件のため、`claude -p` の子セッションもそれを継承していた。
+> ここでの19 caseは「読み取りしかできない」状態ではなく、system promptの指示に
+> モデルが従っていただけ。`--permission-mode default` と `--setting-sources project` を
+> 固定して塞いだのはそのあと。「コマンドは実行せず、実行するはずのコマンドを書き出す」
 と指示してあるため、**叩いたコマンドは宣言として観測している**。
 コマンドの出力を読んで次を決める類のcaseは、この条件では最後まで見られない。
 
@@ -36,6 +42,9 @@
 | upscale-only-request-uses-img2img | 合格 | img2img + `generation.upscale`、`denoise: 0.35`、元のcheckpointとpresetを `history` から引く |
 
 合格15 / 一部未達2 / 判定不能2。`forbidden_behaviors` を踏んだcaseは無し。
+
+一部未達の `generation-goes-through-session-script` と判定不能の2 caseは、条件を整えて
+回し直して3件とも合格になった ([needs- の採点](../2026-08-15-needs/SCORE.md))。
 
 ## 分かったこと
 

@@ -48,8 +48,8 @@ python3 evals/run_case.py --all --outdir evals/results/2026-08-15
 観測条件が対話セッションと1点だけ違う。渡すツールを読み取り (`Read` / `Glob` / `Grep`)
 とskillの発火だけに絞り、「コマンドは実行せず、実行するはずのコマンドを書き出す」と
 指示してある。生成やファイル書き込みを無人で走らせないための制約で、
-**叩いたコマンドは実行ログではなく宣言として観測する**。宣言と実際の挙動が食い違いうる
-caseは、対話セッションで回して確かめる。
+**叩いたコマンドは実行ログではなく宣言として観測する**。
+例外は `shell` を持つcaseで、そこに書いたコマンドだけは実際に叩かせる。
 
 判定はここでは行わない。落ちた応答を読んで `expected_behaviors` /
 `forbidden_behaviors` と突き合わせるのは人 (またはエージェント) の仕事。
@@ -80,11 +80,20 @@ caseで見れば足りる。
 | `forbidden_behaviors` | 1つでも起きたら不合格になる振る舞い |
 | `presets` | caseが名指しするpreset (`character` / `scene` / `style`)。実在をテストが検査する |
 | `references` | caseの根拠になる文書。実在をテストが検査する |
+| `shell` | `run_case.py` が実行を許すコマンド。`Bash(<コマンド>:*)` の形で書く (省略可) |
+| `context` | 直前のやり取りとして渡す前提。これが無いと成立しないcaseだけに書く (省略可) |
 | `tags` | `regression:<Issue番号>` / `routing` / `safety` などの分類 |
 
-`tags` の `needs-` で始まるものは、`run_case.py` では最後まで判定できないcaseの印。
+`tags` の `needs-` で始まるものは、素の条件では最後まで判定できないcaseの印。
 `needs-shell` はコマンドの実行結果が要るもの、`needs-context` は直前の会話が要るもの、
-`needs-fixture` は台帳や過去の出力が要るもの。これらは対話セッションで回す。
+`needs-fixture` は台帳や過去の出力が要るもの。それぞれ `shell` / `context` /
+`evals/fixtures/` で補う。
+
+- `shell` へ書いたコマンドだけが実行を許される。`Bash` をそのまま許すと生成まで走るため、
+  必ず `Bash(uv run imagegen character:*)` のように名指しする
+- `context` はsystem prompt側へ「直前にあったこと」として渡す。`query` は書き換えない
+- 台帳は `evals/fixtures/registry` を見せる (`IMAGEGEN_REGISTRY_ROOT` で差し替えている)。
+  実運用の `registry/` は中身が変わるため、caseの判定が環境に左右されないようにする
 
 `tests/unit/test_skill_evals.py` が検査するのは書式と参照先の実在だけで、
 判定そのものは人 (またはエージェント) が行う。

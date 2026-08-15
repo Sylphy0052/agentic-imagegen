@@ -86,3 +86,37 @@ class TestCases:
         for case in cases:
             for reference in case.get("references", []):
                 assert (REPO_ROOT / reference).is_file(), f"{case['id']}: {reference}"
+
+
+class TestRunnerFields:
+    """`run_case.py` が読むフィールドと `needs-` タグの対応を保つ。"""
+
+    def test_shell_patterns_name_the_command(self, cases: list[dict[str, Any]]) -> None:
+        """`Bash` をそのまま許すと生成まで走る。"""
+        for case in cases:
+            for pattern in case.get("shell", []):
+                assert pattern.startswith("Bash(") and pattern.endswith(")"), (
+                    f"{case['id']}: {pattern}"
+                )
+
+    def test_shell_is_limited_to_cases_that_need_it(self, cases: list[dict[str, Any]]) -> None:
+        for case in cases:
+            has_need = any(tag.startswith("needs-") for tag in case.get("tags", []))
+
+            assert bool(case.get("shell")) <= has_need, case["id"]
+
+    def test_context_belongs_to_needs_context_cases(self, cases: list[dict[str, Any]]) -> None:
+        """直前のやり取りを前提として渡すのは、それが無いと成立しないcaseだけ。"""
+        for case in cases:
+            has_context = bool(case.get("context"))
+
+            assert has_context == ("needs-context" in case.get("tags", [])), case["id"]
+
+    def test_registry_fixture_backs_the_needs_fixture_cases(
+        self, cases: list[dict[str, Any]]
+    ) -> None:
+        fixture = REPO_ROOT / "evals" / "fixtures" / "registry" / "characters"
+        needs_fixture = [case for case in cases if "needs-fixture" in case.get("tags", [])]
+
+        assert needs_fixture
+        assert list(fixture.glob("*.yaml"))
