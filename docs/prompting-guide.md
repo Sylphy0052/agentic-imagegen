@@ -348,21 +348,34 @@ clip skip 2 / 外部VAE) で1枚ずつ生成して比べた結果による (2026
 
 | checkpoint | 高周波比 | 所見 |
 | --- | ---: | --- |
-| `hassakuSD15_v13` | 0.068 | 指定した服装・小物への追従が最も良い。破綻なし |
-| `anyloraCheckpoint_bakedvaeBlessedFp16` | 0.058 | 最も平滑。LoRAの土台向けで単体では平坦 |
-| `meinamix_v12Final` | 0.062 | 破綻はないが暗く沈みやすい |
+| `hassakuSD15_v13` | 0.071 | 指定した服装・小物への追従が最も良い。破綻なし |
+| `anyloraCheckpoint_bakedvaeBlessedFp16` | 0.061 | 最も平滑。LoRAの土台向けで単体では平坦 |
+| `meinamix_v12Final` | 0.069 | 破綻はないが暗く沈みやすい |
 | `abyssorangemix3AOM3_aom3a1b` | 0.065 | 彩度が高い |
-| `perfectdeliberate_v20` | 0.074 | 厚塗り |
-| `darkSushiMixMix_225D` | 0.077 | 2.25D |
-| `counterfeitV30_v30` | 0.084 | 明るい。背景の描き込みが厚い |
-| `cetusMix_Whalefall2` | 0.088 | 最も線が立つ |
-| `chilloutmix_NiPrunedFp16Fix` | 0.044 | 写実寄り。アニメ品質タグと打ち消し合う |
+| `perfectdeliberate_v20` | 0.079 | 厚塗り |
+| `darkSushiMixMix_225D` | 0.083 | 2.25D |
+| `counterfeitV30_v30` | 0.094 | 明るい。背景の描き込みが厚い |
+| `cetusMix_Whalefall2` | 0.099 | 最も線が立つ |
+| `chilloutmix_NiPrunedFp16Fix` | 0.040 | 写実寄り。アニメ品質タグと打ち消し合う |
 
-高周波比はエッジ強度が閾値を超えた画素の割合で、破綻の検出に使う目安。
-正常な範囲は0.04-0.09で、これを大きく超えるものは絵が壊れている
-(VAE不整合を起こした `waiIllustriousSD15_v1` は0.296だった)。
+高周波比はエッジ強度がしきい値を超えた画素の割合で、破綻の検出に使う目安。
+値は次で出す (定義と注意はスクリプトのdocstringにある)。
+
+```bash
+python3 .claude/skills/imagegen/scripts/edge_stats.py outputs/<日付>/<出力ディレクトリ>
+```
+
+SD1.5系のアニメ調を512x768 -> hires x2.0で出した場合の実測は0.04-0.10。
+Illustrious系は線が立つため0.15前後まで上がる (`waiIllustriousSD15_v1` は0.148)。
+0.2を大きく超えるものは絵が壊れている
+(同じcheckpointへSD1.5用の外部VAEを当ててノイズになった状態は0.291だった)。
+しきい値と画像サイズで値が動くため、同じ条件で撮った1回の比較の中でだけ見比べる。
+
 数値は破綻の有無しか見ていないため、順位付けには使わない。採用の決め手は
 「指定した服装・小物がそのまま出るか」で、そこに最も忠実だったのがhassakuだった。
+
+比較そのものの手順は
+[ablation.md](../.claude/skills/imagegen/references/ablation.md) にまとめてある。
 
 `sd15-hassaku` は配布元推奨の `ddim` / `normal` / steps 20 / cfg 8 ではなく、
 この比較で使った設定を持つ。clip skipと外部VAEもpresetが持つため、Spec側に要るのは

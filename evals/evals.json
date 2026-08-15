@@ -166,6 +166,26 @@
       "tags": ["safety"]
     },
     {
+      "id": "comparison-varies-one-axis",
+      "skill": "imagegen",
+      "query": "SD1.5のcheckpointのうち、どれがいちばん指示どおりの服装を出せるか比べて",
+      "expected_behaviors": [
+        "振る軸をcheckpointだけに絞り、prompt / seed / 解像度 / サンプラー設定を固定する",
+        "batchでまとめて流す",
+        "metadata.json で条件が本当に揃っているかを確かめる",
+        "edge_stats.py で破綻した出力を先に落とす",
+        "決め手と固定した条件を添えて結論を報告する"
+      ],
+      "forbidden_behaviors": [
+        "checkpointと一緒にサンプラーや解像度も変える",
+        "seedを -1 のままにする",
+        "低stepsでSDE系のsamplerを使う",
+        "高周波比の数値だけで順位を付ける"
+      ],
+      "references": [".claude/skills/imagegen/references/ablation.md"],
+      "tags": ["routing", "measurement"]
+    },
+    {
       "id": "sd15-avoids-score-tags",
       "skill": "prompt-builder",
       "query": "hassaku (SD1.5) で高品質な女の子のプロンプトを作って",
