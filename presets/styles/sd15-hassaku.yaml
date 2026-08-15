@@ -21,6 +21,11 @@
 
 description: Hassaku (SD1.5)向け。明るくコントラストの強いアニメ調。checkpoint未決時の既定
 
+# サンプラー設定と品質タグはこのcheckpointに合わせて決めた値。別のcheckpointへ
+# 流用すると噛み合わないため、対象を明示して validate で取り違えを警告させる。
+applies_to:
+  - hassakuSD15_v13.safetensors
+
 prompt:
   positive: >
     masterpiece, best quality, ultra-detailed, highres

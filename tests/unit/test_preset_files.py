@@ -166,6 +166,26 @@ def test_non_style_preset_has_no_model(kind: PresetKind, name: str) -> None:
     assert not _load(kind, name).model.specified()
 
 
+@pytest.mark.parametrize(
+    ("kind", "name"),
+    [(kind, name) for kind, name in _presets() if kind is not PresetKind.STYLE],
+    ids=lambda v: str(v),
+)
+def test_non_style_preset_has_no_applies_to(kind: PresetKind, name: str) -> None:
+    """checkpointへの依存を持つのはstyleだけ。
+
+    キャラクタもシーンもcheckpointを問わず使い回せることが軸を分けた理由で、
+    applies_to をそこへ書くと、その前提が崩れたことに誰も気づけない。
+    """
+    assert not _load(kind, name).applies_to
+
+
+@pytest.mark.parametrize("name", sorted(_sd15_styles()))
+def test_sd15_style_names_its_checkpoint(name: str) -> None:
+    """SD1.5系はcheckpointと1対1。対象を名指ししていないと警告が出せない。"""
+    assert len(_load(PresetKind.STYLE, name).applies_to) == 1
+
+
 #: checkpoint未決時の既定として使うstyle preset。
 #: この1つだけを参照すれば、比較で確定した設定がそのまま再現できる状態を保つ。
 DEFAULT_STYLE = "sd15-hassaku"

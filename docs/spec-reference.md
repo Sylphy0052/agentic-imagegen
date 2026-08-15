@@ -182,12 +182,21 @@ SD1.5系は配置済みのcheckpointごとに1つ用意してある。SDXL系は
 | `sdxl-illustrious` | SDXL (Illustrious系 / AnythingXL) | `euler_ancestral` / `normal` | 7.0 | 30 | clip_skip 2 |
 | `sdxl-animagine` | SDXL (Animagine XL系) | `euler_ancestral` / `normal` | 6.0 | 25 | - |
 | `sdxl-shiratakimix` | SDXL (ShiratakiMix XL系) | `dpmpp_3m_sde` / `karras` | 7.5 | 28 | - |
-| `anima-base` | DiT系 (Anima) | `er_sde` / `simple` | 4.5 | 32 | - |
+| `anima-base` | `hassakuAnima_v13_int8` (DiT系) | `er_sde` / `simple` | 4.5 | 32 | - |
 | `anime-soft` | SD1.5汎用 (下描き) | `dpmpp_2m` / `karras` | 5.5 | 20 | - |
 | `anime-detailed` | SD1.5汎用 (仕上げ) | `dpmpp_2m` / `karras` | 7.0 | 30 | - |
 
 `sd15-*` はcheckpointと1対1で対応する。checkpointを決めていれば、それに合うものを選べば
 sampler / scheduler / cfg / stepsとclip_skip / 外部VAEをSpec側で書き直す必要はない。
+対象列がcheckpointを名指ししているpresetは、preset側の`applies_to`にも同じファイル名を持つ。
+`applies_to`はSpecへ展開しない。`imagegen validate`が次の2つを警告するためだけに使う
+(どちらも検証は通り、exit codeは0のまま)。
+
+- style presetを指定していない (clip skipと外部VAE、サンプラー設定が既定のまま落ちる)
+- 指定したstyle presetが`model.checkpoint`とは別のcheckpoint向け
+
+`applies_to`が空のpresetは汎用として扱い、どのcheckpointでも警告しない
+(`anime-soft` / `anime-detailed`と、fine-tuneの系統で選ぶ`sdxl-*`の3つ)。
 `model`列の「外部VAE」は`vaeKlF8Anime2_klF8Anime2VAE.safetensors`を指す。
 `waiIllustriousSD15_v1`はSDXL系のVAEを内蔵しており、外部VAEを当てると出力がノイズになるため
 `sd15-wai-illustrious`は`clip_skip`だけを持つ。SDXL系は配置済みのVAEがSD1.5向けのため

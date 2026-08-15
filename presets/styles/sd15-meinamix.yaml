@@ -18,6 +18,11 @@
 
 description: meinamix向けのアニメ調。A1111での実績設定を持ち込んだ既定
 
+# サンプラー設定と品質タグはこのcheckpointに合わせて決めた値。別のcheckpointへ
+# 流用すると噛み合わないため、対象を明示して validate で取り違えを警告させる。
+applies_to:
+  - meinamix_v12Final.safetensors
+
 prompt:
   positive: >
     masterpiece, best quality, ultra-detailed, highres

@@ -206,7 +206,17 @@ uv run imagegen validate specs/generated/<name>.yaml
 
 `Workflow:` 行で実際に使われるテンプレートを、`Presets:` 行で意図したpresetが並んでいるかを
 確認する。`text` を書いた場合は `Text:` 行にレイヤ数とフォント名が出る。
+`Estimate:` 行に所要時間の概算が出る (XPUとCPUの両方。img2imgは出ない)。
 検証を緩めて通すことはしない。
+
+`warning:` が出たら生成の前に対処する。exit codeは0でも、そのまま流すと
+絵柄が静かに変わるか、タイムアウトで捨てることになる。
+
+| warning | 対処 |
+| --- | --- |
+| style presetを指定していない | 名指しされたpresetを `presets.style` へ書く |
+| style presetが別のcheckpoint向け | checkpointに対応するpresetへ変える |
+| 見積りが `IMAGEGEN_TIMEOUT` を超える | steps・解像度・batch_sizeを下げる |
 
 ### 6. generateする
 

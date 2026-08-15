@@ -21,6 +21,11 @@
 
 description: AnyLoRA向け。LoRAの画風を邪魔しない品質タグだけの構成
 
+# サンプラー設定と品質タグはこのcheckpointに合わせて決めた値。別のcheckpointへ
+# 流用すると噛み合わないため、対象を明示して validate で取り違えを警告させる。
+applies_to:
+  - anyloraCheckpoint_bakedvaeBlessedFp16.safetensors
+
 prompt:
   positive: >
     masterpiece, best quality, ultra-detailed, highres

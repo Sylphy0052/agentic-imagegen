@@ -162,6 +162,11 @@ fp16の相対誤差は4.2e-4だった。
 | SDXL / 832x1216 / 8 steps | Intel XPU | 299.7秒 (初回) | 600 |
 | SDXL / 832x1216 / 24 steps | Intel XPU | 362.6秒 | 600 |
 
+`imagegen validate` が出す `Estimate:` 行はこの表から起こした係数
+(Mpixel・stepあたりXPUで SD1.5 9秒 / SDXL 15秒 / DiT系 22秒、CPUはその約10倍) による概算。
+モデルのロード時間とControlNet / IPAdapterの上乗せは織り込まない。
+再計測してこの表を直したときは `src/agentic_imagegen/services/estimate.py` の係数も見直す。
+
 SD1.5系はモデルロード済み (2回目以降) の値。初回はモデルロードの分だけ上乗せされる。
 Anima系はSD1.5系より1stepあたりが重く、配布元推奨の832x1216 / 32 stepsはさらに伸びる。
 SDXL系はモデルのロードだけで数分かかるため、初回とロード済みの差がSD1.5系より大きい。

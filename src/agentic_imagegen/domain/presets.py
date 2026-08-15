@@ -117,9 +117,22 @@ class PresetDocument(_StrictModel):
     """presetファイル1つ分の内容。"""
 
     description: str = ""
+    #: このpresetが前提にしているcheckpoint (DiT系はUNet) のファイル名。
+    #: Specへは展開しない。品質タグとサンプラー設定はモデルの学習内容に依存するため、
+    #: 別のcheckpointへ流用すると噛み合わない。その取り違えをvalidateで言うためだけに持つ。
+    #: 空なら汎用 (どのcheckpointでも咎めない)。
+    applies_to: tuple[str, ...] = ()
     prompt: PresetPrompt = Field(default_factory=PresetPrompt)
     generation: PresetGeneration = Field(default_factory=PresetGeneration)
     model: PresetModel = Field(default_factory=PresetModel)
+
+    @field_validator("applies_to")
+    @classmethod
+    def _reject_unsafe_paths(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(
+            validate_model_filename(name, allowed_suffixes=ALLOWED_CHECKPOINT_SUFFIXES)
+            for name in value
+        )
 
 
 def iter_preset_refs(refs: PresetRefs) -> tuple[tuple[PresetKind, str], ...]:
