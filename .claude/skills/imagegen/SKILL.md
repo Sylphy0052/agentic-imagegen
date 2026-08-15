@@ -55,6 +55,16 @@ cd ~/ComfyUI && ./.venv/bin/python main.py --listen 127.0.0.1 --port 8188
 
 **「さっきの子」「前回の設定で」と言われたら記録から引く。** 推測で当てない。
 
+台帳に載っているキャラなら名前で引ける。preset・style・checkpoint・基準画像・seedが
+そのまま出るため、Specへ書き写すだけでよい。
+
+```bash
+uv run imagegen character list
+uv run imagegen character show yui
+```
+
+台帳に無い場合は生成の記録から引く。
+
 ```bash
 uv run imagegen history --limit 5
 uv run imagegen history --prefix yui
@@ -62,6 +72,8 @@ uv run imagegen history --prefix yui
 
 出力パス・実際に使われたseed・checkpoint・presetがそのまま出る。
 基準画像はここに出たパスを `inputs/` へ置いて使う。
+以降も同じキャラを出しそうなら、そのときに台帳へ登録する
+(書き方は [character-consistency.md](references/character-consistency.md))。
 
 ### 2. presetを選ぶか、新しく作る
 

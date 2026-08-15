@@ -340,6 +340,27 @@
       "tags": [
         "tooling"
       ]
+    },
+    {
+      "id": "known-character-is-looked-up-in-the-registry",
+      "skill": "imagegen",
+      "query": "aoiで図書館の絵を作って",
+      "expected_behaviors": [
+        "imagegen character show aoi で台帳を引く",
+        "台帳のpreset・style・checkpoint・基準画像・seedをSpecへ書き写す",
+        "台帳が指す参照先の欠落 (warning) を無視しない"
+      ],
+      "forbidden_behaviors": [
+        "台帳を引かずに記憶や推測でpreset・checkpointを決める",
+        "checkpointを台帳と別のものへ変える"
+      ],
+      "references": [
+        ".claude/skills/imagegen/references/character-consistency.md"
+      ],
+      "tags": [
+        "tooling",
+        "consistency"
+      ]
     }
   ]
 }

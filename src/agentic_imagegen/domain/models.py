@@ -209,7 +209,7 @@ _PREFIX_PATTERN: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _COLOR_PATTERN: Final = re.compile(r"^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$")
 
 
-def _validate_relative_image_path(value: str) -> str:
+def validate_relative_image_path(value: str) -> str:
     """リポジトリ配下の画像パスとして安全か検証する。
 
     checkpointと違い階層の深さは問わない。実体の解決とルート外への脱出検証は
@@ -566,7 +566,7 @@ class SourceSpec(_StrictModel):
     @field_validator("image")
     @classmethod
     def _reject_unsafe_path(cls, value: str) -> str:
-        return _validate_relative_image_path(value)
+        return validate_relative_image_path(value)
 
 
 class ControlSpec(_StrictModel):
@@ -602,7 +602,7 @@ class ControlSpec(_StrictModel):
     @field_validator("image")
     @classmethod
     def _reject_unsafe_image(cls, value: str) -> str:
-        return _validate_relative_image_path(value)
+        return validate_relative_image_path(value)
 
     @field_validator("model")
     @classmethod
@@ -864,7 +864,7 @@ class ReferenceSpec(_StrictModel):
     @field_validator("image")
     @classmethod
     def _reject_unsafe_image(cls, value: str) -> str:
-        return _validate_relative_image_path(value)
+        return validate_relative_image_path(value)
 
     @field_validator("model")
     @classmethod
@@ -988,4 +988,5 @@ __all__ = [
     "UpscaleMethod",
     "UpscaleSpec",
     "validate_model_filename",
+    "validate_relative_image_path",
 ]

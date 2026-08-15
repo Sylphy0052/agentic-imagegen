@@ -125,7 +125,8 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
 - **「さっきの子で」「前回の設定で」と言われたら `uv run imagegen history` で引く。**
   出力パス・実際に使われたseed・checkpoint・presetが `metadata.json` から出る。推測で当てない
 - **「さっきの子で別の場面を」と言われたら基準画像を作り `reference` に指定する。**
-  presetだけでは顔立ちまでは固定できない。手順は
+  presetだけでは顔立ちまでは固定できない。どのpreset・checkpoint・基準画像・seedだったかは
+  記憶で補わず `imagegen character show <name>` (未登録なら `imagegen history`) で引く。手順は
   [.claude/skills/imagegen/references/character-consistency.md](.claude/skills/imagegen/references/character-consistency.md)
 
 ## 複数枚をまとめて生成する
@@ -223,6 +224,7 @@ uv run mypy src
 | `src/agentic_imagegen/workflows/` | Workflowテンプレートの読み込みとallowlist |
 | `src/agentic_imagegen/adapters/comfyui/` | ComfyUI固有のHTTP / WebSocket / JSON形状 |
 | `workflows/` | API形式のWorkflowテンプレート (人間が作成) |
+| `registry/characters/` | キャラクタ台帳 (preset・checkpoint・基準画像・seedの記録) |
 | `presets/characters/` | キャラクタpreset (外見的特徴) |
 | `presets/scenes/` | シーンpreset (場所・時間帯・構図) |
 | `presets/styles/` | 画風preset (画風・品質タグ・サンプラー設定・clip skip・外部VAE) |
@@ -247,6 +249,7 @@ uv run mypy src
 | `IMAGEGEN_TIMEOUT` | 300 | 生成のタイムアウト秒 |
 | `IMAGEGEN_OUTPUT_ROOT` | `outputs` | 出力ルート |
 | `IMAGEGEN_PRESETS_ROOT` | `presets` | presetの探索ルート |
+| `IMAGEGEN_REGISTRY_ROOT` | `registry` | キャラクタ台帳の探索ルート |
 | `IMAGEGEN_MAX_SOURCE_BYTES` | 33554432 | img2imgの入力画像の上限バイト数 |
 | `IMAGEGEN_FONTS_ROOT` | `fonts` | テキスト合成に使うフォントの探索ルート |
 

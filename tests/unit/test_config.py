@@ -19,6 +19,7 @@ ENV_KEYS = [
     "IMAGEGEN_MAX_SOURCE_BYTES",
     "IMAGEGEN_MAX_UPSCALED_PIXELS",
     "IMAGEGEN_FONTS_ROOT",
+    "IMAGEGEN_REGISTRY_ROOT",
     "COMFYUI_HOME",
 ]
 
@@ -40,6 +41,7 @@ def test_defaults() -> None:
     assert settings.timeout_seconds == 300
     assert settings.output_root.name == "outputs"
     assert settings.presets_root.name == "presets"
+    assert settings.registry_root.name == "registry"
     assert settings.max_source_bytes == 32 * 1024 * 1024
     assert settings.max_upscaled_pixels == 16777216
 
@@ -68,6 +70,19 @@ def test_override_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.presets_root.name == "tmp-presets"
     assert settings.max_source_bytes == 1048576
     assert settings.max_upscaled_pixels == 2097152
+
+
+def test_registry_root_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("IMAGEGEN_REGISTRY_ROOT", "tmp-registry")
+
+    assert Settings.from_env().registry_root.name == "tmp-registry"
+
+
+def test_empty_registry_root_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("IMAGEGEN_REGISTRY_ROOT", "  ")
+
+    with pytest.raises(InvalidConfiguration, match="IMAGEGEN_REGISTRY_ROOT"):
+        Settings.from_env()
 
 
 def test_empty_presets_root_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:

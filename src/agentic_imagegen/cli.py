@@ -20,6 +20,7 @@ import typer
 from agentic_imagegen import __version__
 from agentic_imagegen.adapters.comfyui.client import ComfyUIClient
 from agentic_imagegen.config import Settings
+from agentic_imagegen.domain.characters import Character
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.domain.policy import (
     resolve_compose_output,
@@ -35,6 +36,7 @@ from agentic_imagegen.domain.results import (
 from agentic_imagegen.errors import ComfyUIUnavailable, ImageGenError, InvalidGenerationSpec
 from agentic_imagegen.services.batch import BatchItem, BatchOutcome, expand_seeds, run_batch
 from agentic_imagegen.services.catalog import CATALOG_KINDS, collect_catalog
+from agentic_imagegen.services.characters import collect_characters, load_character
 from agentic_imagegen.services.compose import compose_text
 from agentic_imagegen.services.estimate import estimate_duration, format_duration
 from agentic_imagegen.services.generation import TEXT_SUFFIX, generate, resolve_fonts_root
@@ -162,6 +164,61 @@ def history(
             return
 
         _print_history(records)
+
+
+character_app = typer.Typer(help="キャラクタ台帳を引く。ComfyUIへは接続しない。")
+app.add_typer(character_app, name="character")
+
+
+@character_app.command("list")
+def character_list(
+    as_json: Annotated[bool, typer.Option("--json", help="機械可読な形で出力する")] = False,
+    verbose: VerboseOption = False,
+) -> None:
+    """台帳にあるキャラクタを名前順に出す。"""
+    _configure_logging(verbose)
+
+    with _handled_errors():
+        characters = _collect_characters()
+
+        if as_json:
+            payload = [_character_payload(character) for character in characters]
+            typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+            return
+
+        if not characters:
+            typer.echo("(なし)")
+            return
+        for character in characters:
+            summary = character.record.description or "(説明なし)"
+            mark = " (参照先に欠落あり)" if character.missing else ""
+            typer.echo(f"{character.name}: {summary}{mark}")
+
+
+@character_app.command("show")
+def character_show(
+    name: Annotated[str, typer.Argument(help="台帳のファイル名 (拡張子なし)")],
+    as_json: Annotated[bool, typer.Option("--json", help="機械可読な形で出力する")] = False,
+    verbose: VerboseOption = False,
+) -> None:
+    """キャラクタ1件を出す。Specへ書き写す値がそのまま並ぶ。"""
+    _configure_logging(verbose)
+
+    with _handled_errors():
+        settings = Settings.from_env()
+        project_root = Path.cwd()
+        character = load_character(
+            name,
+            registry_root=_resolve_root(settings.registry_root, project_root),
+            presets_root=_resolve_root(settings.presets_root, project_root),
+            project_root=project_root,
+        )
+
+        if as_json:
+            typer.echo(json.dumps(_character_payload(character), ensure_ascii=False, indent=2))
+            return
+
+        _print_character(character)
 
 
 @app.command()
@@ -394,6 +451,52 @@ def _echo_names(names: tuple[str, ...], *, annotate: bool = False) -> None:
         if annotate and name == DEFAULT_CHECKPOINT:
             suffix = f"  <- 既定 ({DEFAULT_STYLE_PRESET})"
         typer.echo(f"  {name}{suffix}")
+
+
+def _collect_characters() -> tuple[Character, ...]:
+    settings = Settings.from_env()
+    project_root = Path.cwd()
+    return collect_characters(
+        registry_root=_resolve_root(settings.registry_root, project_root),
+        presets_root=_resolve_root(settings.presets_root, project_root),
+        project_root=project_root,
+    )
+
+
+def _character_payload(character: Character) -> dict[str, object]:
+    record = character.record
+    return {
+        "name": character.name,
+        "description": record.description,
+        "preset": record.preset,
+        "style": record.style,
+        "checkpoint": record.checkpoint,
+        "reference": record.reference,
+        "seed": record.seed,
+        "notes": record.notes,
+        "missing": list(character.missing),
+    }
+
+
+def _print_character(character: Character) -> None:
+    record = character.record
+    typer.echo(f"Character: {character.name}")
+    if record.description:
+        typer.echo(f"Description: {record.description}")
+    for label, value in (
+        ("Preset", record.preset),
+        ("Style", record.style),
+        ("Checkpoint", record.checkpoint),
+        ("Reference", record.reference),
+        ("Seed", record.seed),
+    ):
+        if value is not None:
+            typer.echo(f"{label}: {value}")
+    if record.notes:
+        typer.echo(f"Notes: {record.notes}")
+    # 台帳は古びる。欠けたまま生成すると、別人が出てから気づくことになる。
+    for item in character.missing:
+        typer.echo(f"warning: 台帳が指す参照先が見つかりません: {item}", err=True)
 
 
 def _history_payload(record: RunRecord) -> dict[str, object]:
