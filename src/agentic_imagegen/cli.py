@@ -26,12 +26,18 @@ from agentic_imagegen.domain.policy import (
     resolve_source_image,
     validate_against_limits,
 )
-from agentic_imagegen.domain.results import CatalogSnapshot, GenerationResult, HealthStatus
+from agentic_imagegen.domain.results import (
+    CatalogSnapshot,
+    GenerationResult,
+    HealthStatus,
+    RunRecord,
+)
 from agentic_imagegen.errors import ComfyUIUnavailable, ImageGenError, InvalidGenerationSpec
 from agentic_imagegen.services.batch import BatchItem, BatchOutcome, expand_seeds, run_batch
 from agentic_imagegen.services.catalog import CATALOG_KINDS, collect_catalog
 from agentic_imagegen.services.compose import compose_text
 from agentic_imagegen.services.generation import TEXT_SUFFIX, generate, resolve_fonts_root
+from agentic_imagegen.services.history import DEFAULT_LIMIT, collect_history
 from agentic_imagegen.services.spec_loader import load_spec, load_text_spec
 from agentic_imagegen.workflows.injector import resolve_workflow_name
 
@@ -125,6 +131,35 @@ def catalog(
             return
 
         _print_catalog(snapshot, settings, status)
+
+
+@app.command()
+def history(
+    limit: Annotated[int, typer.Option("--limit", min=1, help="出す件数")] = DEFAULT_LIMIT,
+    prefix: Annotated[
+        str | None, typer.Option("--prefix", help="出力ディレクトリ名で絞り込む")
+    ] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="機械可読な形で出力する")] = False,
+    verbose: VerboseOption = False,
+) -> None:
+    """直近の生成を新しい順に出す。ComfyUIへは接続しない。
+
+    「さっきの子で別の場面を」のような要求で、基準画像と使ったseedを推測ではなく
+    記録から引くために使う。
+    """
+    _configure_logging(verbose)
+
+    with _handled_errors():
+        settings = Settings.from_env()
+        root = _resolve_root(settings.output_root, Path.cwd())
+        records = collect_history(root, limit=limit, prefix=prefix)
+
+        if as_json:
+            payload = [_history_payload(record) for record in records]
+            typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+            return
+
+        _print_history(records)
 
 
 @app.command()
@@ -334,6 +369,55 @@ def _echo_names(names: tuple[str, ...], *, annotate: bool = False) -> None:
         if annotate and name == DEFAULT_CHECKPOINT:
             suffix = f"  <- 既定 ({DEFAULT_STYLE_PRESET})"
         typer.echo(f"  {name}{suffix}")
+
+
+def _history_payload(record: RunRecord) -> dict[str, object]:
+    return {
+        "directory": str(record.directory),
+        "created_at": record.created_at,
+        "task": record.task,
+        "model": record.model,
+        "presets": dict(record.presets),
+        "seed": record.seed,
+        "width": record.width,
+        "height": record.height,
+        "source": record.source,
+        "upscale": record.upscale,
+        "features": list(record.features),
+        "files": [str(path) for path in record.files],
+        "workflow": record.workflow,
+    }
+
+
+def _print_history(records: tuple[RunRecord, ...]) -> None:
+    """1件2行で出す。1行目で何の生成か、2行目でどこにあるかが分かる形にする。"""
+    if not records:
+        typer.echo("(なし)")
+        return
+
+    for record in records:
+        details = [record.model or "(モデル不明)"]
+        details.extend(f"{axis}:{name}" for axis, name in sorted(record.presets.items()))
+        if record.source:
+            # img2imgのサイズは入力画像で決まる。Specの width/height は使われない。
+            details.append(f"<- {record.source}")
+        else:
+            details.append(f"{record.width}x{record.height}")
+        if record.upscale:
+            details.append(f"x{record.upscale}")
+        details.extend(record.features)
+
+        typer.echo(f"{_format_time(record.created_at)}  {record.task}  seed {record.seed}")
+        typer.echo(f"  {'  '.join(details)}")
+        for file in record.files:
+            typer.echo(f"  {file}")
+
+
+def _format_time(created_at: str) -> str:
+    """ISO 8601 を分までに切り詰める。秒とタイムゾーンは一覧では読まない。"""
+    if len(created_at) >= 16 and created_at[10] == "T":
+        return f"{created_at[:10]} {created_at[11:16]}"
+    return created_at or "(日時不明)"
 
 
 def _relative_to_root(path: Path, project_root: Path) -> str:

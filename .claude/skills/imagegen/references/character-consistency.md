@@ -51,9 +51,15 @@ output:
 
 ### 2. 基準画像を `inputs/` へ置く
 
+どの出力が基準の1枚かは `history` で引く。ディレクトリ名を目で探さない。
+
 ```bash
-cp outputs/<日付>/<時刻>_consistency_base/image_0001.png inputs/character.png
+uv run imagegen history --prefix consistency_base --limit 1
+cp <出力パス> inputs/character.png
 ```
+
+セッションを跨いだあとも同じ。`--prefix` にキャラの名前を入れて、
+直近でそのキャラを出した生成のパスとseedを引く。
 
 ### 3. scene presetだけ差し替えて生成する
 

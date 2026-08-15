@@ -66,4 +66,34 @@ class CatalogSnapshot:
     fonts: tuple[str, ...]
 
 
-__all__ = ["CatalogSnapshot", "GenerationResult", "HealthStatus", "ImageRef"]
+@dataclass(frozen=True, slots=True)
+class RunRecord:
+    """過去の生成1件。`metadata.json` に書いてある値だけで組み立てる。
+
+    「さっきの子で別の場面を」のような要求を推測で当てないために使う。
+    Specや出力はgit管理外なので、セッションを跨ぐと metadata.json しか手がかりが残らない。
+    """
+
+    directory: Path
+    #: metadata.json の created_at をそのまま持つ (ISO 8601)。
+    created_at: str
+    task: str
+    #: checkpoint。DiT系のようにcheckpointを持たない構成では unet の名前。
+    model: str
+    presets: Mapping[str, str]
+    #: 実際に使われたseed (metadata.json の resolved_seed)。
+    seed: int
+    #: txt2imgでの生成サイズ。img2imgでは入力画像のサイズが使われるため意味を持たない。
+    width: int
+    height: int
+    #: img2imgの入力画像。txt2imgでは None。
+    source: str | None
+    #: hires fixの倍率。使っていなければ None。
+    upscale: float | None
+    #: reference / control / text / lora のうち、その生成で使ったもの。
+    features: tuple[str, ...]
+    files: tuple[Path, ...]
+    workflow: str
+
+
+__all__ = ["CatalogSnapshot", "GenerationResult", "HealthStatus", "ImageRef", "RunRecord"]

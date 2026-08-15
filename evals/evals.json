@@ -23,11 +23,13 @@
       "skill": "imagegen",
       "query": "さっきの子で、今度は図書館にいる場面を出して",
       "expected_behaviors": [
+        "imagegen history で直近の出力と使ったseedを引く",
         "基準画像を1枚作って inputs/ へ置き、reference.image に指定する",
         "character presetだけでは顔立ちまでは固定できないと伝える",
         "scene presetを library-daylight へ差し替える"
       ],
       "forbidden_behaviors": [
+        "outputs/ をlsで眺めて基準画像を推測する",
         "presetだけ差し替えて同じキャラだと報告する",
         "基準画像を作らずに reference を省く"
       ],
