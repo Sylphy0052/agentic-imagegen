@@ -33,6 +33,9 @@ inputs/*
 fonts/*
 !fonts/.gitkeep
 
+# tagcheckが引いたDanbooruのpost_count (再取得できるため追跡しない)
+.cache/
+
 # Claude Codeの作業用worktree (skillなど .claude/ 配下の他のファイルは追跡する)
 .claude/worktrees/
 

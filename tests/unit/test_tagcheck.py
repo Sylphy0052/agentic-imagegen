@@ -36,6 +36,14 @@ def tagcheck() -> types.ModuleType:
     return _load_module()
 
 
+@pytest.fixture(autouse=True)
+def _isolated_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """テストがリポジトリの .cache/ を書き換えないようにする。"""
+    path = tmp_path / "tagcheck.json"
+    monkeypatch.setenv("IMAGEGEN_TAGCHECK_CACHE", str(path))
+    return path
+
+
 class _FakeResponse(io.BytesIO):
     """`with urllib.request.urlopen(...) as response` を満たす最小の応答。"""
 
@@ -304,3 +312,207 @@ def test_main_error_output_hides_stack_detail(
     out = capsys.readouterr().out
     assert str(SCRIPT_PATH) not in out
     assert "URLError" in out
+
+
+# --- キャッシュ ------------------------------------------------------------
+
+
+def _count_calls(payload: str, calls: list[str]) -> Any:
+    def urlopen(request: Any, timeout: float | None = None) -> _FakeResponse:
+        calls.append(request.full_url)
+        return _FakeResponse(payload.encode("utf-8"))
+
+    return urlopen
+
+
+def test_cache_avoids_the_second_lookup(
+    tagcheck: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    _isolated_cache: Path,
+) -> None:
+    """同じタグは何度も出てくる。post_countは日単位でしか動かない。"""
+    calls: list[str] = []
+    monkeypatch.setattr(
+        tagcheck.urllib.request, "urlopen", _count_calls(json.dumps([{"post_count": 8000}]), calls)
+    )
+    monkeypatch.setattr(tagcheck.time, "sleep", lambda _: None)
+    monkeypatch.setattr("sys.argv", ["tagcheck.py", "1girl"])
+
+    assert tagcheck.main() == 0
+    assert len(calls) == 1
+    assert _isolated_cache.is_file()
+
+    assert tagcheck.main() == 0
+    assert len(calls) == 1
+    assert "キャッシュ 1件" in capsys.readouterr().out
+
+
+def test_absent_tag_is_cached_too(
+    tagcheck: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    _isolated_cache: Path,
+) -> None:
+    """存在しないタグほど何度も問い合わせ直しやすい。"""
+    calls: list[str] = []
+    monkeypatch.setattr(tagcheck.urllib.request, "urlopen", _count_calls("[]", calls))
+    monkeypatch.setattr(tagcheck.time, "sleep", lambda _: None)
+    monkeypatch.setattr("sys.argv", ["tagcheck.py", "nonexistent_tag"])
+
+    assert tagcheck.main() == 0
+    assert tagcheck.main() == 0
+    assert len(calls) == 1
+
+
+def test_failed_lookup_is_not_cached(
+    tagcheck: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    _isolated_cache: Path,
+) -> None:
+    """到達できなかった結果を覚えると、復旧してもしばらく確認できない。"""
+    monkeypatch.setattr(
+        tagcheck.urllib.request, "urlopen", _raise(urllib.error.URLError("unreachable"))
+    )
+    monkeypatch.setattr(tagcheck.time, "sleep", lambda _: None)
+    monkeypatch.setattr("sys.argv", ["tagcheck.py", "1girl"])
+
+    assert tagcheck.main() == 0
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        tagcheck.urllib.request, "urlopen", _count_calls(json.dumps([{"post_count": 8000}]), calls)
+    )
+    assert tagcheck.main() == 0
+    assert len(calls) == 1
+
+
+def test_expired_entry_is_refetched(
+    tagcheck: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    _isolated_cache: Path,
+) -> None:
+    _isolated_cache.write_text(
+        json.dumps(
+            {
+                "version": tagcheck.CACHE_VERSION,
+                "entries": {"1girl": {"count": 1, "fetched_at": 0.0}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls: list[str] = []
+    monkeypatch.setattr(
+        tagcheck.urllib.request, "urlopen", _count_calls(json.dumps([{"post_count": 8000}]), calls)
+    )
+    monkeypatch.setattr(tagcheck.time, "sleep", lambda _: None)
+    monkeypatch.setattr("sys.argv", ["tagcheck.py", "1girl"])
+
+    assert tagcheck.main() == 0
+    assert len(calls) == 1
+
+
+def test_no_cache_flag_skips_both_read_and_write(
+    tagcheck: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    _isolated_cache: Path,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        tagcheck.urllib.request, "urlopen", _count_calls(json.dumps([{"post_count": 8000}]), calls)
+    )
+    monkeypatch.setattr(tagcheck.time, "sleep", lambda _: None)
+    monkeypatch.setattr("sys.argv", ["tagcheck.py", "--no-cache", "1girl"])
+
+    assert tagcheck.main() == 0
+    assert tagcheck.main() == 0
+    assert len(calls) == 2
+    assert not _isolated_cache.exists()
+
+
+def test_refresh_flag_refetches_and_overwrites(
+    tagcheck: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    _isolated_cache: Path,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        tagcheck.urllib.request, "urlopen", _count_calls(json.dumps([{"post_count": 8000}]), calls)
+    )
+    monkeypatch.setattr(tagcheck.time, "sleep", lambda _: None)
+    monkeypatch.setattr("sys.argv", ["tagcheck.py", "1girl"])
+    assert tagcheck.main() == 0
+
+    monkeypatch.setattr(
+        tagcheck.urllib.request, "urlopen", _count_calls(json.dumps([{"post_count": 9000}]), calls)
+    )
+    monkeypatch.setattr("sys.argv", ["tagcheck.py", "--refresh", "1girl"])
+    assert tagcheck.main() == 0
+
+    assert len(calls) == 2
+    entries = json.loads(_isolated_cache.read_text(encoding="utf-8"))["entries"]
+    assert entries["1girl"]["count"] == 9000
+
+
+@pytest.mark.parametrize(
+    "content",
+    ["{ not json", json.dumps({"version": 999, "entries": {}}), json.dumps(["not", "a", "map"])],
+)
+def test_broken_cache_does_not_break_the_check(
+    tagcheck: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    _isolated_cache: Path,
+    content: str,
+) -> None:
+    """キャッシュは補助。壊れていたら捨てて取り直す。"""
+    _isolated_cache.write_text(content, encoding="utf-8")
+    monkeypatch.setattr(
+        tagcheck.urllib.request, "urlopen", _respond(json.dumps([{"post_count": 8000}]))
+    )
+    monkeypatch.setattr(tagcheck.time, "sleep", lambda _: None)
+    monkeypatch.setattr("sys.argv", ["tagcheck.py", "1girl"])
+
+    assert tagcheck.main() == 0
+    assert "実在する" in capsys.readouterr().out
+
+
+def test_unwritable_cache_still_returns_the_result(
+    tagcheck: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("IMAGEGEN_TAGCHECK_CACHE", str(tmp_path / "nope" / "tagcheck.json"))
+
+    def deny(*args: Any, **kwargs: Any) -> None:
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(Path, "mkdir", deny)
+    monkeypatch.setattr(
+        tagcheck.urllib.request, "urlopen", _respond(json.dumps([{"post_count": 8000}]))
+    )
+    monkeypatch.setattr(tagcheck.time, "sleep", lambda _: None)
+    monkeypatch.setattr("sys.argv", ["tagcheck.py", "1girl"])
+
+    assert tagcheck.main() == 0
+    assert "実在する" in capsys.readouterr().out
+
+
+def test_cache_hit_does_not_sleep(
+    tagcheck: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    _isolated_cache: Path,
+) -> None:
+    """ウェイトを省けることが、キャッシュを持つ主な理由。"""
+    monkeypatch.setattr(
+        tagcheck.urllib.request, "urlopen", _respond(json.dumps([{"post_count": 8000}]))
+    )
+    slept: list[float] = []
+    monkeypatch.setattr(tagcheck.time, "sleep", slept.append)
+    monkeypatch.setattr("sys.argv", ["tagcheck.py", "1girl", "solo"])
+    assert tagcheck.main() == 0
+    assert len(slept) == 1
+
+    slept.clear()
+    assert tagcheck.main() == 0
+    assert slept == []
