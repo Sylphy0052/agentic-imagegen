@@ -42,7 +42,8 @@ def pytest_collection_modifyitems(config: pytest.Config, items: Iterable[pytest.
         return
 
     skip_integration = pytest.mark.skip(
-        reason="ComfyUI起動が必要。実行するには `uv run pytest -m integration`"
+        reason="実機 (ComfyUI起動またはモデル読み込み) が必要。"
+        "実行するには `uv run pytest -m integration`"
     )
     for item in items:
         if "integration" in item.keywords:

@@ -11,12 +11,12 @@ LLMがノードや接続を組み立てることは設計上禁止しており�
 from __future__ import annotations
 
 import copy
-import secrets
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Final
 
-from agentic_imagegen.domain.models import MAX_SEED, RANDOM_SEED, GenerationSpec
+from agentic_imagegen.domain.models import GenerationSpec
+from agentic_imagegen.domain.models import resolve_seed as _resolve_seed
 from agentic_imagegen.errors import WorkflowValidationError
 from agentic_imagegen.workflows import axes
 
@@ -520,11 +520,9 @@ IMG2IMG_LORA_BINDING: Final = ALL_BINDINGS["img2img_lora"]
 IMG2IMG_VAE_BINDING: Final = ALL_BINDINGS["img2img_vae"]
 
 
-def resolve_seed(seed: int) -> int:
-    """seedが -1 ならランダムな値へ解決する。それ以外はそのまま返す。"""
-    if seed != RANDOM_SEED:
-        return seed
-    return secrets.randbelow(MAX_SEED + 1)
+#: seedの解決はバックエンド非依存の取り決めのため domain 側にある。
+#: ここからの再輸出は既存のimport経路を保つためのもの。
+resolve_seed = _resolve_seed
 
 
 def validate_structure(workflow: object, binding: WorkflowBinding) -> None:

@@ -29,6 +29,7 @@ txt2img / preset / LoRA / img2img / MCP Server / ControlNet / IPAdapter / hires 
 | [.claude/skills/prompt-builder/SKILL.md](.claude/skills/prompt-builder/SKILL.md) | プロンプトの組み立てとタグの実在確認の手順 |
 | [evals/README.md](evals/README.md) | skillの判断を退行検出するevalの回し方。台帳は `evals/evals.json` |
 | [README.md](README.md) | プロジェクトの紹介、セットアップ、CLIの使い方 |
+| [docs/diffusers-backend.md](docs/diffusers-backend.md) | diffusersバックエンドの対応範囲・設定・ComfyUIとの違い |
 | [docs/](docs/) | 環境構築とモデル別の運用知識 |
 
 パラメータを1つ足したときに直すのは、実装と `docs/spec-reference.md` だけで済む形を保つ。
@@ -161,11 +162,18 @@ scripts/comfyui-session.sh batch specs/generated/a.yaml specs/generated/b.yaml
 ## 設計上守ること
 
 - **GenerationSpecが内部API契約。** Claude Code固有形式やComfyUI固有JSONを層間インターフェースにしない
-- **ComfyUI依存は `src/agentic_imagegen/adapters/comfyui/` に閉じ込める。** Domain / Service層はNode IDやHTTP仕様を知らない
+- **バックエンド依存は `src/agentic_imagegen/adapters/<name>/` に閉じ込める。** Domain / Service層は
+  Node IDやHTTP仕様、torchのdeviceを知らない。Service層が見るのは
+  `GenerationBackend` / `CatalogBackend` の2つのProtocolだけ
+- **具象バックエンドの選択は `backends.py` に集約する。** CLI / MCP Serverは
+  `open_generation_backend` / `open_catalog_backend` を呼ぶだけで、
+  `IMAGEGEN_BACKEND` の値からどのクラスを作るかは知らない
 - **Node IDとclass_typeのマッピングは1か所に集約する。** 定義は `adapters/comfyui/workflow.py` の `TXT2IMG_BINDING`
 - **CLIはMCP導入後も残す。** ローカルデバッグ・CI・Integration Test・障害切り分けに使う
-- **想像上の共通化を先行させない。** Backend抽象は2つ目のバックエンドを足す時点で確定させる
-  ([Issue #31](https://github.com/Sylphy0052/agentic-imagegen/issues/31))
+- **バックエンドが増えても機能の対応範囲は揃えない。** diffusers側はControlNet /
+  IPAdapter / hires fix / 外部VAE / DiT系に未対応で、指定されたら生成前に拒否して
+  ComfyUIを案内する。揃えるために抽象を歪めない
+  ([docs/diffusers-backend.md](docs/diffusers-backend.md))
 
 ## 所要時間に注意する
 
@@ -239,6 +247,8 @@ uv run mypy src
 
 | 変数 | 既定値 | 用途 |
 | --- | --- | --- |
+| `IMAGEGEN_BACKEND` | `comfyui` | 使うバックエンド (`comfyui` / `diffusers`) |
+| `IMAGEGEN_MODELS_ROOT` | (なし) | diffusersバックエンドのモデル探索ルート。`comfyui` では使わない |
 | `COMFYUI_BASE_URL` | `http://127.0.0.1:8188` | ComfyUI接続先 |
 | `COMFYUI_HOME` | `~/ComfyUI` | ComfyUIの置き場。`catalog` がComfyUIへ到達できないときにmodels配下を直接見る |
 | `IMAGEGEN_MAX_WIDTH` | 2048 | 幅の上限 |

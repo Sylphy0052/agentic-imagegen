@@ -39,6 +39,7 @@ batch、日本語テキスト合成、DiT系モデル (Anima) 対応まで一通
 | [docs/spec-reference.md](docs/spec-reference.md) | GenerationSpecの全フィールド仕様。値域・既定値・組み合わせ規則・metadata.json |
 | [CLAUDE.md](CLAUDE.md) | Claude Codeがこのリポジトリを操作するときのルール。環境変数・exit code |
 | [.claude/skills/imagegen/SKILL.md](.claude/skills/imagegen/SKILL.md) | 画像生成要求を受けてから結果を返すまでの手順 |
+| [docs/diffusers-backend.md](docs/diffusers-backend.md) | ComfyUIを使わずdiffusersで直接生成する場合の設定と対応範囲 |
 | [docs/](docs/) | 環境構築 ([xpu](docs/xpu-setup.md) / [cpu](docs/comfyui-setup.md) / [mcp](docs/mcp-setup.md) / [fonts](docs/fonts-setup.md)) とモデル別の [プロンプト指針](docs/prompting-guide.md) |
 | [workflows/README.md](workflows/README.md) | Workflowテンプレートの一覧と作り方 |
 
@@ -375,6 +376,11 @@ outputs/
 [CLAUDE.mdの「環境変数」](CLAUDE.md#環境変数) を参照。
 秘密情報は扱わないため、環境変数ファイルは必須ではない。
 
+`IMAGEGEN_BACKEND=diffusers` を指定すると、ComfyUIを立てずに
+diffusersでプロセス内推論する。Specの書き方もCLIの使い方も変わらないが、
+ControlNet / IPAdapter / hires fix などには対応していない。
+設定と対応範囲は [docs/diffusers-backend.md](docs/diffusers-backend.md) を参照。
+
 ## テスト
 
 ```bash
@@ -444,20 +450,21 @@ MCP経由で検証を迂回できる経路は作っていない。
 ## アーキテクチャ
 
 ```text
-CLI (typer)                 入出力とexit codeへの変換
+CLI (typer) / MCP Server    入出力とexit codeへの変換
     |
 Service (generation)        ユースケースの組み立て、presetの解決
-    |
+    |                       見えるのは GenerationBackend / CatalogBackend の2つのProtocolだけ
 Domain (models / policy)    GenerationSpecと検証規則。外部依存なし
     |
-Workflows (injector)        テンプレートの読み込みとallowlist
+backends.py                 IMAGEGEN_BACKEND から具象を選ぶ
     |
-Adapters (comfyui)          HTTP / WebSocket / ComfyUI固有のJSON形状
+    +-- Adapters (comfyui)    Workflowテンプレート / HTTP / WebSocket / ComfyUI固有のJSON形状
+    +-- Adapters (diffusers)  プロセス内推論。Pipelineの読み込みとscheduler対応
 ```
 
-ComfyUI依存は `adapters/comfyui/` に閉じ込めてあり、
-バックエンドを追加する際もDomain / Service層の変更を必要としない。
-実際、CPU推論からIntel XPUへ切り替えた際も `src/` の変更は不要だった。
+バックエンド依存は `adapters/<name>/` に閉じ込めてあり、
+2つ目のバックエンド (diffusers) を足した際もDomain / Service層の変更は不要だった。
+CPU推論からIntel XPUへ切り替えた際も `src/` の変更は要らなかった。
 
 ## ライセンス
 
