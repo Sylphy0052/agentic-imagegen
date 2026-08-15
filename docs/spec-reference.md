@@ -117,7 +117,7 @@ prompt:
 | --- | --- | --- |
 | `character` | `presets/characters/<name>.yaml` | 人物の外見的特徴 |
 | `scene` | `presets/scenes/<name>.yaml` | 場所・時間帯・構図 |
-| `style` | `presets/styles/<name>.yaml` | 画風・品質タグ・サンプラー設定 |
+| `style` | `presets/styles/<name>.yaml` | 画風・品質タグ・サンプラー設定・clip skip・外部VAE |
 
 preset名は英数字で始まる`[A-Za-z0-9._-]`のみ。探索ルートは`IMAGEGEN_PRESETS_ROOT` (既定`presets`)。
 
@@ -128,27 +128,38 @@ presets:
   style: anime-soft
 ```
 
-preset本体は`description` / `prompt` / `generation`を持つ。
+preset本体は`description` / `prompt` / `generation` / `model`を持つ。
 
 ```yaml
-# presets/styles/anime-soft.yaml
-description: 柔らかい光のアニメ調。SD1.5想定
+# presets/styles/sd15-hassaku.yaml
+description: Hassaku (SD1.5)向け。明るくコントラストの強いアニメ調
 
 prompt:
-  positive: anime illustration, soft lighting, masterpiece, best quality
-  negative: low quality, worst quality, blurry
+  positive: masterpiece, best quality, ultra-detailed, highres
+  negative: worst quality, low quality, lowres, blurry
 
 generation:
-  sampler: dpmpp_2m
-  scheduler: karras
+  sampler: dpmpp_2m_sde
+  scheduler: exponential
+  cfg: 7.0
+  steps: 30
+
+model:
+  clip_skip: 2
+  vae: vaeKlF8Anime2_klF8Anime2VAE.safetensors
 ```
+
+`model`へ書けるのは`clip_skip`と`vae`だけ。絵柄はcheckpointだけでは決まらず、
+CLIPをどこで打ち切るかとどのVAEでデコードするかでも変わるため、そのcheckpointで
+検証した値をstyle preset側へ置く。`checkpoint` / `unet` / `clip` / `loras`は書けない
+(どのモデルで描くかはSpec側の責務)。
 
 解決規則:
 
 - **prompt**: `character` -> `scene` -> `style` -> Spec本体 の順にカンマ連結し、重複トークンは
   最初の1つを残して除去する (大文字小文字と連続空白は無視)。`negative`も同じ
-- **generation**: presetの指定を取り込んだうえでSpec本体の指定を優先する
-  (優先順位はspec > style > scene > character)
+- **generation** / **model**: presetの指定を取り込んだうえでSpec本体の指定を優先する
+  (優先順位はspec > style > scene > character)。未指定のフィールドは補完対象にしない
 - 適用したpreset名は解決後のSpecに残り、`metadata.json`にも記録される
 
 軸の責務を混ぜない。解像度とseedは再現性に直結するためpresetには書かず、Spec側で指定する。
@@ -156,27 +167,31 @@ generation:
 
 SD1.5系は配置済みのcheckpointごとに1つ用意してある。SDXL系はfine-tuneの系統ごと。
 
-| style preset | 対象 | sampler / scheduler | cfg | steps |
-| --- | --- | --- | --- | --- |
-| `sd15-meinamix` | `meinamix_v12Final` | `dpmpp_2m_sde` / `exponential` | 7.0 | 30 |
-| `sd15-counterfeit` | `counterfeitV30_v30` | `dpmpp_2m` / `karras` | 9.0 | 25 |
-| `sd15-aom3` | `abyssorangemix3AOM3_aom3a1b` | `dpmpp_sde` / `karras` | 7.0 | 25 |
-| `sd15-anylora` | `anyloraCheckpoint_bakedvaeBlessedFp16` | `dpmpp_2m_sde` / `exponential` | 7.0 | 30 |
-| `sd15-cetusmix` | `cetusMix_Whalefall2` | `dpmpp_2m` / `karras` | 6.0 | 24 |
-| `sd15-darksushi` | `darkSushiMixMix_225D` | `dpmpp_sde` / `karras` | 7.5 | 30 |
-| `sd15-hassaku` | `hassakuSD15_v13` (既定) | `dpmpp_2m_sde` / `exponential` | 7.0 | 30 |
-| `sd15-chilloutmix` | `chilloutmix_NiPrunedFp16Fix` (写実寄り) | `dpmpp_sde` / `karras` | 7.0 | 20 |
-| `sd15-perfectdeliberate` | `perfectdeliberate_v20` | `dpmpp_2m` / `karras` | 6.5 | 30 |
-| `sd15-wai-illustrious` | `waiIllustriousSD15_v1` | `dpmpp_2m` / `karras` | 6.0 | 28 |
-| `sdxl-illustrious` | SDXL (Illustrious系 / AnythingXL) | `euler_ancestral` / `normal` | 7.0 | 30 |
-| `sdxl-animagine` | SDXL (Animagine XL系) | `euler_ancestral` / `normal` | 6.0 | 25 |
-| `sdxl-shiratakimix` | SDXL (ShiratakiMix XL系) | `dpmpp_3m_sde` / `karras` | 7.5 | 28 |
-| `anima-base` | DiT系 (Anima) | `er_sde` / `simple` | 4.5 | 32 |
-| `anime-soft` | SD1.5汎用 (下描き) | `dpmpp_2m` / `karras` | 5.5 | 20 |
-| `anime-detailed` | SD1.5汎用 (仕上げ) | `dpmpp_2m` / `karras` | 7.0 | 30 |
+| style preset | 対象 | sampler / scheduler | cfg | steps | model |
+| --- | --- | --- | --- | --- | --- |
+| `sd15-meinamix` | `meinamix_v12Final` | `dpmpp_2m_sde` / `exponential` | 7.0 | 30 | clip_skip 2 + 外部VAE |
+| `sd15-counterfeit` | `counterfeitV30_v30` | `dpmpp_2m` / `karras` | 9.0 | 25 | clip_skip 2 + 外部VAE |
+| `sd15-aom3` | `abyssorangemix3AOM3_aom3a1b` | `dpmpp_sde` / `karras` | 7.0 | 25 | clip_skip 2 + 外部VAE |
+| `sd15-anylora` | `anyloraCheckpoint_bakedvaeBlessedFp16` | `dpmpp_2m_sde` / `exponential` | 7.0 | 30 | clip_skip 2 + 外部VAE |
+| `sd15-cetusmix` | `cetusMix_Whalefall2` | `dpmpp_2m` / `karras` | 6.0 | 24 | clip_skip 2 + 外部VAE |
+| `sd15-darksushi` | `darkSushiMixMix_225D` | `dpmpp_sde` / `karras` | 7.5 | 30 | clip_skip 2 + 外部VAE |
+| `sd15-hassaku` | `hassakuSD15_v13` (既定) | `dpmpp_2m_sde` / `exponential` | 7.0 | 30 | clip_skip 2 + 外部VAE |
+| `sd15-chilloutmix` | `chilloutmix_NiPrunedFp16Fix` (写実寄り) | `dpmpp_sde` / `karras` | 7.0 | 20 | clip_skip 2 + 外部VAE |
+| `sd15-perfectdeliberate` | `perfectdeliberate_v20` | `dpmpp_2m` / `karras` | 6.5 | 30 | clip_skip 2 + 外部VAE |
+| `sd15-wai-illustrious` | `waiIllustriousSD15_v1` | `dpmpp_2m` / `karras` | 6.0 | 28 | clip_skip 2 |
+| `sdxl-illustrious` | SDXL (Illustrious系 / AnythingXL) | `euler_ancestral` / `normal` | 7.0 | 30 | clip_skip 2 |
+| `sdxl-animagine` | SDXL (Animagine XL系) | `euler_ancestral` / `normal` | 6.0 | 25 | - |
+| `sdxl-shiratakimix` | SDXL (ShiratakiMix XL系) | `dpmpp_3m_sde` / `karras` | 7.5 | 28 | - |
+| `anima-base` | DiT系 (Anima) | `er_sde` / `simple` | 4.5 | 32 | - |
+| `anime-soft` | SD1.5汎用 (下描き) | `dpmpp_2m` / `karras` | 5.5 | 20 | - |
+| `anime-detailed` | SD1.5汎用 (仕上げ) | `dpmpp_2m` / `karras` | 7.0 | 30 | - |
 
 `sd15-*` はcheckpointと1対1で対応する。checkpointを決めていれば、それに合うものを選べば
-sampler / scheduler / cfg / stepsをSpec側で書き直す必要はない。
+sampler / scheduler / cfg / stepsとclip_skip / 外部VAEをSpec側で書き直す必要はない。
+`model`列の「外部VAE」は`vaeKlF8Anime2_klF8Anime2VAE.safetensors`を指す。
+`waiIllustriousSD15_v1`はSDXL系のVAEを内蔵しており、外部VAEを当てると出力がノイズになるため
+`sd15-wai-illustrious`は`clip_skip`だけを持つ。SDXL系は配置済みのVAEがSD1.5向けのため
+指定しない。DiT系 (`anima-base`) はclip_skipと併用できず、VAEはSpec側の必須項目。
 値の根拠と各モデルの傾向は
 [prompting-guide.md](prompting-guide.md#配置済みのsd15系モデル) を参照。
 

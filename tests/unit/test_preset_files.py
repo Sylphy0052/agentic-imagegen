@@ -154,3 +154,30 @@ def test_divergent_prompt_styles_actually_differ(name: str) -> None:
     prompt = _load(PresetKind.STYLE, name).prompt
 
     assert (prompt.positive, prompt.negative) != (shared.positive, shared.negative)
+
+
+@pytest.mark.parametrize(
+    ("kind", "name"),
+    [(kind, name) for kind, name in _presets() if kind is not PresetKind.STYLE],
+    ids=lambda v: str(v),
+)
+def test_non_style_preset_has_no_model(kind: PresetKind, name: str) -> None:
+    """clip_skipと外部VAEは画風とセットで決まるため、style以外へ置かない。"""
+    assert not _load(kind, name).model.specified()
+
+
+#: checkpoint未決時の既定として使うstyle preset。
+#: この1つだけを参照すれば、比較で確定した設定がそのまま再現できる状態を保つ。
+DEFAULT_STYLE = "sd15-hassaku"
+
+
+def test_default_style_carries_model_settings() -> None:
+    """既定のstyle presetは、絵柄を決めるclip_skipと外部VAEを自分で持つ。
+
+    以前はこの2つをSpec側へ手で書く必要があり、書き忘れても検証は通り生成も成功した。
+    出来上がった絵だけが静かに変わるため、preset側へ寄せて取りこぼしを無くす。
+    """
+    specified = _load(PresetKind.STYLE, DEFAULT_STYLE).model.specified()
+
+    assert specified["clip_skip"] == 2
+    assert specified["vae"] == "vaeKlF8Anime2_klF8Anime2VAE.safetensors"

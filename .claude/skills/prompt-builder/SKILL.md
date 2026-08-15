@@ -136,6 +136,9 @@ prompt:
 
 - **解像度とseedをpresetへ書かない。** 再現性に直結するためSpec側で指定する
 - **styleにはcfg / steps / sampler / schedulerと品質タグを置く。** モデル系統ごとに分ける
+- **clip skipと外部VAEもstyleへ置く。** `model.clip_skip` と `model.vae` はcheckpointごとに
+  決まり、書き忘れても検証は通って生成も成功するため、preset側へ寄せる
+  (`model` へ書けるのはこの2つだけ)
 - **sceneに人物の外見を混ぜない。** 使い回せなくなる
 - 連結順は `character` -> `scene` -> `style`。品質タグは末尾へ回る
   (詳細は [presets](../../../docs/spec-reference.md#presets))

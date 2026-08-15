@@ -70,7 +70,7 @@ ControlNet / IPAdapterを使う場合は `~/ComfyUI/models/controlnet/`、
 | --- | --- | --- |
 | `character` | `presets/characters/<name>.yaml` | 人物の外見的特徴 |
 | `scene` | `presets/scenes/<name>.yaml` | 場所・時間帯・構図 |
-| `style` | `presets/styles/<name>.yaml` | 画風・品質タグ・サンプラー設定 |
+| `style` | `presets/styles/<name>.yaml` | 画風・品質タグ・サンプラー設定・clip skip・外部VAE |
 
 新しく作るときは軸の責務を混ぜない。解像度とseedは再現性に直結するため
 presetには書かず、Spec側で指定する。
@@ -95,8 +95,8 @@ sampler / scheduler / cfg / stepsを持つ。SDXL系はfine-tuneの系統で選�
 (Illustrious系とAnythingXLは `sdxl-illustrious`、Animagine XL系は `sdxl-animagine`、
 ShiratakiMix XL系は `sdxl-shiratakimix`)。Anima系は `anima-base`。
 checkpointを決めていない段階は `hassakuSD15_v13.safetensors` + `sd15-hassaku` を既定にする
-(9種のSD1.5系を同一条件で比較した結果。あわせて `model.clip_skip: 2` と
-`model.vae: vaeKlF8Anime2_klF8Anime2VAE.safetensors` を書く)。
+(9種のSD1.5系を同一条件で比較した結果)。clip skipと外部VAEはstyle presetが持つため、
+Spec側に書くのは `model.checkpoint` だけでよい。
 負荷を下げたいときだけ汎用の `anime-soft` (steps 20) へ落とす。
 どのcheckpointにどのpresetを使うかは `ls presets/styles` と
 [配置済みのSD1.5系モデル](../../../docs/prompting-guide.md#配置済みのsd15系モデル)の表で確認する。

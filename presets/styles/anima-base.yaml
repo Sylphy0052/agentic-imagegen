@@ -2,6 +2,8 @@
 # 配布元が推奨する品質タグとサンプラー設定をまとめる。
 # 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
 # Animaは1024x1024前後が前提のため、Spec側で832x1216などを指定する。
+# model ブロックは持たない。DiT系はtext encoderの構造が違うためclip_skipと併用できず、
+# VAEは model.unet / clip とセットでSpec側へ書く必須項目のため。
 
 description: Anima系の既定設定。danbooruタグと自然文のどちらでも使える
 

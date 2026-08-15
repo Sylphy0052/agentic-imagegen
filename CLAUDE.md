@@ -102,10 +102,10 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
 - **軸の責務を混ぜない。** 解像度とseedは再現性に直結するためpresetには書かず、Spec側で指定する
 - **style presetはcheckpointごとに用意する。** 品質タグとサンプラー設定はモデルの
   学習内容に依存するため流用しない。SD1.5系は `sd15-<通称>` がcheckpointと1対1で対応し、
-  そのcheckpointの推奨 sampler / scheduler / cfg / steps を持つ。
+  そのcheckpointの推奨 sampler / scheduler / cfg / steps と clip skip / 外部VAE を持つ。
   SDXL系はfine-tuneの系統で選び、DiT系は `anima-base` を使う。
   checkpointを決めていない段階は `hassakuSD15_v13.safetensors` + `sd15-hassaku` を既定にする
-  (9種のSD1.5系を同一条件で比較した結果。根拠は
+  (9種のSD1.5系を同一条件で比較した結果。Spec側に書くのは `model.checkpoint` だけでよい。根拠は
   [既定のcheckpointを決める](docs/prompting-guide.md#既定のcheckpointを決める))。
   負荷を下げたいときだけ汎用の `anime-soft` (steps 20の下描き向け) へ落とす
   (一覧は [presets](docs/spec-reference.md#presets))
@@ -215,7 +215,7 @@ uv run mypy src
 | `workflows/` | API形式のWorkflowテンプレート (人間が作成) |
 | `presets/characters/` | キャラクタpreset (外見的特徴) |
 | `presets/scenes/` | シーンpreset (場所・時間帯・構図) |
-| `presets/styles/` | 画風preset (画風・品質タグ・サンプラー設定) |
+| `presets/styles/` | 画風preset (画風・品質タグ・サンプラー設定・clip skip・外部VAE) |
 | `specs/examples/` | サンプルSpec |
 | `specs/generated/` | Claude Codeが生成したSpec (git管理外) |
 | `inputs/` | img2imgの入力画像 (git管理外) |

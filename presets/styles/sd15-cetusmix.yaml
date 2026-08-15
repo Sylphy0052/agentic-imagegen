@@ -24,3 +24,7 @@ generation:
   scheduler: karras
   cfg: 6.0
   steps: 24
+
+model:
+  clip_skip: 2
+  vae: vaeKlF8Anime2_klF8Anime2VAE.safetensors

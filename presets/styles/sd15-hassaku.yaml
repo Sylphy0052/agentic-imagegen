@@ -14,10 +14,8 @@
 # SDE系は低stepsで収束せず絵が破綻する。低負荷で流したいときは
 # Spec側で sampler: euler_ancestral などへ上書きする。
 #
-# このpresetだけでは絵柄は揃わない。preset に書けるのは prompt と generation だけで、
-# 次の2つはSpec側に書く必要がある。
-#   model.clip_skip: 2
-#   model.vae: vaeKlF8Anime2_klF8Anime2VAE.safetensors
+# clip_skip と外部VAEもこのpresetが持つ。Spec側に書く必要があるのは
+# model.checkpoint (hassakuSD15_v13.safetensors) だけ。
 #
 # 同名のDiT系モデル (hassakuAnima_v13_int8) とは別物。あちらは anima-base を使う。
 
@@ -39,3 +37,7 @@ generation:
   scheduler: exponential
   cfg: 7.0
   steps: 30
+
+model:
+  clip_skip: 2
+  vae: vaeKlF8Anime2_klF8Anime2VAE.safetensors
