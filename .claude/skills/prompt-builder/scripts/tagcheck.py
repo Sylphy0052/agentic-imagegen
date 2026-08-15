@@ -9,6 +9,10 @@
 `--prompt` はカンマ区切りのプロンプトをそのまま渡す。スペースはアンダースコアへ
 変換してから問い合わせる (Danbooruのタグ名はアンダースコア表記で登録されている)。
 
+一度引いた結果は `.cache/tagcheck.json` へ30日残す。同じタグは何度も出てくるうえ、
+post_countは日単位でしか動かないため、問い合わせ直す意味が薄い。取り直すときは
+`--refresh`、キャッシュを触らせたくないときは `--no-cache`。
+
 post_count の判定基準と、0でも残す例外 (品質ラベル / 学習時点にのみ存在したタグ) は
 docs/prompting-guide.md の「タグの実在を確認する」を一次情報とする。
 """
@@ -17,11 +21,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 from typing import Any
 
 API = "https://danbooru.donmai.us/tags.json"
@@ -33,6 +39,16 @@ INTERVAL_SECONDS = 0.2
 
 # これを下回る件数は学習への寄与が小さく、置換を検討する。
 WEAK_COUNT = 1000
+
+# 一度引いた結果の置き場。リポジトリ直下の .cache/ (git管理外)。
+CACHE_ENV = "IMAGEGEN_TAGCHECK_CACHE"
+DEFAULT_CACHE_PATH = Path(__file__).resolve().parents[4] / ".cache" / "tagcheck.json"
+
+# 形式を変えたら上げる。読み込み側は一致しないキャッシュを捨てる。
+CACHE_VERSION = 1
+
+# 有効期限。実在するか否かはこの期間では動かない。
+CACHE_TTL_SECONDS = 30 * 24 * 60 * 60
 
 # Danbooruタグではないが学習時のラベルとして効くもの。post_countでは判定しない。
 QUALITY_LABELS = frozenset(
@@ -136,6 +152,54 @@ def fetch_count(tag: str) -> int | None:
     return extract_count(payload)
 
 
+def cache_path() -> Path:
+    override = os.environ.get(CACHE_ENV, "").strip()
+    return Path(override) if override else DEFAULT_CACHE_PATH
+
+
+def load_cache(path: Path) -> dict[str, Any]:
+    """キャッシュを読む。読めない・形が違う場合は空として扱う。
+
+    キャッシュは補助であり、壊れていたら捨てて取り直せばよい。
+    ここで失敗させるとタグの確認そのものができなくなる。
+    """
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(raw, dict) or raw.get("version") != CACHE_VERSION:
+        return {}
+    entries = raw.get("entries")
+    return entries if isinstance(entries, dict) else {}
+
+
+def cached_count(entries: dict[str, Any], tag: str, now: float) -> tuple[bool, int | None]:
+    """(キャッシュに当たったか, post_count) を返す。"""
+    entry = entries.get(tag)
+    if not isinstance(entry, dict):
+        return False, None
+    fetched_at = entry.get("fetched_at")
+    if not isinstance(fetched_at, int | float) or now - fetched_at > CACHE_TTL_SECONDS:
+        return False, None
+    count = entry.get("count")
+    if count is not None and not isinstance(count, int):
+        return False, None
+    return True, count
+
+
+def save_cache(path: Path, entries: dict[str, Any]) -> None:
+    """書けなければ黙って諦める。確認結果はキャッシュの成否に依らない。"""
+    payload = {"version": CACHE_VERSION, "entries": entries}
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # 途中で落ちた書きかけを読ませないよう、別名で書いてから差し替える。
+        temporary = path.with_name(f"{path.name}.tmp")
+        temporary.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        temporary.replace(path)
+    except OSError:
+        return
+
+
 def verdict(tag: str, count: int | None) -> str:
     if tag in QUALITY_LABELS:
         return "品質ラベル (post_countでは判定しない)"
@@ -160,6 +224,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Danbooruのタグの実在をまとめて確認する")
     parser.add_argument("tags", nargs="*", help="確認するタグ (スペース区切り)")
     parser.add_argument("--prompt", help="カンマ区切りのプロンプトをそのまま渡す")
+    parser.add_argument("--no-cache", action="store_true", help="キャッシュを読み書きしない")
+    parser.add_argument("--refresh", action="store_true", help="取り直してキャッシュを上書きする")
     return parser
 
 
@@ -172,23 +238,50 @@ def main() -> int:
         parser.print_usage()
         return 2
 
+    path = cache_path()
+    use_cache = not args.no_cache
+    entries = load_cache(path) if use_cache else {}
+    now = time.time()
+
     needs_action = 0
-    for index, tag in enumerate(tags):
-        if index:
-            time.sleep(INTERVAL_SECONDS)
-        try:
-            count = fetch_count(tag)
-        except FETCH_ERRORS as error:
-            print(f"{tag}\t-\t確認できなかった ({type(error).__name__})")
-            needs_action += 1
-            continue
+    hits = 0
+    fetched = 0
+    stored = False
+    for tag in tags:
+        hit, count = (
+            cached_count(entries, tag, now) if use_cache and not args.refresh else (False, None)
+        )
+        if hit:
+            hits += 1
+        else:
+            # ウェイトは問い合わせの間隔。キャッシュから答えた分では待たない。
+            if fetched:
+                time.sleep(INTERVAL_SECONDS)
+            fetched += 1
+            try:
+                count = fetch_count(tag)
+            except FETCH_ERRORS as error:
+                # 到達できなかった結果を覚えると、復旧してもしばらく確認できない。
+                print(f"{tag}\t-\t確認できなかった ({type(error).__name__})")
+                needs_action += 1
+                continue
+            if use_cache:
+                entries[tag] = {"count": count, "fetched_at": now}
+                stored = True
+
         shown = "-" if count is None else f"{count:,}"
         note = verdict(tag, count)
         if note in (MISSING, WEAK):
             needs_action += 1
         print(f"{tag}\t{shown}\t{note}")
 
-    print(f"\n{len(tags)}件を確認、うち要対応 {needs_action}件")
+    if stored:
+        save_cache(path, entries)
+
+    summary = f"\n{len(tags)}件を確認、うち要対応 {needs_action}件"
+    if hits:
+        summary += f" (キャッシュ {hits}件)"
+    print(summary)
     return 0
 
 
