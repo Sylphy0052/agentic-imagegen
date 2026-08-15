@@ -173,10 +173,29 @@ Spec: specs/examples/txt2img.yaml
 Workflow: txt2img
 Resolution: 512x768 (batch 1)
 Checkpoint: meinamix_v12Final.safetensors
+Estimate: XPU 約1分 / CPU 約12分
 ```
 
 preset・LoRA・ControlNet・IPAdapter・テキスト合成を指定している場合は、
 適用内容と実際に使われるテンプレート名も表示される。
+
+`Estimate:` は解像度・steps・batch・hires fixから出した概算。どちらの実行基盤で動くかは
+接続しないと分からないため両方出す (img2imgは入力画像のサイズで生成するため出さない)。
+
+検証を通ったうえで気になる点があると、標準エラーへ `warning:` が出る。
+exit codeは0のままで、生成もできる。
+
+```text
+warning: style presetを指定していません。clip skipと外部VAE、そのcheckpointで詰めた
+sampler / scheduler / cfg / stepsはstyle presetが持ちます。hassakuSD15_v13.safetensors には
+sd15-hassaku が対応します
+```
+
+出るのは次の3つ。
+
+- style presetを指定していない
+- 指定したstyle presetが`model.checkpoint`とは別のcheckpoint向け
+- XPUでも見積りが`IMAGEGEN_TIMEOUT`を超える
 
 ```text
 Workflow: txt2img_lora

@@ -12,6 +12,11 @@
 
 description: AbyssOrangeMix3向けのアニメ調。イラスト寄りの厚い塗り
 
+# サンプラー設定と品質タグはこのcheckpointに合わせて決めた値。別のcheckpointへ
+# 流用すると噛み合わないため、対象を明示して validate で取り違えを警告させる。
+applies_to:
+  - abyssorangemix3AOM3_aom3a1b.safetensors
+
 prompt:
   positive: >
     masterpiece, best quality, absurdres, highres, anime coloring

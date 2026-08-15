@@ -36,8 +36,10 @@ from agentic_imagegen.errors import ComfyUIUnavailable, ImageGenError, InvalidGe
 from agentic_imagegen.services.batch import BatchItem, BatchOutcome, expand_seeds, run_batch
 from agentic_imagegen.services.catalog import CATALOG_KINDS, collect_catalog
 from agentic_imagegen.services.compose import compose_text
+from agentic_imagegen.services.estimate import estimate_duration, format_duration
 from agentic_imagegen.services.generation import TEXT_SUFFIX, generate, resolve_fonts_root
 from agentic_imagegen.services.history import DEFAULT_LIMIT, collect_history
+from agentic_imagegen.services.preset_advice import style_warnings
 from agentic_imagegen.services.spec_loader import load_spec, load_text_spec
 from agentic_imagegen.workflows.injector import resolve_workflow_name
 
@@ -215,6 +217,29 @@ def validate(spec_path: SpecArgument, verbose: VerboseOption = False) -> None:
                 if name is not None
             )
             typer.echo(f"Presets: {applied}")
+
+        estimate = estimate_duration(spec)
+        if estimate is not None:
+            # validateはComfyUIへ接続しないため、どちらの実行基盤で動くかは分からない。
+            typer.echo(
+                f"Estimate: XPU {format_duration(estimate.xpu_seconds)} / "
+                f"CPU {format_duration(estimate.cpu_seconds)}"
+            )
+
+        # 助言は検証結果ではない。exit codeは変えず、stdoutの検証結果とも混ぜない。
+        advice = style_warnings(
+            spec,
+            presets_root=_resolve_root(settings.presets_root, Path.cwd()),
+            project_root=Path.cwd(),
+        )
+        if estimate is not None and estimate.xpu_seconds > settings.timeout_seconds:
+            advice += (
+                f"XPUでも{format_duration(estimate.xpu_seconds)}かかる見込みで、"
+                f"IMAGEGEN_TIMEOUT ({settings.timeout_seconds}秒) を超えます。"
+                "steps・解像度・batch_sizeを下げるか、IMAGEGEN_TIMEOUTを延ばしてください",
+            )
+        for warning in advice:
+            typer.echo(f"warning: {warning}", err=True)
 
 
 @app.command(name="generate")

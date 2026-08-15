@@ -105,6 +105,8 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
   学習内容に依存するため流用しない。SD1.5系は `sd15-<通称>` がcheckpointと1対1で対応し、
   そのcheckpointの推奨 sampler / scheduler / cfg / steps と clip skip / 外部VAE を持つ。
   SDXL系はfine-tuneの系統で選び、DiT系は `anima-base` を使う。
+  style presetを選ばなかったときと、checkpointに合わないpresetを選んだときは
+  `validate` が警告する (生成は止めない)。
   checkpointを決めていない段階は `hassakuSD15_v13.safetensors` + `sd15-hassaku` を既定にする
   (9種のSD1.5系を同一条件で比較した結果。Spec側に書くのは `model.checkpoint` だけでよい。根拠は
   [既定のcheckpointを決める](docs/prompting-guide.md#既定のcheckpointを決める))。

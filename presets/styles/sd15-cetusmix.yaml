@@ -10,6 +10,11 @@
 
 description: Cetus-Mix向けのアニメ調。澄んだ発色とフラットな塗り
 
+# サンプラー設定と品質タグはこのcheckpointに合わせて決めた値。別のcheckpointへ
+# 流用すると噛み合わないため、対象を明示して validate で取り違えを警告させる。
+applies_to:
+  - cetusMix_Whalefall2.safetensors
+
 prompt:
   positive: >
     masterpiece, best quality, absurdres, highres, anime coloring

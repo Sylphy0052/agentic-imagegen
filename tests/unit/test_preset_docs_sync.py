@@ -145,6 +145,20 @@ def test_reference_table_matches_preset(row: list[str]) -> None:
     assert generation.steps == int(_strip_code(steps))
 
 
+@pytest.mark.parametrize("row", _reference_rows(), ids=lambda row: _strip_code(row[0]))
+def test_reference_table_matches_applies_to(row: list[str]) -> None:
+    """対象列がcheckpointを名指ししているpresetは、それをapplies_toにも持つ。
+
+    applies_to は validate が style preset の取り違えを警告するためだけの情報で、
+    Specへは展開されない。書き忘れても生成は成功するため、表との一致で担保する。
+    """
+    name, target = _strip_code(row[0]), row[1].strip()
+    match = re.match(r"`([^`]+)`", target)
+    expected = (f"{match[1]}.safetensors",) if match else ()
+
+    assert _load(name).applies_to == expected
+
+
 @pytest.mark.parametrize("row", _guide_rows(), ids=lambda row: _strip_code(row[0]))
 def test_guide_table_preset_exists(row: list[str]) -> None:
     """表が指すstyle presetが実在すること。"""

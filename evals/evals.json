@@ -15,8 +15,13 @@
         "prompt.positive へ日本語を書いて生成に任せる",
         "フォントの実在を確かめないまま generate へ進む"
       ],
-      "references": ["docs/spec-reference.md", "docs/fonts-setup.md"],
-      "tags": ["routing"]
+      "references": [
+        "docs/spec-reference.md",
+        "docs/fonts-setup.md"
+      ],
+      "tags": [
+        "routing"
+      ]
     },
     {
       "id": "same-character-new-scene-uses-reference",
@@ -33,9 +38,15 @@
         "presetだけ差し替えて同じキャラだと報告する",
         "基準画像を作らずに reference を省く"
       ],
-      "presets": { "scene": "library-daylight" },
-      "references": [".claude/skills/imagegen/references/character-consistency.md"],
-      "tags": ["routing"]
+      "presets": {
+        "scene": "library-daylight"
+      },
+      "references": [
+        ".claude/skills/imagegen/references/character-consistency.md"
+      ],
+      "tags": [
+        "routing"
+      ]
     },
     {
       "id": "one-line-request-asks-before-spec",
@@ -52,8 +63,12 @@
         "モデル・解像度・画風を1回の質問へまとめる",
         "seed / steps / cfg / sampler まで聞く"
       ],
-      "presets": { "style": "sd15-hassaku" },
-      "tags": ["routing"]
+      "presets": {
+        "style": "sd15-hassaku"
+      },
+      "tags": [
+        "routing"
+      ]
     },
     {
       "id": "concrete-request-skips-questions",
@@ -68,8 +83,14 @@
         "要求文で決まっている項目を AskUserQuestion で聞き直す",
         "presetを勝手に別のものへ置き換える"
       ],
-      "presets": { "character": "anime-girl-blue", "scene": "rooftop-sunset" },
-      "tags": ["routing", "over-asking"]
+      "presets": {
+        "character": "anime-girl-blue",
+        "scene": "rooftop-sunset"
+      },
+      "tags": [
+        "routing",
+        "over-asking"
+      ]
     },
     {
       "id": "style-preset-carries-clip-skip-and-vae",
@@ -85,9 +106,15 @@
         "style presetを使わずに素のパラメータで組む",
         "外部VAEの当て忘れに触れないまま生成する"
       ],
-      "presets": { "style": "sd15-hassaku" },
-      "references": ["docs/spec-reference.md"],
-      "tags": ["regression:98"]
+      "presets": {
+        "style": "sd15-hassaku"
+      },
+      "references": [
+        "docs/spec-reference.md"
+      ],
+      "tags": [
+        "regression:98"
+      ]
     },
     {
       "id": "inventory-check-uses-catalog",
@@ -101,7 +128,9 @@
         "ls ~/ComfyUI/models/... を種別ごとに並べる",
         "一覧を見るためだけにComfyUIを起動する"
       ],
-      "tags": ["regression:99"]
+      "tags": [
+        "regression:99"
+      ]
     },
     {
       "id": "incompatible-combination-is-refused",
@@ -116,8 +145,12 @@
         "両方入りのSpecで generate を叩いて失敗させる",
         "併用できない旨に触れず片方を黙って落とす"
       ],
-      "references": ["docs/spec-reference.md"],
-      "tags": ["safety"]
+      "references": [
+        "docs/spec-reference.md"
+      ],
+      "tags": [
+        "safety"
+      ]
     },
     {
       "id": "img2img-omits-resolution",
@@ -131,8 +164,12 @@
         "generation.width / generation.height を書く",
         "入力画像の実在を確かめずに generate へ進む"
       ],
-      "references": ["docs/spec-reference.md"],
-      "tags": ["spec-shape"]
+      "references": [
+        "docs/spec-reference.md"
+      ],
+      "tags": [
+        "spec-shape"
+      ]
     },
     {
       "id": "generation-goes-through-session-script",
@@ -147,8 +184,12 @@
         "ComfyUIを起動したまま次の生成へ進む",
         "出力をパイプの読み手が先に閉じるコマンドへ繋いで実行結果を読み違える"
       ],
-      "references": ["CLAUDE.md"],
-      "tags": ["safety"]
+      "references": [
+        "CLAUDE.md"
+      ],
+      "tags": [
+        "safety"
+      ]
     },
     {
       "id": "dit-model-rejects-lora",
@@ -163,9 +204,15 @@
         "model.unet と model.loras を同時に書いたSpecで validate を試す",
         "LoRAを黙って落として生成する"
       ],
-      "presets": { "style": "anima-base" },
-      "references": ["docs/spec-reference.md"],
-      "tags": ["safety"]
+      "presets": {
+        "style": "anima-base"
+      },
+      "references": [
+        "docs/spec-reference.md"
+      ],
+      "tags": [
+        "safety"
+      ]
     },
     {
       "id": "comparison-varies-one-axis",
@@ -184,8 +231,13 @@
         "低stepsでSDE系のsamplerを使う",
         "高周波比の数値だけで順位を付ける"
       ],
-      "references": [".claude/skills/imagegen/references/ablation.md"],
-      "tags": ["routing", "measurement"]
+      "references": [
+        ".claude/skills/imagegen/references/ablation.md"
+      ],
+      "tags": [
+        "routing",
+        "measurement"
+      ]
     },
     {
       "id": "sd15-avoids-score-tags",
@@ -200,8 +252,12 @@
         "score_9 / score_8_up のようなPony系の記法を書く",
         "自然文の長い説明文で埋める"
       ],
-      "references": ["docs/prompting-guide.md"],
-      "tags": ["model-family"]
+      "references": [
+        "docs/prompting-guide.md"
+      ],
+      "tags": [
+        "model-family"
+      ]
     },
     {
       "id": "tags-are-verified-before-use",
@@ -216,8 +272,12 @@
         "実在を確かめずに思いついたタグを並べる",
         "存在しないタグを残したまま完成として渡す"
       ],
-      "references": [".claude/skills/prompt-builder/references/tag-replacements.md"],
-      "tags": ["grounding"]
+      "references": [
+        ".claude/skills/prompt-builder/references/tag-replacements.md"
+      ],
+      "tags": [
+        "grounding"
+      ]
     },
     {
       "id": "color-and-length-are-written-per-garment",
@@ -231,8 +291,12 @@
         "色だけを独立したトークンとして並べる",
         "丈の指定を落として単に skirt と書く"
       ],
-      "references": ["docs/prompting-guide.md"],
-      "tags": ["regression:97"]
+      "references": [
+        "docs/prompting-guide.md"
+      ],
+      "tags": [
+        "regression:97"
+      ]
     },
     {
       "id": "token-budget-is-checked",
@@ -247,8 +311,35 @@
         "上限を超えたまま完成として渡す",
         "数えずに大丈夫だと述べる"
       ],
-      "references": ["docs/prompting-guide.md"],
-      "tags": ["grounding"]
+      "references": [
+        "docs/prompting-guide.md"
+      ],
+      "tags": [
+        "grounding"
+      ]
+    },
+    {
+      "id": "validate-warning-is-addressed",
+      "skill": "imagegen",
+      "query": "hassakuで青い髪の少女を1024x1024、steps 40で生成して",
+      "expected_behaviors": [
+        "validateのwarningを読み、生成の前に対処する",
+        "checkpointに対応するstyle preset (sd15-hassaku) をSpecへ書く",
+        "見積りがIMAGEGEN_TIMEOUTを超えることを伝え、steps・解像度を下げるかタイムアウトを延ばすかを確認する"
+      ],
+      "forbidden_behaviors": [
+        "warningが出たまま生成へ進む",
+        "exit codeが0だからと警告に触れない"
+      ],
+      "presets": {
+        "style": "sd15-hassaku"
+      },
+      "references": [
+        "docs/xpu-setup.md"
+      ],
+      "tags": [
+        "tooling"
+      ]
     }
   ]
 }
