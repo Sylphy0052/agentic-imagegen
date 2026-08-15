@@ -29,10 +29,30 @@
 2. 応答と、その過程で作られたSpec・叩かれたコマンドを記録する
 3. `expected_behaviors` を1つずつ満たしたか判定する。`forbidden_behaviors` は1つでも
    起きたらそのcaseは不合格
-4. 判定結果を日付とcommit hashを添えて残す (置き場所は決めていない。
-   PRの本文へ貼るのがいちばん追いやすい)
+4. 判定結果を `evals/results/<日付>/SCORE.md` へ、対象のcommit hashを添えて残す
 
 会話の途中から投げると、それまでの文脈が判断へ影響する。1 caseにつき1セッションで回す。
+
+### まとめて回す
+
+`evals/run_case.py` が `claude -p` を1 caseにつき1回起動する。`claude -p` は毎回
+新しいセッションとして立ち上がるため、1 case 1セッションの条件を機械的に満たせる。
+
+```bash
+python3 evals/run_case.py inventory-check-uses-catalog --outdir evals/results/2026-08-15
+python3 evals/run_case.py --all --outdir evals/results/2026-08-15
+```
+
+応答は `<outdir>/<id>.md` へ、生のログは `<id>.json` へ落ちる (JSONは追跡しない)。
+
+観測条件が対話セッションと1点だけ違う。渡すツールを読み取り (`Read` / `Glob` / `Grep`)
+とskillの発火だけに絞り、「コマンドは実行せず、実行するはずのコマンドを書き出す」と
+指示してある。生成やファイル書き込みを無人で走らせないための制約で、
+**叩いたコマンドは実行ログではなく宣言として観測する**。宣言と実際の挙動が食い違いうる
+caseは、対話セッションで回して確かめる。
+
+判定はここでは行わない。落ちた応答を読んで `expected_behaviors` /
+`forbidden_behaviors` と突き合わせるのは人 (またはエージェント) の仕事。
 
 ### skill無しとの比較
 
@@ -61,6 +81,10 @@ caseで見れば足りる。
 | `presets` | caseが名指しするpreset (`character` / `scene` / `style`)。実在をテストが検査する |
 | `references` | caseの根拠になる文書。実在をテストが検査する |
 | `tags` | `regression:<Issue番号>` / `routing` / `safety` などの分類 |
+
+`tags` の `needs-` で始まるものは、`run_case.py` では最後まで判定できないcaseの印。
+`needs-shell` はコマンドの実行結果が要るもの、`needs-context` は直前の会話が要るもの、
+`needs-fixture` は台帳や過去の出力が要るもの。これらは対話セッションで回す。
 
 `tests/unit/test_skill_evals.py` が検査するのは書式と参照先の実在だけで、
 判定そのものは人 (またはエージェント) が行う。

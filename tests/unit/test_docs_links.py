@@ -12,7 +12,9 @@ from pathlib import Path
 import pytest
 
 #: 検証対象から外すディレクトリ。生成物・依存・作業用worktreeを含む。
-_SKIP_PARTS = frozenset({".git", ".venv", "node_modules", "worktrees", "htmlcov"})
+#: `results` はevalの応答をそのまま落とした記録で、人が保守する文書ではない
+#: (モデルがリポジトリ直下からの相対パスで書いたリンクがそのまま残る)。
+_SKIP_PARTS = frozenset({".git", ".venv", "node_modules", "worktrees", "htmlcov", "results"})
 
 _LINK_PATTERN = re.compile(r"\]\(([^)]+)\)")
 

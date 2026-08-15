@@ -44,3 +44,6 @@ fonts/*
 .idea/
 *.swp
 .DS_Store
+
+# evalの生ログ (応答本文とSCORE.mdだけを追跡する)
+evals/results/*/*.json
