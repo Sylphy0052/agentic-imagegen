@@ -94,10 +94,12 @@ A1111で運用したときの実績設定 (`dpmpp_2m_sde` / `exponential` / cfg 
   SD1.5向けのstyle presetと設定を流用しない。目安は後述の
   [SDXL / Illustrious系](#sdxl--illustrious系-novaanimexl_ilv190など)を参照
 
-配布元の推奨のうち、Spec側で明示しないと既定値のままになるものが3つある。
+配布元の推奨のうち、既定値のままだと反映されないものが3つある。
+このうちclip skipと外部VAEはstyle presetが持つため、`sd15-*` を選べば書かなくてよい
+([presets](spec-reference.md#presets))。style presetを使わない場合はSpecへ書く。
 
 - **clip skipは大半のモデルが2を推奨する。** 既定は未指定 (1相当) のため、
-  `model.clip_skip: 2` と書く
+  `model.clip_skip: 2` が要る
   ([model.clip_skip](spec-reference.md#modelclip_skip))。
   1のままでも破綻はしないが、配布元のサンプル画像へ絵柄を寄せたい場合は差が出る
 - **外部VAEの差し替えを前提にするモデルが多い。** `model.vae` へファイル名を書くと
@@ -242,8 +244,9 @@ A1111 / Forgeでは品質タグを先頭へ置く書き方が通例だが、pres
   キャラクタ名もDanbooruの表記順に従う
   (確認手順は [タグの実在を確認する](#タグの実在を確認する))
 - v2.0以降は自然文とタグの併用に対応する
-- **配布元はclip skip 2を推奨する。** 既定は未指定 (1相当) のため、
-  `model.clip_skip: 2` と書く ([model.clip_skip](spec-reference.md#modelclip_skip))
+- **配布元はclip skip 2を推奨する。** `sdxl-illustrious` が持っているため、
+  このpresetを使うならSpec側へ書かなくてよい
+  ([model.clip_skip](spec-reference.md#modelclip_skip))
 
 ### モデルごとの推奨設定
 
@@ -353,17 +356,20 @@ clip skip 2 / 外部VAE) で1枚ずつ生成して比べた結果による (2026
 「指定した服装・小物がそのまま出るか」で、そこに最も忠実だったのがhassakuだった。
 
 `sd15-hassaku` は配布元推奨の `ddim` / `normal` / steps 20 / cfg 8 ではなく、
-この比較で使った設定を持つ。既定として使う場合もSpec側に次の2つを書く。
+この比較で使った設定を持つ。clip skipと外部VAEもpresetが持つため、Spec側に要るのは
+checkpointだけになる。
 
 ```yaml
+presets:
+  style: sd15-hassaku
+
 model:
   checkpoint: hassakuSD15_v13.safetensors
-  clip_skip: 2
-  vae: vaeKlF8Anime2_klF8Anime2VAE.safetensors
 ```
 
 `waiIllustriousSD15_v1` だけは `model.vae` を書いてはいけない。このcheckpointは
 SDXL系のVAEを内蔵しており、SD1.5用の外部VAEへ差し替えると出力が極彩色のノイズになる。
+`sd15-wai-illustrious` は外部VAEを持たないが、Spec側で書けばそちらが優先されてしまう。
 
 ## A1111から設定を移す
 
@@ -406,17 +412,18 @@ sha256sum ~/ComfyUI/models/vae/*.safetensors | cut -c1-10
 
 ### Specへ写す
 
-sampler / scheduler / cfg / steps とプロンプトはstyle presetへ入れられる。
-残りの3つはpresetに書く場所が無いため、Spec側に書く。
+sampler / scheduler / cfg / steps とプロンプト、clip skipとVAEはstyle presetへ入れられる。
+hires fixだけはpresetに書く場所が無いため、Spec側に書く。
 
 | A1111の項目 | Specの書き場所 |
 | --- | --- |
 | Sampler / Schedule type / CFG scale / Steps | style presetの `generation` (またはSpecの `generation`) |
-| Clip skip | `model.clip_skip` |
-| VAE | `model.vae` |
+| Clip skip | style presetの `model.clip_skip` (またはSpecの `model.clip_skip`) |
+| VAE | style presetの `model.vae` (またはSpecの `model.vae`) |
 | Hires upscaler / upscale / steps / Denoising strength | `generation.upscale` |
 
-`model.clip_skip` を省くと1相当になり、2を前提にしたアニメ系モデルでは絵柄が変わる。
+`model.clip_skip` はどちらにも無いと1相当になり、2を前提にしたアニメ系モデルでは
+絵柄が変わる。
 書き方をまとめた例は
 [specs/examples/txt2img_a1111_compat.yaml](../specs/examples/txt2img_a1111_compat.yaml) にある。
 

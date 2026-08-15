@@ -14,16 +14,20 @@ from collections.abc import Iterable
 from enum import StrEnum
 from typing import Annotated, Final
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from agentic_imagegen.domain.models import (
+    ALLOWED_CHECKPOINT_SUFFIXES,
+    MAX_CLIP_SKIP,
     MAX_DIMENSION,
     MAX_SEED,
+    MIN_CLIP_SKIP,
     MIN_DIMENSION,
     RANDOM_SEED,
     PresetRefs,
     SamplerName,
     SchedulerName,
+    validate_model_filename,
 )
 
 #: preset名はファイル名になる。Path Traversalと紛らわしい名前を機械的に排除する。
@@ -79,12 +83,43 @@ class PresetGeneration(_StrictModel):
         return {key: value for key, value in self.model_dump().items() if value is not None}
 
 
+class PresetModel(_StrictModel):
+    """モデル設定の部分指定。
+
+    絵柄は checkpoint だけでは決まらない。CLIPをどこで打ち切るか (`clip_skip`) と
+    どのVAEでデコードするか (`vae`) でも変わるため、そのcheckpointで検証した値を
+    style preset 側へ置けるようにする。Spec側へ手で書く形にすると、書き忘れても
+    検証は通り生成も成功し、出来上がった絵だけが静かに変わる。
+
+    `checkpoint` と loader周り (`unet` / `clip` / `loras`) は持たせない。
+    どのモデルで描くかは利用者が意識して選ぶ値であり、Spec側の責務として残す。
+
+    未指定は None のままにしておき、ModelSpec の既定値を勝手に埋めない
+    (PresetGeneration と同じ理由)。
+    """
+
+    clip_skip: Annotated[int, Field(ge=MIN_CLIP_SKIP, le=MAX_CLIP_SKIP)] | None = None
+    vae: str | None = None
+
+    @field_validator("vae")
+    @classmethod
+    def _reject_unsafe_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return validate_model_filename(value, allowed_suffixes=ALLOWED_CHECKPOINT_SUFFIXES)
+
+    def specified(self) -> dict[str, object]:
+        """明示的に指定されたフィールドだけを返す。"""
+        return {key: value for key, value in self.model_dump().items() if value is not None}
+
+
 class PresetDocument(_StrictModel):
     """presetファイル1つ分の内容。"""
 
     description: str = ""
     prompt: PresetPrompt = Field(default_factory=PresetPrompt)
     generation: PresetGeneration = Field(default_factory=PresetGeneration)
+    model: PresetModel = Field(default_factory=PresetModel)
 
 
 def iter_preset_refs(refs: PresetRefs) -> tuple[tuple[PresetKind, str], ...]:
@@ -131,6 +166,7 @@ __all__ = [
     "PresetDocument",
     "PresetGeneration",
     "PresetKind",
+    "PresetModel",
     "PresetPrompt",
     "PresetRefs",
     "iter_preset_refs",

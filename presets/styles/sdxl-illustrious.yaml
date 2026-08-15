@@ -32,3 +32,7 @@ generation:
   scheduler: normal
   cfg: 7.0
   steps: 30
+
+# vae は書かない。配置済みのVAEはSD1.5向けで、SDXLへ当てると成立しない。
+model:
+  clip_skip: 2

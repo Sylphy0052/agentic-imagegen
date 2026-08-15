@@ -62,6 +62,9 @@ def presets_root(tmp_path: Path) -> Path:
           sampler: dpmpp_2m
           scheduler: karras
           cfg: 5.5
+        model:
+          clip_skip: 2
+          vae: klF8Anime2.safetensors
         """,
     )
     return root
@@ -248,3 +251,124 @@ class TestPresetRefs:
         assert refs.character == "kaede"
         assert refs.scene is None
         assert refs.style is None
+
+
+class TestPresetModel:
+    """presetが持つmodelの部分指定。
+
+    style presetはcheckpointごとに用意するため、そのcheckpointで検証した
+    clip_skip と外部VAEをpreset側に置けないと、preset単体では絵柄が揃わない。
+    """
+
+    def test_loads_model_block(self, presets_root: Path) -> None:
+        preset = load_preset(PresetKind.STYLE, "anime-soft", root=presets_root)
+
+        assert preset.model.clip_skip == 2
+        assert preset.model.vae == "klF8Anime2.safetensors"
+
+    def test_model_defaults_to_unspecified(self, presets_root: Path) -> None:
+        """未指定は None のまま。GenerationSpec の既定値をここで埋めない。"""
+        preset = load_preset(PresetKind.CHARACTER, "kaede", root=presets_root)
+
+        assert preset.model.clip_skip is None
+        assert preset.model.vae is None
+        assert preset.model.specified() == {}
+
+    @pytest.mark.parametrize(
+        "field",
+        ["checkpoint", "unet", "clip", "loras"],
+    )
+    def test_rejects_fields_outside_scope(self, presets_root: Path, field: str) -> None:
+        """checkpointとloader周りはSpec側の責務。presetへ書けると軸の責務が崩れる。"""
+        _write(presets_root, "styles", "broken", f"model:\n  {field}: sd15.safetensors\n")
+
+        with pytest.raises(InvalidGenerationSpec):
+            load_preset(PresetKind.STYLE, "broken", root=presets_root)
+
+    @pytest.mark.parametrize(
+        "vae",
+        ["../secret.safetensors", "/etc/passwd.safetensors", "a/b/c.safetensors", "vae.txt"],
+    )
+    def test_rejects_unsafe_vae(self, presets_root: Path, vae: str) -> None:
+        _write(presets_root, "styles", "broken", f"model:\n  vae: {vae}\n")
+
+        with pytest.raises(InvalidGenerationSpec):
+            load_preset(PresetKind.STYLE, "broken", root=presets_root)
+
+    @pytest.mark.parametrize("clip_skip", [0, 13])
+    def test_rejects_clip_skip_out_of_range(self, presets_root: Path, clip_skip: int) -> None:
+        """値域は ModelSpec と揃える。presetだけ緩いと通ってから弾かれる。"""
+        _write(presets_root, "styles", "broken", f"model:\n  clip_skip: {clip_skip}\n")
+
+        with pytest.raises(InvalidGenerationSpec):
+            load_preset(PresetKind.STYLE, "broken", root=presets_root)
+
+
+class TestApplyPresetModel:
+    def test_fills_model_from_preset(self, presets_root: Path) -> None:
+        payload = {
+            "presets": {"style": "anime-soft"},
+            "prompt": {"positive": "1girl"},
+            "model": {"checkpoint": "sd15.safetensors"},
+        }
+
+        resolved, _ = apply_presets(payload, root=presets_root)
+
+        assert resolved["model"]["checkpoint"] == "sd15.safetensors"
+        assert resolved["model"]["clip_skip"] == 2
+        assert resolved["model"]["vae"] == "klF8Anime2.safetensors"
+
+    def test_prefers_spec_over_preset(self, presets_root: Path) -> None:
+        payload = {
+            "presets": {"style": "anime-soft"},
+            "prompt": {"positive": "1girl"},
+            "model": {"checkpoint": "sd15.safetensors", "clip_skip": 1},
+        }
+
+        resolved, _ = apply_presets(payload, root=presets_root)
+
+        assert resolved["model"]["clip_skip"] == 1  # spec優先
+        assert resolved["model"]["vae"] == "klF8Anime2.safetensors"  # presetで補完
+
+    def test_style_wins_over_other_axes(self, presets_root: Path) -> None:
+        """優先順位は spec > style > scene > character。generation と同じ規則にする。"""
+        _write(
+            presets_root,
+            "characters",
+            "with-model",
+            "prompt:\n  positive: 1girl\nmodel:\n  clip_skip: 1\n",
+        )
+        payload = {
+            "presets": {"character": "with-model", "style": "anime-soft"},
+            "prompt": {"positive": "1girl"},
+            "model": {"checkpoint": "sd15.safetensors"},
+        }
+
+        resolved, _ = apply_presets(payload, root=presets_root)
+
+        assert resolved["model"]["clip_skip"] == 2
+
+    def test_creates_model_block_when_spec_omits_it(self, presets_root: Path) -> None:
+        payload = {"presets": {"style": "anime-soft"}, "prompt": {"positive": "1girl"}}
+
+        resolved, _ = apply_presets(payload, root=presets_root)
+
+        assert resolved["model"]["clip_skip"] == 2
+
+    def test_keeps_model_absent_when_nothing_specified(self, presets_root: Path) -> None:
+        """presetもSpecもmodelを指定しないなら、空のmodelを生やさない。"""
+        payload = {"presets": {"character": "kaede"}, "prompt": {"positive": "1girl"}}
+
+        resolved, _ = apply_presets(payload, root=presets_root)
+
+        assert "model" not in resolved
+
+    def test_rejects_non_mapping_model(self, presets_root: Path) -> None:
+        payload = {
+            "presets": {"style": "anime-soft"},
+            "prompt": {"positive": "1girl"},
+            "model": "sd15.safetensors",
+        }
+
+        with pytest.raises(InvalidGenerationSpec):
+            apply_presets(payload, root=presets_root)

@@ -232,7 +232,7 @@ def _validate_relative_image_path(value: str) -> str:
     return value
 
 
-def _validate_model_filename(value: str, *, allowed_suffixes: frozenset[str]) -> str:
+def validate_model_filename(value: str, *, allowed_suffixes: frozenset[str]) -> str:
     """モデルファイル名にPath Traversalや想定外の拡張子を許さない。
 
     ComfyUIの各modelsディレクトリ配下を前提とし、サブフォルダは1階層まで許可する。
@@ -330,7 +330,7 @@ class UpscaleSpec(_StrictModel):
     def _reject_unsafe_path(cls, value: str | None) -> str | None:
         if value is None:
             return None
-        return _validate_model_filename(value, allowed_suffixes=ALLOWED_UPSCALE_MODEL_SUFFIXES)
+        return validate_model_filename(value, allowed_suffixes=ALLOWED_UPSCALE_MODEL_SUFFIXES)
 
     @model_validator(mode="after")
     def _check_model_combination(self) -> UpscaleSpec:
@@ -415,7 +415,7 @@ class LoraSpec(_StrictModel):
     @field_validator("name")
     @classmethod
     def _reject_unsafe_path(cls, value: str) -> str:
-        return _validate_model_filename(value, allowed_suffixes=ALLOWED_LORA_SUFFIXES)
+        return validate_model_filename(value, allowed_suffixes=ALLOWED_LORA_SUFFIXES)
 
 
 class ModelSpec(_StrictModel):
@@ -468,7 +468,7 @@ class ModelSpec(_StrictModel):
     def _reject_unsafe_path(cls, value: str | None) -> str | None:
         if value is None:
             return None
-        return _validate_model_filename(value, allowed_suffixes=ALLOWED_CHECKPOINT_SUFFIXES)
+        return validate_model_filename(value, allowed_suffixes=ALLOWED_CHECKPOINT_SUFFIXES)
 
     @model_validator(mode="after")
     def _validate_loader_combination(self) -> ModelSpec:
@@ -607,7 +607,7 @@ class ControlSpec(_StrictModel):
     @field_validator("model")
     @classmethod
     def _reject_unsafe_model(cls, value: str) -> str:
-        return _validate_model_filename(value, allowed_suffixes=ALLOWED_CONTROLNET_SUFFIXES)
+        return validate_model_filename(value, allowed_suffixes=ALLOWED_CONTROLNET_SUFFIXES)
 
     @model_validator(mode="after")
     def _validate_ranges(self) -> ControlSpec:
@@ -814,7 +814,7 @@ class TextLayer(_StrictModel):
     @field_validator("font")
     @classmethod
     def _reject_unsafe_font(cls, value: str) -> str:
-        return _validate_model_filename(value, allowed_suffixes=ALLOWED_FONT_SUFFIXES)
+        return validate_model_filename(value, allowed_suffixes=ALLOWED_FONT_SUFFIXES)
 
     @field_validator("color")
     @classmethod
@@ -869,12 +869,12 @@ class ReferenceSpec(_StrictModel):
     @field_validator("model")
     @classmethod
     def _reject_unsafe_model(cls, value: str) -> str:
-        return _validate_model_filename(value, allowed_suffixes=ALLOWED_IPADAPTER_SUFFIXES)
+        return validate_model_filename(value, allowed_suffixes=ALLOWED_IPADAPTER_SUFFIXES)
 
     @field_validator("clip_vision")
     @classmethod
     def _reject_unsafe_clip_vision(cls, value: str) -> str:
-        return _validate_model_filename(value, allowed_suffixes=ALLOWED_CLIP_VISION_SUFFIXES)
+        return validate_model_filename(value, allowed_suffixes=ALLOWED_CLIP_VISION_SUFFIXES)
 
     @model_validator(mode="after")
     def _validate_ranges(self) -> ReferenceSpec:
@@ -987,4 +987,5 @@ __all__ = [
     "TextSpec",
     "UpscaleMethod",
     "UpscaleSpec",
+    "validate_model_filename",
 ]

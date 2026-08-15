@@ -74,7 +74,7 @@ def apply_presets(
     """Specのpayloadにpresetを適用し、(展開後payload, 適用したpreset名) を返す。
 
     優先順位は spec > style > scene > character。
-    prompt は連結、それ以外の生成パラメータは spec の指定を優先して補完する。
+    prompt は連結、generation と model は spec の指定を優先して補完する。
     """
     if PRESETS_KEY not in payload:
         return payload, {}
@@ -101,18 +101,34 @@ def apply_presets(
             prompt[field] = merged
     resolved["prompt"] = prompt
 
-    generation = resolved.get("generation")
-    if generation is not None and not isinstance(generation, dict):
-        raise InvalidGenerationSpec("generation はマッピングである必要があります")
-    merged_generation: dict[str, Any] = {}
-    for _, doc in documents:
-        merged_generation.update(doc.generation.specified())
-    merged_generation.update(dict(generation or {}))
-    if merged_generation:
-        resolved["generation"] = merged_generation
+    for key in ("generation", "model"):
+        block = _merge_block(resolved, key, documents)
+        if block:
+            resolved[key] = block
 
     applied = {kind.value: name for kind, name in iter_preset_refs(refs)}
     return resolved, applied
+
+
+def _merge_block(
+    resolved: dict[str, Any],
+    key: str,
+    documents: list[tuple[PresetKind, PresetDocument]],
+) -> dict[str, Any]:
+    """presetの部分指定へSpecの指定を重ねた結果を返す。
+
+    documents は PRESET_ORDER の順に並んでいるため、あとに来た軸が前を上書きし、
+    最後にSpecの指定が全てに勝つ (spec > style > scene > character)。
+    """
+    block = resolved.get(key)
+    if block is not None and not isinstance(block, dict):
+        raise InvalidGenerationSpec(f"{key} はマッピングである必要があります")
+
+    merged: dict[str, Any] = {}
+    for _, document in documents:
+        merged.update(getattr(document, key).specified())
+    merged.update(dict(block or {}))
+    return merged
 
 
 def _parse_refs(value: Any) -> PresetRefs:

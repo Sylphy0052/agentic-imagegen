@@ -30,6 +30,15 @@ PROMPTING_GUIDE = PROJECT_ROOT / "docs" / "prompting-guide.md"
 #: 「7前後」と書かれた推奨に対して許容する幅。
 AROUND_TOLERANCE = 0.2
 
+#: 一覧の model 列の表記と、presetが実際に持つ model の対応。
+#: 「外部VAE」はアニメ調のSD1.5系で共通して使う vaeKlF8Anime2。
+EXTERNAL_VAE = "vaeKlF8Anime2_klF8Anime2VAE.safetensors"
+MODEL_CELLS: dict[str, dict[str, object]] = {
+    "clip_skip 2 + 外部VAE": {"clip_skip": 2, "vae": EXTERNAL_VAE},
+    "clip_skip 2": {"clip_skip": 2},
+    "-": {},
+}
+
 #: sampler / scheduler / cfg / stepsを配布元の推奨ではなく、実機で生成した絵から選んだ
 #: style preset。推奨表と食い違っていてよい。
 #: sd15-anylora / sd15-meinamix は同じcheckpointをA1111で運用したときの実績設定
@@ -165,3 +174,16 @@ def test_preset_follows_recommended_settings(row: list[str]) -> None:
         assert value is not None
         low, high = _parse_range(cell)
         assert low <= value <= high, f"{name} の{label} {value} が推奨 {cell} の外"
+
+
+@pytest.mark.parametrize("row", _reference_rows(), ids=lambda row: _strip_code(row[0]))
+def test_reference_table_matches_preset_model(row: list[str]) -> None:
+    """clip_skipと外部VAEをpresetへ移したあと、一覧の表記が実体とずれないようにする。
+
+    この2つは書き忘れても検証が通り生成も成功するため、表だけが古くなっても
+    生成では気づけない。
+    """
+    name, cell = _strip_code(row[0]), _strip_code(row[5])
+
+    assert cell in MODEL_CELLS, f"{name} の model 列 {cell!r} は表記として未定義"
+    assert _load(name).model.specified() == MODEL_CELLS[cell]
