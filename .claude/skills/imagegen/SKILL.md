@@ -1,6 +1,6 @@
 ---
 name: imagegen
-description: "自然言語の画像生成要求をGenerationSpecへ落とし込み、preset選択・validate・generateまで実行して出力パスとseedを返す。ComfyUI未起動時やエラー時は原因ごとの切り分けまで担う。Use when: 「〇〇な画像を生成して」「画像を作って」「イラストを生成」「同じキャラで別の構図」「presetを追加して」、/imagegen。"
+description: "自然言語の画像生成要求をGenerationSpecへ落とし込み、preset選択・validate・generateまで実行して出力パスとseedを返す。ComfyUI未起動時やエラー時は原因ごとの切り分けまで担う。Use when: 「〇〇な画像を生成して」「画像を作って」「イラストを生成」「同じキャラで別の構図」「presetを追加して」「どのモデルがいいか比べて」「設定を振って比較して」、/imagegen。"
 allowed-tools: Read, Write, Bash, Glob, Grep, AskUserQuestion
 argument-hint: "[生成したい画像の説明]"
 ---
@@ -230,6 +230,10 @@ IPAdapter (`reference`) とhires fix (`generation.upscale`) は併用できな�
 色の命中はseedごとに揺れるため、1枚だけ見て「効いた」と判断すると次の生成で崩れる。
 書き方の対策と実測値は
 [指定した色と丈を出す](../../../docs/prompting-guide.md#指定した色と丈を出す) を参照。
+
+**「どれがいいか比べて」と言われた場合は1回につき1軸だけ振る。**
+seedとプロンプトを固定し、条件が本当に揃っているかを `metadata.json` で確かめる。
+手順と、結論をどこへ書くかは [references/ablation.md](references/ablation.md) を参照。
 
 生成済みの画像へ後からテキストだけ入れる場合は `compose` を使う。入力画像は変更しない。
 
