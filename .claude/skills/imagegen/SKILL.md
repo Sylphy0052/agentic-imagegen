@@ -229,6 +229,12 @@ scripts/comfyui-session.sh batch specs/generated/a.yaml specs/generated/b.yaml
 不正なSpecが混ざっていたら1件も生成しない。枚数分だけ時間がかかるので、
 `steps` と解像度を落としてから使う。
 
+**キャラクタの引き継ぎと解像度アップを両方求められた場合は2段に分ける。**
+IPAdapter (`reference`) とhires fix (`generation.upscale`) は併用できないため、
+1段目でIPAdapterを効かせて512x768を出し、その画像を `inputs/` へ置いて2段目の
+`img2img` + `upscale` で仕上げる。手順は
+[references/character-consistency.md](references/character-consistency.md) を参照。
+
 **服の色や靴下の丈を指定された場合は、1枚で判定せずseedを4本振る。**
 色の命中はseedごとに揺れるため、1枚だけ見て「効いた」と判断すると次の生成で崩れる。
 書き方の対策と実測値は
