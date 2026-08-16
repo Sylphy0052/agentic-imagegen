@@ -72,4 +72,5 @@ XPU ([xpu-setup.md](../../../../../docs/xpu-setup.md)) を用意してから使�
 
 構成例は [specs/examples/txt2img_sdxl.yaml](../../../../../specs/examples/txt2img_sdxl.yaml)、
 preset本体は [presets/styles/sdxl-animagine.yaml](../../../../../presets/styles/sdxl-animagine.yaml)
-にある。
+にある。**サンプルのcheckpointとstyle presetはIllustrious系のため、
+この系統で使うときは両方を差し替える。** Specの骨格は同じでよい。

@@ -45,6 +45,10 @@ text encoderはCLIPではなくQwen3-0.6B、VAEはQwen-Image VAE。
 決まっていない場合は `hassakuAnima_v13_int8.safetensors` を既定にする
 (int8で2.1GB。他の3つは3.9GBあり、メモリの余裕がない環境では読み込みで詰まる)。
 
+要求に合わなくて振り直すときは **Hassaku -> WAI-ANIMA -> CottonAnima -> MiaoMiao** の順で試す。
+同一条件で出した4枚を比べて決めた優先順で、根拠は
+[references/anima-models.md](references/anima-models.md#選ぶ順序) にある。
+
 系統によって品質タグの扱いが変わる点だけ、ここで押さえる。
 
 | 系統 | 品質タグ |
