@@ -1,6 +1,6 @@
 ---
 name: prompt-builder
-description: "自然言語の要求や既存のプロンプトからDanbooruタグ主体のプロンプトを組み立て、タグの実在・ブロック順・トークン数を検証してpresetの3軸へ振り分ける。生成は行わない。Use when: 「プロンプトを作って」「Danbooruタグで書き直して」「このプロンプトを最適化して」「A1111の設定をpreset化して」「タグが効いているか確認して」、/prompt-builder。"
+description: "SD1.5 / SDXL / Illustrious系向けに、自然言語の要求や既存のプロンプトからDanbooruタグ主体のプロンプトを組み立て、タグの実在・ブロック順・トークン数を検証してpresetの3軸へ振り分ける。生成は行わない。Anima系 (DiT) はanima-prompt skillが扱う。Use when: 「プロンプトを作って」「Danbooruタグで書き直して」「このプロンプトを最適化して」「A1111の設定をpreset化して」「タグが効いているか確認して」、/prompt-builder。"
 allowed-tools: Read, Write, Bash, Glob, Grep
 argument-hint: "[組み立てたい要求、または既存のプロンプト]"
 ---
@@ -12,8 +12,12 @@ argument-hint: "[組み立てたい要求、または既存のプロンプト]"
 生成まで求められている場合は [imagegen skill](../imagegen/SKILL.md) が本体で、
 このskillはその中でプロンプトを決める部分だけを担う。
 
-**記法・値域・判定基準の実体は
-[docs/prompting-guide.md](../../../docs/prompting-guide.md) を一次情報とする。**
+**Anima系 (DiT) はこのskillでは扱わない。** タグと自然文のハイブリッド構造で組むため
+手順そのものが違う。[anima-prompt skill](../anima-prompt/SKILL.md) を使う。
+
+**記法・値域・判定基準の実体は [references/](references/) を一次情報とする。**
+系統によらない原則は [references/common.md](references/common.md)、系統ごとの値域と記法は
+[references/models/](references/models/) の3本にある。
 このSKILLは適用の手順を扱う。同じ内容をここへ転記しない。
 
 ## 手順
@@ -21,20 +25,31 @@ argument-hint: "[組み立てたい要求、または既存のプロンプト]"
 ### 1. モデル系統を確定する
 
 記法・トークン上限・重み付けの効き方がすべて系統で変わる。先に決める。
+確定したら該当する1本だけを開く。3本すべてを読まない。
 
 | 系統 | 判断材料 | 参照 |
 | --- | --- | --- |
-| SD1.5系 | `model.checkpoint` がSD1.5のマージ (`meinamix` / `counterfeit` など) | [SD1.5系](../../../docs/prompting-guide.md#sd15系-meinamix_v12finalなど) |
-| SDXL / Illustrious系 | `model.checkpoint` がSDXL系 (`novaAnimeXL` / `AnythingXL` など) | [SDXL / Illustrious系](../../../docs/prompting-guide.md#sdxl--illustrious系-novaanimexl_ilv190など) |
-| Anima系 (DiT) | `model.unet` / `clip` / `vae` の3点指定 | [Anima系](../../../docs/prompting-guide.md#anima系-hassakuanima_v13などdit--qwen3-06b) |
+| SD1.5系 | `model.checkpoint` がSD1.5のマージ (`meinamix` / `counterfeit` / `hassakuSD15` / `waiIllustriousSD15` など) | [models/sd15.md](references/models/sd15.md) |
+| SDXL系 | `model.checkpoint` がSDXL 1.0ベース (`AnythingXL` / `animagineXL` / `shiratakimixXL`) | [models/sdxl.md](references/models/sdxl.md) |
+| Illustrious系 | `model.checkpoint` がIllustrious由来 (`novaAnimeXL` / `hassakuXL` / `waiNSFWIllustrious`) | [models/illustrious.md](references/models/illustrious.md) |
+| Anima系 (DiT) | `model.unet` / `clip` / `vae` の3点指定 | このskillでは扱わない。[anima-prompt skill](../anima-prompt/SKILL.md) へ移る |
+
+- **SDXL系とIllustrious系はベースモデルで分ける。** どちらもSDXLだが、品質タグの語彙が
+  割れる (`high score` 系はAnimagineの学習語彙で、Illustriousでは効かない)。
+  `AnythingXL` / `shiratakimixXL` はSDXL 1.0ベースのためsdxl.mdを開くが、
+  品質タグの語彙だけはIllustrious系と同じものを使う (その旨はsdxl.mdに書いてある)
+- **`waiIllustriousSD15_v1` はSD1.5系。** Illustriousの蒸留版でタグ記法はIllustrious系に
+  合わせるが、トークン上限とcfgの実用域はSD1.5のものになる
 
 Specが手元にあればそこから読む。無く、要求からも決まらない場合は聞く。
 系統を決めずに組み立てると、品質タグの語彙とサンプラー設定を丸ごと作り直すことになる。
+checkpointを指定されていないときの既定は
+[models/sd15.md](references/models/sd15.md#既定のcheckpointを決める)にある。
 
 ### 2. ブロックへ分解する
 
 要求の語をブロックへ割り当てる。ブロックの区切りとpresetの軸への対応は
-[タグをブロックで組む](../../../docs/prompting-guide.md#タグをブロックで組む)に従う。
+[タグをブロックで組む](references/common.md#タグをブロックで組む)に従う。
 
 - **「知っていること」ではなく「見えるもの」だけを書く。** 足が写らない構図で靴のタグを書かない
 - **1ブロックを厚くしすぎない。** 服装だけ10語あるなら、その絵で見える範囲を疑う
@@ -69,7 +84,7 @@ athletic	0	存在しない (置換または削除)
 | 確認できなかった | APIへ到達できなかった。下記のとおり利用者へ伝える |
 
 - **確認するのはpositiveだけでよい。** 理由と判定の閾値、`post_count` 0でも残す例外は
-  [タグの実在を確認する](../../../docs/prompting-guide.md#タグの実在を確認する)を一次情報とする
+  [タグの実在を確認する](references/common.md#タグの実在を確認する)を一次情報とする
 - **「確認できなかった」が出たタグは、確認できなかったことを利用者へ伝える。**
   推測で「実在する」と報告しない。スクリプトは到達失敗も要対応として数える
 - **引いていない `post_count` を書かない。** スクリプトを走らせていないタグへ「0件」や
@@ -95,13 +110,12 @@ athletic	0	存在しない (置換または削除)
 
 ### 5. トークン数を確認する
 
-系統ごとの上限は手順1で開いた [prompting-guide.md](../../../docs/prompting-guide.md) の
-表で確認する。超えた分は効きが落ちる。
+系統ごとの上限は手順1で開いた [models/](references/models/) の表で確認する
+(SD1.5系は75、SDXL / Illustrious系は248)。超えた分は効きが落ちる。
 
 - **タグ30個前後でSD1.5の上限に達する** (英語のタグは平均2-3トークン)
 - 超えている場合は後方のブロック (背景 -> 構図 -> 表情) から削る。
   前方のトークンほど強く効くため、主題は最後まで残す
-- Anima系は自然文も混ぜられるため、この制約は緩い
 
 ### 6. 競合と重複を洗う
 
@@ -116,7 +130,7 @@ athletic	0	存在しない (置換または削除)
 ### 6-2. 色と丈を指定している場合の書き方へ直す
 
 服の色や靴下の丈を指定した要求では、書き方だけで命中率が変わる。
-手順は [指定した色と丈を出す](../../../docs/prompting-guide.md#指定した色と丈を出す)
+手順は [指定した色と丈を出す](references/common.md#指定した色と丈を出す)
 を一次情報とする。要点だけ挙げると、色とアイテムを1タグにまとめて重みを付け
 (`(navy pleated skirt:1.3)`)、丈はnegative (`thighhighs, over-knee socks`) で押さえる。
 
@@ -166,13 +180,18 @@ uv run imagegen validate specs/generated/<name>.yaml
 
 ## 判断に迷ったときの原則
 
-- [全モデル共通の原則](../../../docs/prompting-guide.md#全モデル共通の原則)に従う
+- [全モデル共通の原則](references/common.md)に従う
 - **利用者が実運用している設定は尊重する。** 存在しないタグの是正と明白な重複の解消に留め、
   好みの領域 (negativeの語数、画風の語彙) を勝手に変えない。削るべきと考える場合は
   理由を添えて提案する
 
 ## 関連
 
-- [docs/prompting-guide.md](../../../docs/prompting-guide.md) — 記法と判定基準の一次情報
+- [references/common.md](references/common.md) — 系統によらない原則と判定基準の一次情報
+- [references/models/](references/models/) — 系統ごとの値域と記法 (sd15 / sdxl / illustrious)
+- [references/a1111-migration.md](references/a1111-migration.md) — A1111の設定をSpecへ写す手順
+- [references/tag-replacements.md](references/tag-replacements.md) — 存在しないタグの置換実績
 - [docs/spec-reference.md](../../../docs/spec-reference.md) — presetとSpecのフィールド仕様
+- [docs/prompting-guide.md](../../../docs/prompting-guide.md) — 上記への索引とComfyUI workflowの扱い
+- [anima-prompt skill](../anima-prompt/SKILL.md) — Anima系 (DiT) のプロンプト
 - [imagegen skill](../imagegen/SKILL.md) — Specへ落として生成まで行う手順

@@ -107,7 +107,7 @@ prompt:
 - 配置済みのembedding名は `list_embeddings` (MCP) で確認する。CLIからは
   `~/ComfyUI/models/embeddings/` を直接確認する
 - checkpointの世代 (SD1.5 / SDXL) とembeddingの対応関係は検証しない (ComfyUI側の責務)。
-  詳細は [prompting-guide.md](prompting-guide.md) を参照
+  詳細は [common.md](../.claude/skills/prompt-builder/references/common.md#textual-inversion-embedding) を参照
 
 ## presets
 
@@ -202,17 +202,17 @@ sampler / scheduler / cfg / stepsとclip_skip / 外部VAEをSpec側で書き直�
 `sd15-wai-illustrious`は`clip_skip`だけを持つ。SDXL系は配置済みのVAEがSD1.5向けのため
 指定しない。DiT系 (`anima-base`) はclip_skipと併用できず、VAEはSpec側の必須項目。
 値の根拠と各モデルの傾向は
-[prompting-guide.md](prompting-guide.md#配置済みのsd15系モデル) を参照。
+[models/sd15.md](../.claude/skills/prompt-builder/references/models/sd15.md#配置済みのsd15系モデル) を参照。
 
 checkpointを決めていない段階の既定は `sd15-hassaku` (対応するcheckpointは
 `hassakuSD15_v13.safetensors`)。根拠は
-[prompting-guide.md](prompting-guide.md#既定のcheckpointを決める) を参照。
+[models/sd15.md](../.claude/skills/prompt-builder/references/models/sd15.md#既定のcheckpointを決める) を参照。
 
 `anime-soft` / `anime-detailed` は負荷を下げたいときの汎用preset。
 `anime-soft`が下描き、`anime-detailed`が仕上げ。
 
 SDXL向けの3つはcheckpointのfine-tune系統で選ぶ。系統ごとの違いは
-[prompting-guide.md](prompting-guide.md#モデルごとの推奨設定) を参照。
+[models/sdxl.md](../.claude/skills/prompt-builder/references/models/sdxl.md#モデルごとの推奨設定) を参照。
 `sdxl-animagine` / `sdxl-shiratakimix` に対応するcheckpointは未配置。
 
 ## generation
@@ -252,7 +252,7 @@ linear_quadratic  kl_optimal
 ```
 
 ComfyUIのKSamplerが受け付けるものに揃えてある。配布元が`beta57`のような通称で
-推奨している場合は [prompting-guide.md](prompting-guide.md) を参照する。
+推奨している場合は [anima-prompt skill](../.claude/skills/anima-prompt/SKILL.md) を参照する。
 
 CPU推論では負荷が所要時間へ直接跳ね返るため、既定は控えめにする。
 
@@ -369,7 +369,7 @@ generation:
 | `clip_skip` | int | `null` | CLIPの最終層を何層手前で打ち切るか。1-12 |
 
 配置済みのcheckpointごとの絵柄とcfg / stepsの目安は
-[prompting-guide.md](prompting-guide.md#配置済みのsd15系モデル)にある。
+[models/sd15.md](../.claude/skills/prompt-builder/references/models/sd15.md#配置済みのsd15系モデル)にある。
 
 `checkpoint` / `unet` / `clip` / `vae`の拡張子は`.safetensors` / `.ckpt`。
 モデル名は共通して次を拒否する。
@@ -569,7 +569,7 @@ reference:
   足先が画面外へ出た)
 - **プロンプトの重み括弧は参照画像の色調と競合する。** 複数箇所へ重みを振ると、
   重みを付けた色のほうが外れることがある。素の語で1枚出し、外れた1箇所だけへ重みを足す
-  ([指定した色と丈を出す](prompting-guide.md#指定した色と丈を出す))
+  ([指定した色と丈を出す](../.claude/skills/prompt-builder/references/common.md#指定した色と丈を出す))
 - ControlNetと併用できる。構図をControlNet、特徴をIPAdapterが担う
 
 同一キャラクタを別の構図で出す手順は

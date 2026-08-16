@@ -2,7 +2,7 @@
 #
 # clip_skipと外部VAEは sd15-meinamix が持つため、Spec側にはcheckpointと
 # hires fixだけを書く。hires fixは解像度に依存するためpresetへは置かない。
-# 経緯は docs/prompting-guide.md の「A1111から設定を移す」を参照。
+# 経緯は .claude/skills/prompt-builder/references/a1111-migration.mdを参照。
 #
 # 同じseedを指定してもA1111と同じ構図にはならない。初期ノイズをA1111はCPUで、
 # ComfyUIはGPUで作るため、ノイズのパターン自体が別物になる。揃うのは絵柄まで。

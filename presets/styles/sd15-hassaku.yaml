@@ -1,6 +1,6 @@
 # hassakuSD15_v13.safetensors 向けの画風preset。
 # checkpointを決めていない段階の既定として使う (この判断の根拠は
-# docs/prompting-guide.md の「既定のcheckpointを決める」)。
+# .claude/skills/prompt-builder/references/models/sd15.md の「既定のcheckpointを決める」)。
 # 画風と品質タグ、それに合うサンプラー設定を書く。
 # 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
 # 照明はシーンの一部としてscene側で指定する。

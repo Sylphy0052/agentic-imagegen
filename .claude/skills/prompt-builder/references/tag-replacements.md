@@ -1,7 +1,7 @@
 # タグ置換の実績
 
 `post_count` はDanbooru tags APIでの実測値 (2026-08時点)。
-判定基準は [docs/prompting-guide.md](../../../../docs/prompting-guide.md#タグの実在を確認する) を一次情報とする。
+判定基準は [common.md](common.md#タグの実在を確認する) を一次情報とする。
 
 同じ語が繰り返し登場するため、確認する前にまずこの表を見る。
 ここに無い語は [scripts/tagcheck.py](../scripts/tagcheck.py) で確認し、判明したらここへ足す。

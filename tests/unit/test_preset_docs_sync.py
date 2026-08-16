@@ -4,7 +4,8 @@
 
 - `presets/styles/*.yaml` — 実体
 - `docs/spec-reference.md` のpreset一覧 — presetが採用した値
-- `docs/prompting-guide.md` の「配置済みのSD1.5系モデル」 — 配布元・利用者の推奨レンジ
+- `.claude/skills/prompt-builder/references/models/sd15.md` の「配置済みのSD1.5系モデル」
+  — 配布元・利用者の推奨レンジ
 
 役割は違うが、sampler / schedulerは両方の表に出てくるうえ、採用値が推奨レンジから
 外れていないことは誰も見ていない。presetを1つ足したときに表の更新を忘れても、
@@ -25,7 +26,9 @@ from agentic_imagegen.services.preset_loader import load_preset
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PRESETS_ROOT = PROJECT_ROOT / "presets"
 SPEC_REFERENCE = PROJECT_ROOT / "docs" / "spec-reference.md"
-PROMPTING_GUIDE = PROJECT_ROOT / "docs" / "prompting-guide.md"
+SD15_REFERENCE = (
+    PROJECT_ROOT / ".claude" / "skills" / "prompt-builder" / "references" / "models" / "sd15.md"
+)
 
 #: 「7前後」と書かれた推奨に対して許容する幅。
 AROUND_TOLERANCE = 0.2
@@ -42,9 +45,9 @@ MODEL_CELLS: dict[str, dict[str, object]] = {
 #: sampler / scheduler / cfg / stepsを配布元の推奨ではなく、実機で生成した絵から選んだ
 #: style preset。推奨表と食い違っていてよい。
 #: sd15-anylora / sd15-meinamix は同じcheckpointをA1111で運用したときの実績設定
-#: (docs/prompting-guide.md の「A1111から設定を移す」)。
+#: (.claude/skills/prompt-builder/references/a1111-migration.md)。
 #: sd15-hassaku はSD1.5系9種を同一条件で比較して既定に選んだときの設定
-#: (同「既定のcheckpointを決める」)。
+#: (同 models/sd15.md の「既定のcheckpointを決める」)。
 MEASURED_SETTING_STYLES = frozenset({"sd15-anylora", "sd15-hassaku", "sd15-meinamix"})
 
 
@@ -115,7 +118,7 @@ def _reference_rows() -> list[list[str]]:
 
 
 def _guide_rows() -> list[list[str]]:
-    return _table_with_header(PROMPTING_GUIDE, "checkpoint")
+    return _table_with_header(SD15_REFERENCE, "checkpoint")
 
 
 def test_tables_are_found() -> None:

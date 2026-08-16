@@ -14,7 +14,7 @@ post_countは日単位でしか動かないため、問い合わせ直す意味�
 `--refresh`、キャッシュを触らせたくないときは `--no-cache`。
 
 post_count の判定基準と、0でも残す例外 (品質ラベル / 学習時点にのみ存在したタグ) は
-docs/prompting-guide.md の「タグの実在を確認する」を一次情報とする。
+.claude/skills/prompt-builder/references/common.md の「タグの実在を確認する」を一次情報とする。
 """
 
 from __future__ import annotations

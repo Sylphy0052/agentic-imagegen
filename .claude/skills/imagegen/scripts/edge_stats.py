@@ -13,7 +13,7 @@
 見るのは破綻の有無だけで、絵の良し悪しの順位付けには使わない。
 アニメ調のSD1.5系を512x768 -> hires x2.0で出した場合の実測は0.04-0.11で、
 0.2を超えるものはVAE不整合などで絵が壊れている
-(判断の基準は docs/prompting-guide.md の「既定のcheckpointを決める」を一次情報とする)。
+(判断の基準は .claude/skills/prompt-builder/references/models/sd15.md の「既定のcheckpointを決める」を一次情報とする)。
 """
 
 from __future__ import annotations

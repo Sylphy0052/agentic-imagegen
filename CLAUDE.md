@@ -26,7 +26,8 @@ txt2img / preset / LoRA / img2img / MCP Server / ControlNet / IPAdapter / hires 
 | **CLAUDE.md** (この文書) | リポジトリを操作するときのルール。禁止事項・設計原則・ディレクトリ・環境変数・exit code |
 | [docs/spec-reference.md](docs/spec-reference.md) | GenerationSpecの全フィールド仕様。値域・既定値・組み合わせ規則・metadata.json |
 | [.claude/skills/imagegen/SKILL.md](.claude/skills/imagegen/SKILL.md) | 画像生成要求を受けたときの手順 |
-| [.claude/skills/prompt-builder/SKILL.md](.claude/skills/prompt-builder/SKILL.md) | プロンプトの組み立てとタグの実在確認の手順 |
+| [.claude/skills/prompt-builder/SKILL.md](.claude/skills/prompt-builder/SKILL.md) | SD1.5 / SDXL / Illustrious系のプロンプトの組み立てとタグの実在確認の手順。記法・値域の実体は `references/` (系統共通の `common.md` と `models/` の3系統) |
+| [.claude/skills/anima-prompt/SKILL.md](.claude/skills/anima-prompt/SKILL.md) | Anima系 (DiT) のプロンプトの組み立て手順。タグ行と自然文のハイブリッド構造 |
 | [evals/README.md](evals/README.md) | skillの判断を退行検出するevalの回し方。台帳は `evals/evals.json` |
 | [README.md](README.md) | プロジェクトの紹介、セットアップ、CLIの使い方 |
 | [docs/diffusers-backend.md](docs/diffusers-backend.md) | diffusersバックエンドの対応範囲・設定・ComfyUIとの違い |
@@ -81,7 +82,16 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
 | [txt2img_a1111_compat.yaml](specs/examples/txt2img_a1111_compat.yaml) | A1111での設定 (clip skip・外部VAE・hires fix) を写して絵柄を揃える場合 |
 
 モデルごとにプロンプトの書き方が違う (タグ語彙・語順・重み付けの効き方・品質タグの記法)。
-どのモデルで何を書くかは [docs/prompting-guide.md](docs/prompting-guide.md) を参照する。
+SD1.5 / SDXL / Illustrious系は系統ごとに1本へ分けてあるため、使うcheckpointの系統に
+対応する1本だけを開く
+([sd15](.claude/skills/prompt-builder/references/models/sd15.md) /
+[sdxl](.claude/skills/prompt-builder/references/models/sdxl.md) /
+[illustrious](.claude/skills/prompt-builder/references/models/illustrious.md))。
+系統によらない原則は
+[references/common.md](.claude/skills/prompt-builder/references/common.md)にある。
+Anima系 (DiT) は組み立ての手順そのものが違うため、
+[anima-prompt skill](.claude/skills/anima-prompt/SKILL.md) が扱う。
+索引は [docs/prompting-guide.md](docs/prompting-guide.md) にある。
 
 ## 使える機能と参照先
 
@@ -110,7 +120,7 @@ Specの書き方はサンプルを参照する (`specs/examples/`)。
   `validate` が警告する (生成は止めない)。
   checkpointを決めていない段階は `hassakuSD15_v13.safetensors` + `sd15-hassaku` を既定にする
   (9種のSD1.5系を同一条件で比較した結果。Spec側に書くのは `model.checkpoint` だけでよい。根拠は
-  [既定のcheckpointを決める](docs/prompting-guide.md#既定のcheckpointを決める))。
+  [既定のcheckpointを決める](.claude/skills/prompt-builder/references/models/sd15.md#既定のcheckpointを決める))。
   負荷を下げたいときだけ汎用の `anime-soft` (steps 20の下描き向け) へ落とす
   (一覧は [presets](docs/spec-reference.md#presets))
 - **併用できない組み合わせがある。** hires fixとIPAdapter、DiT系モデルと

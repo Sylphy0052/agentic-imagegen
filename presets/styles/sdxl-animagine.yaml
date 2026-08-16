@@ -8,7 +8,7 @@
 # Illustrious系の `masterpiece, best quality` とは学習語彙が異なるため流用しない。
 #
 # extra fingers はDanbooruに実在しないため extra digits へ置き換えている
-# (確認手順は docs/prompting-guide.md)。
+# (確認手順は .claude/skills/prompt-builder/references/common.md)。
 #
 # 対象のcheckpointは ~/ComfyUI/models/checkpoints/ へ未配置。使う前に配置する。
 

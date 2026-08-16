@@ -32,7 +32,7 @@ generation:
 
 model:
   # 別のcheckpointへ差し替えるときは cfg / steps の実用域も見直す。
-  # モデルごとの目安は docs/prompting-guide.md にある。
+  # モデルごとの目安は .claude/skills/prompt-builder/references/models/ にある。
   checkpoint: meinamix_v12Final.safetensors
 
 output:
