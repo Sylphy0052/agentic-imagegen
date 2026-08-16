@@ -150,16 +150,23 @@ def test_clip_skip_source_is_checkpoint_when_no_lora() -> None:
     assert template["70"]["inputs"]["clip"] == ["4", 1]
 
 
-def test_clip_skip_source_is_clip_loader_for_unet_template() -> None:
+def test_unet_template_has_no_clip_set_last_layer() -> None:
+    """DiT系テンプレートはCLIPSetLastLayerを持たず、CLIPLoaderへ直結する。
+
+    text encoderがCLIPではなくQwen3のため、stop_at_clip_layer=-1でも素通しにならず
+    条件付けが壊れる (出力が単色や人型の崩れた塊になるのを2026-08-16に実機で確認)。
+    """
     template = load_workflow_template("txt2img_unet")
 
-    assert template["70"]["inputs"]["clip"] == ["61", 0]
-    assert TXT2IMG_UNET_BINDING.nodes[CLIP_SKIP_ROLE].node_id == "70"
+    assert "70" not in template
+    assert template["6"]["inputs"]["clip"] == ["61", 0]
+    assert template["7"]["inputs"]["clip"] == ["61", 0]
+    assert CLIP_SKIP_ROLE not in TXT2IMG_UNET_BINDING.nodes
 
 
 def test_clip_text_encode_always_reads_from_clip_skip_node() -> None:
-    """CLIPTextEncode (positive/negative) はCLIPの供給元へ直結しない。"""
-    for name in ("txt2img", "txt2img_lora", "img2img", "img2img_lora", "txt2img_unet"):
+    """checkpoint系のCLIPTextEncode (positive/negative) はCLIPの供給元へ直結しない。"""
+    for name in ("txt2img", "txt2img_lora", "img2img", "img2img_lora"):
         template = load_workflow_template(name)
 
         assert template["6"]["inputs"]["clip"] == ["70", 0], name
@@ -182,9 +189,21 @@ def test_all_templates_pass_structure_validation(name: str) -> None:
 
 
 @pytest.mark.parametrize("name", sorted(ALLOWED_WORKFLOWS))
-def test_all_templates_contain_clip_set_last_layer(name: str) -> None:
-    """全29テンプレートへCLIPSetLastLayerが無条件に挿入されている。"""
+def test_clip_set_last_layer_is_inserted_only_for_checkpoint_templates(
+    name: str,
+) -> None:
+    """CLIPSetLastLayerはcheckpoint系にだけ挿入し、DiT系 (unet) には挿入しない。
+
+    DiT系のtext encoderはQwen3で層構造が違うため、通すと条件付けが壊れる。
+    clip_skipはそもそもDiT系との併用を検証で拒否している。
+    """
     template = load_workflow_template(name)
+
+    if "unet" in name:
+        assert "70" not in template
+        assert template["6"]["inputs"]["clip"] == ["61", 0]
+        assert template["7"]["inputs"]["clip"] == ["61", 0]
+        return
 
     assert template["70"]["class_type"] == "CLIPSetLastLayer"
     assert template["70"]["inputs"]["stop_at_clip_layer"] == -1
