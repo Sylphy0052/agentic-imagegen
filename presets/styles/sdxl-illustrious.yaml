@@ -2,7 +2,7 @@
 # 実運用で使っている品質タグとネガティブプロンプトを持ち込む構成。
 # 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
 #
-# タグはDanbooruに実在するものだけを使う (確認手順は docs/prompting-guide.md)。
+# タグはDanbooruに実在するものだけを使う (確認手順は .claude/skills/prompt-builder/references/common.md)。
 # ultra-detailed / harsh lighting は実在しないため落とし、high res はDanbooruの表記
 # highres へ、super deformed は chibi へ、extra fingers は extra digits へ置き換えている。
 #

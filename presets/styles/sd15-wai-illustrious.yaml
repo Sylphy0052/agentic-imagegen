@@ -30,7 +30,7 @@ generation:
   steps: 28
 
 # vae は書かない。このcheckpointはSDXL系のVAEを内蔵しており、SD1.5用の外部VAEへ
-# 差し替えると出力が極彩色のノイズになる (docs/prompting-guide.md
+# 差し替えると出力が極彩色のノイズになる (.claude/skills/prompt-builder/references/models/sd15.md
 # 「既定のcheckpointを決める」)。clip_skip は蒸留元のIllustrious系に倣った暫定値。
 model:
   clip_skip: 2

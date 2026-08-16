@@ -4,7 +4,7 @@
 #
 # 品質タグは4個までに絞る。積み増すと主題のトークンが希釈されるだけで品質は上がらない。
 # ultra-detailed / detailed / illustration はDanbooruタグでもNAI系の品質ラベルでもなく、
-# 効果が見込めないため外した (判定基準は docs/prompting-guide.md)。
+# 効果が見込めないため外した (判定基準は .claude/skills/prompt-builder/references/common.md)。
 #
 # easynegative のようなTextual Inversion embeddingはまだ扱えないため、
 # ここでは素のタグだけで組んでいる (Issue #59)。

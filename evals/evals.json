@@ -258,7 +258,8 @@
         "自然文の長い説明文で埋める"
       ],
       "references": [
-        "docs/prompting-guide.md"
+        ".claude/skills/prompt-builder/references/models/sd15.md",
+        ".claude/skills/prompt-builder/references/common.md"
       ],
       "tags": [
         "model-family"
@@ -301,7 +302,7 @@
         "丈の指定を落として単に skirt と書く"
       ],
       "references": [
-        "docs/prompting-guide.md"
+        ".claude/skills/prompt-builder/references/common.md"
       ],
       "tags": [
         "regression:97"
@@ -321,7 +322,8 @@
         "数えずに大丈夫だと述べる"
       ],
       "references": [
-        "docs/prompting-guide.md"
+        ".claude/skills/prompt-builder/references/models/sd15.md",
+        ".claude/skills/prompt-builder/references/common.md"
       ],
       "tags": [
         "grounding"
@@ -416,6 +418,30 @@
       ],
       "tags": [
         "routing"
+      ]
+    },
+    {
+      "id": "anima-splits-tags-and-prose",
+      "skill": "anima-prompt",
+      "query": "hassakuAnimaで、夕方の教室の窓際に座っている女の子のプロンプトを作って",
+      "expected_behaviors": [
+        "タグ行と自然文を分けて出す",
+        "自然文を2文以上書く",
+        "Base系の品質タグ (masterpiece, best quality, score_7) を接頭に置く",
+        "cfg 4-5 / steps 30前後 / sampler er_sde / scheduler simple を添える"
+      ],
+      "forbidden_behaviors": [
+        "score_9 のようなPony系の記法を書く",
+        "タグだけを並べて自然文を書かない",
+        "SD1.5時代の長大なnegativeをそのまま積む",
+        "引いていない post_count を書く"
+      ],
+      "references": [
+        ".claude/skills/anima-prompt/SKILL.md",
+        ".claude/skills/anima-prompt/references/anima-models.md"
+      ],
+      "tags": [
+        "model-family"
       ]
     }
   ]

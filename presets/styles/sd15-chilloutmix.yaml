@@ -4,7 +4,7 @@
 # 照明はシーンの一部としてscene側で指定する。
 #
 # 推奨は steps 20前後 / cfg 7前後 / dpmpp_sde + karras
-# (一覧は docs/prompting-guide.md の「配置済みのSD1.5系モデル」)。
+# (一覧は .claude/skills/prompt-builder/references/models/sd15.md の「配置済みのSD1.5系モデル」)。
 #
 # 配置済みのSD1.5系で唯一の写実寄りのモデル。アニメ調のstyle preset
 # (anime-soft / anime-detailed / 他の sd15-*) を当てると品質タグが打ち消し合う。

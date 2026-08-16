@@ -15,7 +15,7 @@
 # Spec側で sampler: euler_ancestral などへ上書きする。
 #
 # clip_skip と外部VAEもこのpresetが持つ。A1111での実績設定のうち、Spec側に書く必要が
-# 残るのは次の2つ (書き方は docs/prompting-guide.md の「A1111から設定を移す」を参照)。
+# 残るのは次の2つ (書き方は .claude/skills/prompt-builder/references/a1111-migration.mdを参照)。
 #   model.checkpoint: anyloraCheckpoint_bakedvaeBlessedFp16.safetensors
 #   generation.upscale: RealESRGAN_x4plus_anime_6B.pth / scale 2.0 / denoise 0.65 / steps 20
 

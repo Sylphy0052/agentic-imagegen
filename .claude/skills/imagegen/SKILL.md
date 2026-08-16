@@ -54,7 +54,7 @@ uv run imagegen catalog
   [docs/fonts-setup.md](../../../docs/fonts-setup.md) の手順を案内する
 
 どのcheckpointがどういう絵柄で、cfgとstepsの実用域がどこかは
-[配置済みのSD1.5系モデル](../../../docs/prompting-guide.md#配置済みのsd15系モデル)にまとめてある。
+[配置済みのSD1.5系モデル](../prompt-builder/references/models/sd15.md#配置済みのsd15系モデル)にまとめてある。
 
 生成は `scripts/comfyui-session.sh` 経由で行うため、事前の手動起動は要らない
 (スクリプトが起動し、生成し、停止する)。手で立ち上げてデバッグしたいときだけ次を使う
@@ -126,7 +126,7 @@ checkpointを決めていない段階は `hassakuSD15_v13.safetensors` + `sd15-h
 Spec側に書くのは `model.checkpoint` だけでよい。
 負荷を下げたいときだけ汎用の `anime-soft` (steps 20) へ落とす。
 どのcheckpointにどのpresetを使うかは `catalog` の `presets/style` と
-[配置済みのSD1.5系モデル](../../../docs/prompting-guide.md#配置済みのsd15系モデル)の表で確認する。
+[配置済みのSD1.5系モデル](../prompt-builder/references/models/sd15.md#配置済みのsd15系モデル)の表で確認する。
 一覧と連結・優先順位の規則は
 [presets](../../../docs/spec-reference.md#presets) を参照。
 
@@ -153,7 +153,7 @@ sceneだけ差し替える。プロンプトを一から書き直さない。
 
 | 項目 | 選択肢の作り方 |
 | --- | --- |
-| モデル (checkpoint) | `catalog` の `checkpoints` にあるものから、要求に近い系統を推奨案にする。傾向は [配置済みのSD1.5系モデル](../../../docs/prompting-guide.md#配置済みのsd15系モデル) を見て書く |
+| モデル (checkpoint) | `catalog` の `checkpoints` にあるものから、要求に近い系統を推奨案にする。傾向は [配置済みのSD1.5系モデル](../prompt-builder/references/models/sd15.md#配置済みのsd15系モデル) を見て書く |
 | 解像度・アスペクト | 縦長 512x768 / 正方形 512x512 / 横長 768x512 のように、CPU・XPUで現実的な範囲から出す。SDXL系を選んだ場合は1024x1024相当で出す |
 | 画風 (style preset) | `catalog` の `presets/style` にあるものから出す。checkpointが決まっていれば対応する `sd15-*` / `sdxl-*` / `anima-base` を推奨案にする |
 
@@ -196,7 +196,7 @@ presetで足りない要素だけ `prompt.positive` に足す。preset側と重�
 **プロンプトの書き方はモデル系統ごとに違う。** SD1.5はdanbooruタグ主体で75トークンまで、
 SDXL / Illustrious系は品質タグを先頭に置き `score_9` 系の記法は使わない、Animaはタグと
 自然文のどちらでもよく絵師タグに `@` を前置する、といった差がある。語順・重み付けの効き方・
-品質タグの記法は [docs/prompting-guide.md](../../../docs/prompting-guide.md) を参照する。
+品質タグの記法は [references/models/](../prompt-builder/references/models/) を参照する。
 
 要求に応じて足すブロックは次のとおり。**値域と既定値は書かず、参照先で確かめる。**
 
@@ -280,7 +280,7 @@ IPAdapter (`reference`) とhires fix (`generation.upscale`) は併用できな�
 **服の色や靴下の丈を指定された場合は、1枚で判定せずseedを4本振る。**
 色の命中はseedごとに揺れるため、1枚だけ見て「効いた」と判断すると次の生成で崩れる。
 書き方の対策と実測値は
-[指定した色と丈を出す](../../../docs/prompting-guide.md#指定した色と丈を出す) を参照。
+[指定した色と丈を出す](../prompt-builder/references/common.md#指定した色と丈を出す) を参照。
 
 **「どれがいいか比べて」と言われた場合は1回につき1軸だけ振る。**
 seedとプロンプトを固定し、条件が本当に揃っているかを `metadata.json` で確かめる。

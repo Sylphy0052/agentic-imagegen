@@ -4,7 +4,7 @@
 # 照明はシーンの一部としてscene側で指定する。
 #
 # 推奨は steps 20以上 / cfg 4-8 / dpmpp_2m + karras
-# (一覧は docs/prompting-guide.md の「配置済みのSD1.5系モデル」)。
+# (一覧は .claude/skills/prompt-builder/references/models/sd15.md の「配置済みのSD1.5系モデル」)。
 # cfgの実用域が低めのため、汎用の anime-detailed (cfg 7.0) より下げた 6.0 を既定にした。
 # 人物と背景の分離が良く、フラットな塗りに寄る。
 

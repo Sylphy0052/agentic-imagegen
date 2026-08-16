@@ -80,7 +80,7 @@ python3 .claude/skills/imagegen/scripts/edge_stats.py outputs/<日付>/<出力�
 
 高周波比が0.2を大きく超えるものはVAE不整合などで絵が壊れている。
 正常な範囲と読み方は
-[既定のcheckpointを決める](../../../../docs/prompting-guide.md#既定のcheckpointを決める)
+[既定のcheckpointを決める](../../prompt-builder/references/models/sd15.md#既定のcheckpointを決める)
 を一次情報とする。
 
 **この数値で順位を付けない。** 破綻の有無しか見ていない。
@@ -100,7 +100,7 @@ python3 .claude/skills/imagegen/scripts/edge_stats.py outputs/<日付>/<出力�
 
 | 何を決めたか | 書く場所 |
 | --- | --- |
-| モデルの傾向・推奨設定・プロンプトの書き方 | [docs/prompting-guide.md](../../../../docs/prompting-guide.md) |
+| モデルの傾向・推奨設定・プロンプトの書き方 | [references/models/](../../prompt-builder/references/models/) |
 | そのcheckpointの推奨 sampler / cfg / steps / clip skip / VAE | `presets/styles/<name>.yaml` |
 | 既定として何を使うか | [CLAUDE.md](../../../../CLAUDE.md) の「使える機能と参照先」 |
 

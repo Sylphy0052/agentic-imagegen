@@ -1,7 +1,7 @@
 # 黒パーカーの男性キャラクタpreset。
 # 人物の外見的特徴と表情だけを書く。構図や画風は scene / style 側の責務とする。
 #
-# タグはDanbooruに実在するものだけを使う (確認手順は docs/prompting-guide.md)。
+# タグはDanbooruに実在するものだけを使う (確認手順は .claude/skills/prompt-builder/references/common.md)。
 # bangs は現在のDanbooruでは整理されて post_count 0 だが、SD1.5系checkpointの
 # 学習データには存在したため残している。
 

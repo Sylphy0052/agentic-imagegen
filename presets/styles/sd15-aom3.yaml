@@ -4,7 +4,7 @@
 # 照明はシーンの一部としてscene側で指定する。
 #
 # 推奨は steps 20-30 / cfg 6以上 / dpmpp_sde + karras
-# (一覧は docs/prompting-guide.md の「配置済みのSD1.5系モデル」)。
+# (一覧は .claude/skills/prompt-builder/references/models/sd15.md の「配置済みのSD1.5系モデル」)。
 # 汎用の anime-soft / anime-detailed は dpmpp_2m のためsamplerの系統が違う。
 #
 # SDE系のサンプラーはstepsを削ると収束しない。動作確認で負荷を落とす場合は
