@@ -183,6 +183,9 @@ SD1.5系は配置済みのcheckpointごとに1つ用意してある。SDXL系は
 | `sdxl-animagine` | SDXL (Animagine XL系) | `euler_ancestral` / `normal` | 6.0 | 25 | - |
 | `sdxl-shiratakimix` | SDXL (ShiratakiMix XL系) | `dpmpp_3m_sde` / `karras` | 7.5 | 28 | - |
 | `anima-base` | `hassakuAnima_v13_int8` (DiT系) | `er_sde` / `simple` | 4.5 | 32 | - |
+| `anima-wai` | `waiANIMA_v10Base10` (DiT系) | `euler_ancestral` / `normal` | 4.5 | 25 | - |
+| `anima-miaomiao` | `miaomiaoHarem_aniAnimeColoring10` (DiT系) | `euler` / `normal` | 4.5 | 30 | - |
+| `anima-cotton` | `cottonanima_base1` (DiT系) | `er_sde` / `simple` | 5.0 | 28 | - |
 | `anime-soft` | SD1.5汎用 (下描き) | `dpmpp_2m` / `karras` | 5.5 | 20 | - |
 | `anime-detailed` | SD1.5汎用 (仕上げ) | `dpmpp_2m` / `karras` | 7.0 | 30 | - |
 
@@ -200,7 +203,10 @@ sampler / scheduler / cfg / stepsとclip_skip / 外部VAEをSpec側で書き直�
 `model`列の「外部VAE」は`vaeKlF8Anime2_klF8Anime2VAE.safetensors`を指す。
 `waiIllustriousSD15_v1`はSDXL系のVAEを内蔵しており、外部VAEを当てると出力がノイズになるため
 `sd15-wai-illustrious`は`clip_skip`だけを持つ。SDXL系は配置済みのVAEがSD1.5向けのため
-指定しない。DiT系 (`anima-base`) はclip_skipと併用できず、VAEはSpec側の必須項目。
+指定しない。DiT系 (`anima-*`) はclip_skipと併用できず、VAEはSpec側の必須項目。
+`anima-cotton`は配布元が画風LoRAをマージした固定画風のモデル向けで、`score_*`を
+positive / negativeの双方から外してある。品質タグの違いは
+[anima-models.md](../.claude/skills/anima-prompt/references/anima-models.md#モデル別の品質タグ) を参照。
 値の根拠と各モデルの傾向は
 [models/sd15.md](../.claude/skills/prompt-builder/references/models/sd15.md#配置済みのsd15系モデル) を参照。
 

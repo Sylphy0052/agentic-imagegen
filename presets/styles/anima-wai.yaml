@@ -1,0 +1,28 @@
+# WAI-ANIMA v1.0 向けの画風preset。
+# 配布元が推奨する品質タグとサンプラー設定をまとめる。
+# 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
+# 配布元は1024x1344を推奨しているため、Spec側でその近傍を指定する。
+# model ブロックは持たない。DiT系はtext encoderの構造が違うためclip_skipと併用できず、
+# VAEは model.unet / clip とセットでSpec側へ書く必須項目のため。
+#
+# sampler は配布元推奨の euler_ancestral / normal。er_sde を使う他のAnima系とは違う。
+# negative の lowres / censor は配布元が明示しているこのモデル固有の項目。
+
+description: WAI-ANIMA v1.0の既定設定。柔らかい線でまとまりやすい
+
+applies_to:
+  - waiANIMA_v10Base10.safetensors
+
+prompt:
+  positive: >
+    masterpiece, best quality, score_7, safe
+
+  negative: >
+    worst quality, low quality, score_1, score_2, score_3, artist name, blurry,
+    jpeg artifacts, lowres, censor
+
+generation:
+  sampler: euler_ancestral
+  scheduler: normal
+  cfg: 4.5
+  steps: 25

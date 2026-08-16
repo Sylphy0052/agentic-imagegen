@@ -95,17 +95,29 @@ def _to_separate_loaders(base: WorkflowBinding, *, name: str) -> WorkflowBinding
     3つのローダーはそれぞれ別の系統を担うため、取り違えると
     「動くが指定したモデルが効かない」状態になる。結線まで検証する。
     """
-    nodes = {role: node for role, node in base.nodes.items() if role != "checkpoint"}
+    nodes = {
+        role: node
+        for role, node in base.nodes.items()
+        if role not in ("checkpoint", CLIP_SKIP_ROLE)
+    }
     nodes[UNET_LOADER_ROLE] = NodeRef("60", "UNETLoader", ("unet_name", "weight_dtype"))
     nodes[CLIP_LOADER_ROLE] = NodeRef("61", "CLIPLoader", ("clip_name", "type"))
     nodes[VAE_LOADER_ROLE] = NodeRef("62", "VAELoader", ("vae_name",))
     nodes["vae_decode"] = NodeRef("8", "VAEDecode", ())
 
-    links = [link for link in base.links if link.expected_role != "checkpoint"]
+    links = [
+        link
+        for link in base.links
+        if link.expected_role not in ("checkpoint", CLIP_SKIP_ROLE)
+        and link.source_node != CLIP_SKIP_ROLE
+    ]
     links += [
         LinkRef("ksampler", "model", UNET_LOADER_ROLE),
-        # CLIPTextEncodeは変わらずclip_skip経由。clip_skipの供給元だけ差し替える。
-        LinkRef(CLIP_SKIP_ROLE, "clip", CLIP_LOADER_ROLE),
+        # DiT系のtext encoderはCLIPではなくQwen3のため、CLIPSetLastLayerを通さない。
+        # stop_at_clip_layer=-1でも素通しにならず条件付けが壊れ、出力が単色や
+        # 人型の崩れた塊になる (2026-08-16に実機で確認)。CLIPTextEncodeはCLIPLoaderへ直結する。
+        LinkRef("positive_prompt", "clip", CLIP_LOADER_ROLE),
+        LinkRef("negative_prompt", "clip", CLIP_LOADER_ROLE),
         LinkRef("vae_decode", "vae", VAE_LOADER_ROLE),
     ]
     if "vae_encode" in nodes:

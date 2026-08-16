@@ -1,0 +1,30 @@
+# MiaoMiao Harem Ani_Anime Coloring 1.0 向けの画風preset。
+# 配布元が推奨する品質タグとサンプラー設定をまとめる。
+# 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
+# model ブロックは持たない。DiT系はtext encoderの構造が違うためclip_skipと併用できず、
+# VAEは model.unet / clip とセットでSpec側へ書く必須項目のため。
+#
+# 塗り (Anime Coloring) を狙ったfine-tuneで、配布元は fair skin / high contrast を
+# 推奨接頭に含め、肌のテカりを shiny skin で抑える設計にしている。
+# 配布元の既定ratingは sensitive だが、このpresetでは safe を採る。
+# sensitive が要る場合はSpec側で明示的に上書きする。
+
+description: MiaoMiao Harem Ani_Anime Coloring 1.0の既定設定。高コントラストな塗り
+
+applies_to:
+  - miaomiaoHarem_aniAnimeColoring10.safetensors
+
+prompt:
+  positive: >
+    best quality, score_7, score_9, safe, very aesthetic, ultra detailed,
+    fair skin, high contrast
+
+  negative: >
+    worst quality, low quality, score_1, score_2, score_3, artist name,
+    shiny skin, blurry, jpeg artifacts
+
+generation:
+  sampler: euler
+  scheduler: normal
+  cfg: 4.5
+  steps: 30

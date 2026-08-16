@@ -1,0 +1,39 @@
+# 水瀬結衣 (作品: reversed-world-streamer) のcharacter preset。
+#
+# 名字のイメージカラーが水色。髪と瞳、スカーフをその系統で揃える。
+# 髪色は水色だが、`light blue hair` / `sky blue hair` / `cyan hair` / `pale blue hair` は
+# いずれも実在しない。実在するのは `aqua hair` (175,154件) と `blue hair` (1,184,546件) の2つだけで、
+# `aqua hair` は青緑に寄ってエメラルド色で出るため `blue hair` を採る。
+# 水色の明度はタグでは指定できないため、Spec側の自然文で補う。
+# 緑側へ振れるのを green hair の negative で止める。
+# 髪型はボブ。`bob cut` (137,257件) だけでは長さが伸びる枚が出るため、
+# long hair / very long hair / twintails / ponytail を negative で止める。
+#
+# 制服は白の上衣に紺のセーラー襟、半袖。`navy sailor collar` は実在しないため
+# `blue sailor collar` (89,911件) で表す。`white sailor uniform` も実在しないため入れず、
+# 白の上衣は `serafuku` に任せる。
+# スカートは紺のプリーツ。`navy pleated skirt` が実在しないため
+# `pleated skirt` + `blue skirt` の2タグに分ける。
+# 靴下は膝下丈の白。`white kneehighs` / `white kneesocks` が実在しないため
+# `kneehighs` (166,072件) + `white socks` (220,530件) で表し、
+# 丈が伸びるのを thighhighs / over-knee socks の negative で押さえる。
+#
+# 体格は華奢 (158cm)。`slim` は実在しないため `petite` + `aged down` で表す。
+# 静かで規則を重んじる性格を expressionless / closed mouth で出す。
+
+description: 水瀬結衣 (水色のボブ、淡い水色の瞳、白セーラーに紺襟の半袖制服、華奢で静かな2年生)
+
+prompt:
+  positive: >
+    1girl, solo, aged down, petite,
+    blue hair, bob cut, aqua eyes, expressionless, closed mouth,
+    serafuku, school uniform, blue sailor collar, short sleeves, aqua neckerchief,
+    pleated skirt, blue skirt, kneehighs, white socks, loafers
+
+  negative: >
+    long hair, very long hair, twintails, ponytail,
+    blonde hair, pink hair, purple hair, green hair, white hair,
+    blazer, necktie, cardigan, long sleeves,
+    thighhighs, over-knee socks, bare legs, black socks,
+    mature female, large breasts,
+    multiple girls, 1boy

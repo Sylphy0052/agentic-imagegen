@@ -1,0 +1,31 @@
+# CottonAnima base1 向けの画風preset。
+# 配布元が推奨する品質タグとサンプラー設定をまとめる。
+# 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
+# model ブロックは持たない。DiT系はtext encoderの構造が違うためclip_skipと併用できず、
+# VAEは model.unet / clip とセットでSpec側へ書く必須項目のため。
+#
+# 画風LoRAをマージした固定画風のモデルで、配布元の推奨接頭は
+# masterpiece, highres, absurdres, newest。scoreタグを使わないため、
+# 他のAnima系presetと違い positive / negative の双方から score_* を外してある。
+# 他系統の画風へ寄るのを避けるため、source_pony / source_furry / 3d / realistic を
+# negativeで止める (配布元の推奨に従う)。
+
+description: CottonAnima base1の既定設定。画風LoRAマージ済みで画風が一貫する
+
+applies_to:
+  - cottonanima_base1.safetensors
+
+prompt:
+  positive: >
+    masterpiece, highres, absurdres, newest, safe
+
+  negative: >
+    worst quality, low quality, blurry, jpeg artifacts, sepia, username,
+    watermark, chibi, source_pony, source_furry, source_cartoon, monochrome,
+    greyscale, 3d, realistic, backlighting
+
+generation:
+  sampler: er_sde
+  scheduler: simple
+  cfg: 5.0
+  steps: 28

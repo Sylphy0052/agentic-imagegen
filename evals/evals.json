@@ -421,19 +421,19 @@
       ]
     },
     {
-      "id": "anima-splits-tags-and-prose",
+      "id": "anima-routes-to-anima-prompt",
       "skill": "anima-prompt",
-      "query": "hassakuAnimaで、夕方の教室の窓際に座っている女の子のプロンプトを作って",
+      "query": "hassakuAnima で銀髪の女の子のプロンプトを作って",
       "expected_behaviors": [
-        "タグ行と自然文を分けて出す",
-        "自然文を2文以上書く",
-        "Base系の品質タグ (masterpiece, best quality, score_7) を接頭に置く",
+        "model.unet / clip / vae の3点指定になるDiT系だと判断する",
+        "タグ行と自然文を分けて組み、自然文を2文以上書く",
+        "小文字とスペースで書き、アンダースコアはscoreタグにだけ使う",
         "cfg 4-5 / steps 30前後 / sampler er_sde / scheduler simple を添える"
       ],
       "forbidden_behaviors": [
-        "score_9 のようなPony系の記法を書く",
-        "タグだけを並べて自然文を書かない",
-        "SD1.5時代の長大なnegativeをそのまま積む",
+        "prompt-builder skillの手順のままSD1.5 / SDXLの記法で組む",
+        "long_hair のようにアンダースコアでタグを書く",
+        "cfgを7以上にする",
         "引いていない post_count を書く"
       ],
       "references": [
@@ -441,7 +441,48 @@
         ".claude/skills/anima-prompt/references/anima-models.md"
       ],
       "tags": [
+        "routing",
         "model-family"
+      ]
+    },
+    {
+      "id": "anima-cotton-drops-score-tags",
+      "skill": "anima-prompt",
+      "query": "CottonAnima で女の子のプロンプトを作って",
+      "expected_behaviors": [
+        "scoreタグを使わないモデルだと判断し、positive / negativeの双方から score_* を外す",
+        "配布元の推奨接頭 masterpiece, highres, absurdres, newest を使う",
+        "style presetは anima-cotton を選ぶ"
+      ],
+      "forbidden_behaviors": [
+        "masterpiece, best quality, score_7 をそのまま接頭に付ける",
+        "negativeへ score_1, score_2, score_3 を入れる",
+        "他のAnima系モデルのstyle presetを流用する"
+      ],
+      "references": [
+        ".claude/skills/anima-prompt/references/anima-models.md"
+      ],
+      "tags": [
+        "model-family"
+      ]
+    },
+    {
+      "id": "anima-artist-tag-needs-at-mark",
+      "skill": "anima-prompt",
+      "query": "Animaで絵師 wlop の画風を効かせたプロンプトにして",
+      "expected_behaviors": [
+        "絵師タグへ @ を前置する",
+        "@ を付けないと効きが落ちることを伝える"
+      ],
+      "forbidden_behaviors": [
+        "wlop とだけ書いて @ を付けない",
+        "絵師タグをアンダースコア区切りで書く"
+      ],
+      "references": [
+        ".claude/skills/anima-prompt/SKILL.md"
+      ],
+      "tags": [
+        "notation"
       ]
     }
   ]
