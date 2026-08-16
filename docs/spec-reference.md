@@ -232,7 +232,7 @@ SDXL向けの3つはcheckpointのfine-tune系統で選ぶ。系統ごとの違�
 | `seed` | int | -1 | -1、または0以上`2**63-1`以下。-1は実行時に乱数へ解決する |
 | `batch_size` | int | 1 | 1-4。`IMAGEGEN_MAX_BATCH`も超えられない |
 | `sampler` | enum | `euler` | 下記44種 |
-| `scheduler` | enum | `normal` | 下記9種 |
+| `scheduler` | enum | `normal` | 下記10種 |
 | `upscale` | mapping | `null` | hires fix。指定すると2段階生成になる |
 
 `sampler`に指定できる値:
@@ -254,11 +254,22 @@ seeds_2  seeds_3  sa_solver  sa_solver_pece  ddim  uni_pc  uni_pc_bh2
 
 ```text
 normal  karras  exponential  sgm_uniform  simple  ddim_uniform  beta
-linear_quadratic  kl_optimal
+beta57  linear_quadratic  kl_optimal
 ```
 
-ComfyUIのKSamplerが受け付けるものに揃えてある。配布元が`beta57`のような通称で
-推奨している場合は [anima-prompt skill](../.claude/skills/anima-prompt/SKILL.md) を参照する。
+`beta57`以外はComfyUIのKSamplerが受け付けるものに揃えてある。
+
+**`beta57`はDiT系 (`model.unet`) でのみ指定できる。** beta分布の
+alpha=0.5 / beta=0.7 を指す通称で、KSamplerの`scheduler`欄からは選べない
+(KSamplerが選べる`beta`はComfyUI既定の alpha=0.6 / beta=0.6 で固定)。
+指定すると`BetaSamplingScheduler`を持つ専用テンプレート (`*_unet_beta57*`) へ
+切り替わる。checkpoint系で指定するとSpecの検証で拒否する (exit code 2)。
+
+低ノイズ側のstepへ配分を寄せるスケジュールで、背景やテクスチャの情報量が増える。
+Anima系の配布元が推奨しており、`er_sde`との組み合わせが定番。
+モデル別の使い分けは
+[anima-prompt skillのreferences](../.claude/skills/anima-prompt/references/anima-models.md)
+を参照する。
 
 CPU推論では負荷が所要時間へ直接跳ね返るため、既定は控えめにする。
 
@@ -445,7 +456,8 @@ model:
   vae: qwen_image_vae.safetensors
 ```
 
-- テンプレートは`<task>_unet`へ切り替わる (`txt2img_unet` / `img2img_unet`)
+- テンプレートは`<task>_unet`へ切り替わる (`txt2img_unet` / `img2img_unet`)。
+  `scheduler: beta57`を指定した場合は`<task>_unet_beta57`になる
 - **img2img / hires fixとは併用できる。** `generation.upscale`を足すと`<task>_unet_hires`になる
 - **LoRA / ControlNet / IPAdapterとは併用できない。** `control_v11p_sd15_*`も
   `ip-adapter-plus_sd15`もSD1.5向けで、DiT系のUNetへは適用できない。

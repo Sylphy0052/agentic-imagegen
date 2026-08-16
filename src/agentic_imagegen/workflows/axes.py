@@ -1,7 +1,7 @@
 """Workflowテンプレートを構成する軸の定義。
 
-テンプレートは `unet` / `vae` / `lora` / `hires` / `hires_model` / `controlnet` /
-`ipadapter` という直交する軸の組み合わせで決まる。この列挙結果を次の3か所が
+テンプレートは `unet` / `beta57` / `vae` / `lora` / `hires` / `hires_model` /
+`controlnet` / `ipadapter` という直交する軸の組み合わせで決まる。この列挙結果を次の3か所が
 共有することで、軸を1本足したときに書く場所を1か所に留める。
 
 - `workflows/injector.py` の `resolve_workflow_name()` — Specのどのフィールドで
@@ -58,11 +58,16 @@ AXIS_CONTROLNET: Final = "controlnet"
 AXIS_CONTROLNET_RAW: Final = "controlnet_raw"
 #: IPAdapterで参照画像の特徴を寄せる。
 AXIS_IPADAPTER: Final = "ipadapter"
+#: KSamplerを SamplerCustomAdvanced + BetaSamplingScheduler (alpha=0.5 / beta=0.7) へ
+#: 置き換え、配布元が beta57 と呼ぶノイズスケジュールで sampling する。
+#: KSamplerのscheduler欄からは選べないため、テンプレートを分ける必要がある。
+AXIS_BETA57: Final = "beta57"
 
 #: テンプレート名の接尾辞の並び順。`resolve_workflow_name()` の接尾辞組み立てと
 #: 完全に一致させること (例: txt2img_vae_lora_hires_controlnet_ipadapter)。
 AXIS_ORDER: Final[tuple[str, ...]] = (
     AXIS_UNET,
+    AXIS_BETA57,
     AXIS_VAE,
     AXIS_LORA,
     AXIS_HIRES,
@@ -75,8 +80,13 @@ AXIS_ORDER: Final[tuple[str, ...]] = (
 #: グラフ / binding を組み立てる際の適用順。`AXIS_ORDER` と基本は同じだが、
 #: `vae` (外部VAEへの差し替え) だけは他の軸を組み立て終えた後に適用する
 #: (hires fix が増やすVAEDecode / VAEEncodeのVAE参照もまとめて拾うため)。
-#: 名前の接尾辞位置 (unetの直後) とグラフ組み立ての適用順 (最後) が異なる、
-#: この軸だけの例外であることに注意する。
+#: 名前の接尾辞位置と、グラフ組み立ての適用順が異なる軸が2本ある。
+#:
+#: - `vae` (外部VAEへの差し替え): 名前はunetの直後、適用は最後
+#: - `beta57` (KSamplerの置き換え): 名前はunetの直後、適用は最後
+#:
+#: `beta57` を最後にするのは、hires fixが増やす2段目のKSamplerも一緒に
+#: 置き換えるためである。先に適用すると、後から足された2段目だけがKSamplerのまま残る。
 AXIS_BUILD_ORDER: Final[tuple[str, ...]] = (
     AXIS_UNET,
     AXIS_LORA,
@@ -86,6 +96,7 @@ AXIS_BUILD_ORDER: Final[tuple[str, ...]] = (
     AXIS_CONTROLNET_RAW,
     AXIS_IPADAPTER,
     AXIS_VAE,
+    AXIS_BETA57,
 )
 
 #: 同時に指定できない軸の組。
@@ -111,9 +122,19 @@ _EXCLUSIVE_PAIRS: Final[frozenset[frozenset[str]]] = frozenset(
     )
 )
 
+#: その軸を選ぶために別の軸が要る、という依存関係。
+#: - beta57 はDiT系 (unet) だけを対象にする。checkpoint系でも同じ置き換えは可能だが、
+#:   SD1.5 / SDXLでの有効性を確かめておらず、テンプレート数が倍に増えるため広げない
+_REQUIRED_AXES: Final[dict[str, frozenset[str]]] = {
+    AXIS_BETA57: frozenset({AXIS_UNET}),
+}
+
 
 def _is_valid_combination(axes: tuple[str, ...]) -> bool:
-    return all(frozenset(pair) not in _EXCLUSIVE_PAIRS for pair in combinations(axes, 2))
+    if any(frozenset(pair) in _EXCLUSIVE_PAIRS for pair in combinations(axes, 2)):
+        return False
+    present = frozenset(axes)
+    return all(required <= present for axis, required in _REQUIRED_AXES.items() if axis in present)
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,6 +188,7 @@ ALL_TEMPLATE_NAMES: Final[frozenset[str]] = frozenset(
 
 __all__ = [
     "ALL_TEMPLATE_NAMES",
+    "AXIS_BETA57",
     "AXIS_BUILD_ORDER",
     "AXIS_CONTROLNET",
     "AXIS_CONTROLNET_RAW",

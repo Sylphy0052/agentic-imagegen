@@ -63,8 +63,12 @@ SamplerName = Literal[
     "uni_pc_bh2",
 ]
 
-#: ComfyUIの comfy/samplers.py SCHEDULER_HANDLERS と同じ集合。
-#: KSamplerが受け付けないもの (BetaSamplingSchedulerノード側の設定を指す beta57 など) は含めない。
+#: ComfyUIの comfy/samplers.py SCHEDULER_HANDLERS と同じ集合に、`beta57` を加えたもの。
+#:
+#: `beta57` だけはKSamplerのscheduler欄から選べない。beta分布の alpha=0.5 /
+#: beta=0.7 を指す通称で、`BetaSamplingScheduler` ノードを持つテンプレートが要る。
+#: 指定するとDiT系専用の `*_unet_beta57*` テンプレートへ切り替わるため、
+#: checkpoint系のcheckpointと併せて指定することはできない。
 SchedulerName = Literal[
     "normal",
     "karras",
@@ -73,9 +77,13 @@ SchedulerName = Literal[
     "simple",
     "ddim_uniform",
     "beta",
+    "beta57",
     "linear_quadratic",
     "kl_optimal",
 ]
+
+#: KSamplerのscheduler欄からは選べず、専用テンプレートを要求するscheduler。
+BETA57_SCHEDULER: Final = "beta57"
 
 #: 解像度のハード上限。環境変数による実運用上の上限は Settings 側で別途課す。
 MIN_DIMENSION: Final = 64
@@ -941,6 +949,13 @@ class GenerationSpec(_StrictModel):
         if self.generation.upscale is not None and self.reference is not None:
             # 両方かけると生成時間が現実的でないため、テンプレートを用意していない
             raise ValueError("upscale と reference の同時指定は未対応です")
+        if self.generation.scheduler == BETA57_SCHEDULER and not self.model.uses_separate_loaders:
+            # beta57 は BetaSamplingScheduler を持つDiT系テンプレートでのみ使える。
+            # checkpoint系でも同じ置き換えはできるが、有効性を確かめておらず
+            # テンプレートを用意していない
+            raise ValueError(
+                "scheduler: beta57 は unet / clip / vae を指定するDiT系モデルでのみ使えます"
+            )
         if self.model.uses_separate_loaders:
             self._validate_separate_loaders()
         if self.task == "img2img":
@@ -977,6 +992,7 @@ class GenerationSpec(_StrictModel):
 
 
 __all__ = [
+    "BETA57_SCHEDULER",
     "BoxSpec",
     "ControlSpec",
     "GenerationParams",

@@ -19,6 +19,7 @@ import pytest
 
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.workflows.axes import (
+    AXIS_BETA57,
     AXIS_CONTROLNET,
     AXIS_CONTROLNET_RAW,
     AXIS_HIRES,
@@ -63,6 +64,8 @@ def _payload_for(task: str, present_axes: frozenset[str]) -> dict[str, Any]:
 
     if AXIS_UNET in present_axes:
         payload["model"] = dict(SEPARATE_MODEL)
+        if AXIS_BETA57 in present_axes:
+            payload["generation"]["scheduler"] = "beta57"
     else:
         model: dict[str, Any] = {"checkpoint": CHECKPOINT}
         if AXIS_VAE in present_axes:

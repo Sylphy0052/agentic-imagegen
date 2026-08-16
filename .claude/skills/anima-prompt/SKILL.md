@@ -163,8 +163,13 @@ score非推奨のモデルでは `score_1, score_2, score_3` を外す。
 - 解像度は512x512-1536x1536。832x1216が扱いやすい
 - sampler `er_sde` / scheduler `simple` を既定にする。
   柔らかい線は `euler_ancestral`、多様性は `dpmpp_2m_sde_gpu`
-- `beta57` はschedulerではない。指定できない
-  ([references/anima-models.md](references/anima-models.md#beta57はschedulerではない))
+- **情報量を上げたいときは `scheduler: beta57` を使う。** DiT系でのみ指定でき、
+  背景やテクスチャの密度が上がる。`er_sde` / `heunpp2` との組み合わせが定番
+  ([references/anima-models.md](references/anima-models.md#beta57の使い方))
+- **CFG++系のsampler (`*_cfg_pp`) をcfg 4-5で使わない。** ノイズの多い出力になる
+- hires fixを付けるなら `upscale.denoise` を0.25-0.3まで下げる。Specの既定 (0.5) は
+  SD1.5系向けで、Anima系には強すぎる
+  ([references/anima-models.md](references/anima-models.md#hires-fixの目安))
 
 ### 8. presetへ振り分ける
 
