@@ -1,0 +1,188 @@
+{
+  "5": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "",
+      "clip": [
+        "12",
+        1
+      ]
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "",
+      "clip": [
+        "12",
+        1
+      ]
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "94",
+        0
+      ],
+      "vae": [
+        "62",
+        0
+      ]
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "imagegen",
+      "images": [
+        "8",
+        0
+      ]
+    }
+  },
+  "10": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "lora_name": "add_detail.safetensors",
+      "strength_model": 1.0,
+      "strength_clip": 1.0,
+      "model": [
+        "60",
+        0
+      ],
+      "clip": [
+        "61",
+        0
+      ]
+    }
+  },
+  "11": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "lora_name": "add_detail.safetensors",
+      "strength_model": 1.0,
+      "strength_clip": 1.0,
+      "model": [
+        "10",
+        0
+      ],
+      "clip": [
+        "10",
+        1
+      ]
+    }
+  },
+  "12": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "lora_name": "add_detail.safetensors",
+      "strength_model": 1.0,
+      "strength_clip": 1.0,
+      "model": [
+        "11",
+        0
+      ],
+      "clip": [
+        "11",
+        1
+      ]
+    }
+  },
+  "60": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "hassakuAnima_v13_int8.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "61": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_3_06b_base.safetensors",
+      "type": "stable_diffusion"
+    }
+  },
+  "62": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    }
+  },
+  "90": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 0
+    }
+  },
+  "91": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    }
+  },
+  "92": {
+    "class_type": "BetaSamplingScheduler",
+    "inputs": {
+      "model": [
+        "12",
+        0
+      ],
+      "steps": 30,
+      "alpha": 0.5,
+      "beta": 0.7
+    }
+  },
+  "93": {
+    "class_type": "CFGGuider",
+    "inputs": {
+      "model": [
+        "12",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "cfg": 4.0
+    }
+  },
+  "94": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "90",
+        0
+      ],
+      "guider": [
+        "93",
+        0
+      ],
+      "sampler": [
+        "91",
+        0
+      ],
+      "sigmas": [
+        "92",
+        0
+      ],
+      "latent_image": [
+        "5",
+        0
+      ]
+    }
+  }
+}

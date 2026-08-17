@@ -524,16 +524,11 @@ class ModelSpec(_StrictModel):
                 )
             )
 
-        unsupported = []
-        if self.loras:
-            unsupported.append("LoRA")
+        # LoRAはDiT系向けのものが出回ったため通す (Issue #39)。
+        # clip_skipはQwen3 text encoderに「最終層を打ち切る」がそのままの意味を
+        # 持たないため、何を打ち切るのが妥当かを決められるまで拒否したままにする。
         if self.clip_skip is not None:
-            unsupported.append("clip_skip")
-
-        if unsupported:
-            raise ValueError(
-                "unet / clip / vae の指定と{}の併用は未対応です".format(" / ".join(unsupported))
-            )
+            raise ValueError("unet / clip / vae の指定と clip_skip の併用は未対応です")
 
         return self
 

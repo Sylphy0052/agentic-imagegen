@@ -100,9 +100,9 @@ AXIS_BUILD_ORDER: Final[tuple[str, ...]] = (
 )
 
 #: 同時に指定できない軸の組。
-#: - unet (DiT系) は vae / lora / controlnet / controlnet_raw / ipadapter と排他
+#: - unet (DiT系) は vae / controlnet / controlnet_raw / ipadapter と排他
 #:   (control / reference は Specのバリデーションでも拒否している。
-#:   hires / hires_model とは併用できる)
+#:   lora / hires / hires_model とは併用できる)
 #: - hires と hires_model は同じ軸の2値であるため互いに排他
 #: - controlnet と controlnet_raw も同じ軸の2値であるため互いに排他
 #: - ipadapter は hires / hires_model と併用しない
@@ -111,7 +111,6 @@ _EXCLUSIVE_PAIRS: Final[frozenset[frozenset[str]]] = frozenset(
     frozenset(pair)
     for pair in (
         (AXIS_UNET, AXIS_VAE),
-        (AXIS_UNET, AXIS_LORA),
         (AXIS_UNET, AXIS_CONTROLNET),
         (AXIS_UNET, AXIS_CONTROLNET_RAW),
         (AXIS_UNET, AXIS_IPADAPTER),

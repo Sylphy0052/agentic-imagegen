@@ -63,6 +63,18 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `img2img_unet_beta57.json` | DiT系 / beta57 (img2img) |
 | `img2img_unet_beta57_hires.json` | DiT系 / beta57 + hires fix (img2img) |
 | `img2img_unet_beta57_hires_model.json` | DiT系 / beta57 + モデル拡大のhires fix (img2img) |
+| `txt2img_unet_lora.json` | DiT系 + LoRA |
+| `txt2img_unet_lora_hires.json` | DiT系 + LoRA + hires fix |
+| `txt2img_unet_lora_hires_model.json` | DiT系 + LoRA + モデル拡大のhires fix |
+| `img2img_unet_lora.json` | DiT系 + LoRA (img2img) |
+| `img2img_unet_lora_hires.json` | DiT系 + LoRA + hires fix (img2img) |
+| `img2img_unet_lora_hires_model.json` | DiT系 + LoRA + モデル拡大のhires fix (img2img) |
+| `txt2img_unet_beta57_lora.json` | DiT系 / beta57 + LoRA |
+| `txt2img_unet_beta57_lora_hires.json` | DiT系 / beta57 + LoRA + hires fix |
+| `txt2img_unet_beta57_lora_hires_model.json` | DiT系 / beta57 + LoRA + モデル拡大のhires fix |
+| `img2img_unet_beta57_lora.json` | DiT系 / beta57 + LoRA (img2img) |
+| `img2img_unet_beta57_lora_hires.json` | DiT系 / beta57 + LoRA + hires fix (img2img) |
+| `img2img_unet_beta57_lora_hires_model.json` | DiT系 / beta57 + LoRA + モデル拡大のhires fix (img2img) |
 | `txt2img_hires_model.json` | アップスケールモデルで拡大するhires fix |
 | `txt2img_lora_hires_model.json` | LoRA + モデル拡大のhires fix |
 | `img2img_hires_model.json` | モデル拡大のhires fix (img2img) |

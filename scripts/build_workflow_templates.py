@@ -225,13 +225,22 @@ def to_separate_loaders(graph: Graph) -> Graph:
 
 
 def with_lora_chain(graph: Graph, node_ids: tuple[str, ...]) -> Graph:
-    """CheckpointLoader の後に LoraLoader を直列で挟む。"""
+    """MODELの供給元の後に LoraLoader を直列で挟む。
+
+    checkpoint系は MODEL / CLIP とも CheckpointLoader の出力 (0 / 1) から来るが、
+    DiT系は UNETLoader と CLIPLoader に分かれ、どちらも出力0から来る。
+    CLIP側の受け手も違う (checkpoint系は CLIPSetLastLayer、DiT系は
+    CLIPTextEncode 2つ。DiT系はQwen3のため CLIPSetLastLayer を通さない)。
+    """
     graph = copy.deepcopy(graph)
     for node_id in node_ids:
         if node_id in graph:
             raise ValueError(f"LoRA用のノードID {node_id} が既に使われている")
 
-    upstream = CHECKPOINT
+    separate = UNET_LOADER in graph
+    model_source = [UNET_LOADER, 0] if separate else [CHECKPOINT, 0]
+    clip_source = [UNET_CLIP_LOADER, 0] if separate else [CHECKPOINT, 1]
+
     for node_id in node_ids:
         graph[node_id] = {
             "class_type": "LoraLoader",
@@ -239,18 +248,28 @@ def with_lora_chain(graph: Graph, node_ids: tuple[str, ...]) -> Graph:
                 "lora_name": DEFAULT_LORA,
                 "strength_model": 1.0,
                 "strength_clip": 1.0,
-                "model": [upstream, 0],
-                "clip": [upstream, 1],
+                "model": model_source,
+                "clip": clip_source,
             },
         }
-        upstream = node_id
+        model_source = [node_id, 0]
+        clip_source = [node_id, 1]
 
     last = node_ids[-1]
     graph[KSAMPLER]["inputs"]["model"] = [last, 0]
-    # CLIPTextEncodeは変わらずCLIPSetLastLayer経由。CLIPSetLastLayerの供給元を
-    # LoRAチェーンの最終段へ差し替える (LoRA適用後のCLIPに対して層を打ち切るため)
-    graph[CLIP_SKIP]["inputs"]["clip"] = [last, 1]
-    # VAE は LoraLoader を通らないため CheckpointLoader 直結のまま
+    if separate:
+        # CLIPTextEncodeがCLIPLoaderへ直結しているため、そこを最終段へ向け直す。
+        # 1段目のLoraLoader自身もCLIPLoaderを見ているため、チェーンは対象外にする
+        for node_id, node in graph.items():
+            if node_id in node_ids:
+                continue
+            if node["inputs"].get("clip") == [UNET_CLIP_LOADER, 0]:
+                node["inputs"]["clip"] = [last, 1]
+    else:
+        # CLIPTextEncodeは変わらずCLIPSetLastLayer経由。CLIPSetLastLayerの供給元を
+        # LoRAチェーンの最終段へ差し替える (LoRA適用後のCLIPに対して層を打ち切るため)
+        graph[CLIP_SKIP]["inputs"]["clip"] = [last, 1]
+    # VAE は LoraLoader を通らないため元のローダー直結のまま
     return graph
 
 

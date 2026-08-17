@@ -62,17 +62,19 @@ def _payload_for(task: str, present_axes: frozenset[str]) -> dict[str, Any]:
         "generation": {"seed": 1},
     }
 
+    model: dict[str, Any]
     if AXIS_UNET in present_axes:
-        payload["model"] = dict(SEPARATE_MODEL)
+        model = dict(SEPARATE_MODEL)
         if AXIS_BETA57 in present_axes:
             payload["generation"]["scheduler"] = "beta57"
     else:
-        model: dict[str, Any] = {"checkpoint": CHECKPOINT}
+        model = {"checkpoint": CHECKPOINT}
         if AXIS_VAE in present_axes:
             model["vae"] = EXTERNAL_VAE
-        if AXIS_LORA in present_axes:
-            model["loras"] = [dict(LORA)]
-        payload["model"] = model
+    # LoRAはcheckpoint系とDiT系のどちらにも挟める (Issue #39)
+    if AXIS_LORA in present_axes:
+        model["loras"] = [dict(LORA)]
+    payload["model"] = model
 
     if task == "img2img":
         payload["source"] = {"image": "inputs/ref.png"}

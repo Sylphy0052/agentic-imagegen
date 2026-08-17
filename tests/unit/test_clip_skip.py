@@ -87,21 +87,25 @@ def test_clip_skip_rejected_with_separate_loaders() -> None:
         GenerationSpec.model_validate(payload)
 
 
-def test_clip_skip_and_loras_both_reported_with_separate_loaders() -> None:
-    """LoRAとclip_skipを同時指定した場合、両方の非対応理由が1回のエラーで分かる。"""
+def test_only_clip_skip_is_rejected_with_separate_loaders() -> None:
+    """LoRAは通るようになったため (Issue #39)、残る非対応は clip_skip だけ。
+
+    エラーが「何が使えないか」を示す形を保つ。LoRAまで巻き添えで拒否理由へ
+    並べると、使えるものまで使えないと読める。
+    """
     payload = _spec_dict(
         model={
             **SEPARATE_MODEL,
             "checkpoint": None,
             "clip_skip": 2,
-            "loras": [{"name": "add_detail.safetensors"}],
+            "loras": [{"name": "anima_context_detailer_base10.safetensors"}],
         }
     )
 
-    with pytest.raises(ValidationError, match="LoRA") as excinfo:
+    with pytest.raises(ValidationError, match="clip_skip") as excinfo:
         GenerationSpec.model_validate(payload)
 
-    assert "clip_skip" in str(excinfo.value)
+    assert "LoRA" not in str(excinfo.value)
 
 
 # --- adapter: build_workflowでの注入 -----------------------------------------
@@ -201,8 +205,14 @@ def test_clip_set_last_layer_is_inserted_only_for_checkpoint_templates(
 
     if "unet" in name:
         assert "70" not in template
-        assert template["6"]["inputs"]["clip"] == ["61", 0]
-        assert template["7"]["inputs"]["clip"] == ["61", 0]
+        # LoRAを挟む場合はCLIPLoaderへ直結しないため、経路を遡って確かめる。
+        # 途中に混ざってよいのは LoraLoader だけで、行き着く先はCLIPLoader
+        for encode in ("6", "7"):
+            node_id = template[encode]["inputs"]["clip"][0]
+            while template[node_id]["class_type"] == "LoraLoader":
+                node_id = template[node_id]["inputs"]["clip"][0]
+            assert node_id == "61"
+            assert template[node_id]["class_type"] == "CLIPLoader"
         return
 
     assert template["70"]["class_type"] == "CLIPSetLastLayer"

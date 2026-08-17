@@ -58,20 +58,20 @@ def resolve_workflow_name(spec: GenerationSpec) -> str:
     present_axes: list[str] = []
     if spec.model.uses_separate_loaders:
         # UNet / CLIP / VAE を別々に読む形式。ローダーの分割はLoRAより手前の軸なので
-        # 接尾辞も先頭へ置く。LoRA / ControlNet / IPAdapter との組み合わせは
+        # 接尾辞も先頭へ置く。ControlNet / IPAdapter との組み合わせは
         # Specのバリデーションで拒否している
         present_axes.append(AXIS_UNET)
         if spec.generation.scheduler == BETA57_SCHEDULER:
             # beta57 はKSamplerのscheduler欄から選べないため、
             # SamplerCustomAdvanced + BetaSamplingScheduler のテンプレートへ切り替える
             present_axes.append(AXIS_BETA57)
-    else:
-        if spec.model.uses_external_vae:
-            # checkpoint同梱ではなく外部VAEを使う指定。VAELoaderもグラフ上流の
-            # ローダー段のため、_unet と同じ位置 (LoRAより手前) へ置く
-            present_axes.append(AXIS_VAE)
-        if spec.model.loras:
-            present_axes.append(AXIS_LORA)
+    elif spec.model.uses_external_vae:
+        # checkpoint同梱ではなく外部VAEを使う指定。VAELoaderもグラフ上流の
+        # ローダー段のため、_unet と同じ位置 (LoRAより手前) へ置く
+        present_axes.append(AXIS_VAE)
+    if spec.model.loras:
+        # LoRAはcheckpoint系とDiT系のどちらでも挟める (Issue #39)
+        present_axes.append(AXIS_LORA)
     if spec.generation.upscale is not None:
         # 拡大の経路がlatentとpixelで別テンプレートになる
         present_axes.append(AXIS_HIRES_MODEL if spec.generation.upscale.uses_model else AXIS_HIRES)
