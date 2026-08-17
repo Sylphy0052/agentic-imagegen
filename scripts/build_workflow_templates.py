@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Any
 
 from agentic_imagegen.workflows.axes import (
+    AXIS_BETA57,
     AXIS_CONTROLNET,
     AXIS_CONTROLNET_RAW,
     AXIS_HIRES,
@@ -88,6 +89,24 @@ UNET_CLIP_LOADER = "61"
 UNET_VAE_LOADER = "62"
 CLIP_SKIP = "70"
 EXTERNAL_VAE_LOADER = "80"
+# beta57 (KSampler -> SamplerCustomAdvanced) の1段目
+BETA57_NOISE = "90"
+BETA57_SAMPLER_SELECT = "91"
+BETA57_SIGMAS = "92"
+BETA57_GUIDER = "93"
+BETA57_SAMPLER = "94"
+# beta57 の2段目 (hires fix の描き足し)。denoise を SplitSigmasDenoise で表す
+BETA57_HIRES_NOISE = "95"
+BETA57_HIRES_SAMPLER_SELECT = "96"
+BETA57_HIRES_SIGMAS = "97"
+BETA57_HIRES_SPLIT = "98"
+BETA57_HIRES_GUIDER = "99"
+BETA57_HIRES_SAMPLER = "100"
+
+#: 配布元が beta57 と呼ぶノイズスケジュールの実体。beta分布のalpha / beta。
+#: RES4LYFの beta57 と同じ値で、ComfyUI標準の BetaSamplingScheduler で表せる。
+BETA57_ALPHA = 0.5
+BETA57_BETA = 0.7
 
 DEFAULT_LORA = "add_detail.safetensors"
 DEFAULT_SOURCE_IMAGE = "example.png"
@@ -126,6 +145,12 @@ OUTPUT_COUNTS = {
     "UpscaleModelLoader": 1,
     "ImageUpscaleWithModel": 1,
     "ImageScaleBy": 1,
+    "RandomNoise": 1,
+    "KSamplerSelect": 1,
+    "BetaSamplingScheduler": 1,
+    "SplitSigmasDenoise": 2,
+    "CFGGuider": 1,
+    "SamplerCustomAdvanced": 2,
 }
 
 Graph = dict[str, dict[str, Any]]
@@ -175,8 +200,13 @@ def to_separate_loaders(graph: Graph) -> Graph:
     }
 
     graph[KSAMPLER]["inputs"]["model"] = [UNET_LOADER, 0]
-    # CLIPTextEncodeは変わらずCLIPSetLastLayer経由。供給元だけ差し替える
-    graph[CLIP_SKIP]["inputs"]["clip"] = [UNET_CLIP_LOADER, 0]
+    # DiT系のtext encoderはCLIPではなくQwen3のため、CLIPSetLastLayerを通さない。
+    # stop_at_clip_layer=-1でも素通しにならず条件付けが壊れ、出力が単色や人型の
+    # 崩れた塊になる (2026-08-16に実機で確認)。CLIPTextEncodeはCLIPLoaderへ直結する
+    del graph[CLIP_SKIP]
+    for node in graph.values():
+        if node["inputs"].get("clip") == [CLIP_SKIP, 0]:
+            node["inputs"]["clip"] = [UNET_CLIP_LOADER, 0]
     graph[VAE_DECODE]["inputs"]["vae"] = [UNET_VAE_LOADER, 0]
     if IMG2IMG_VAE_ENCODE in graph:
         # img2imgでは入力画像をVAEEncodeする側もCheckpointLoaderのVAEを見ている
@@ -481,6 +511,130 @@ def with_external_vae(graph: Graph) -> Graph:
     return graph
 
 
+def _beta57_stage(
+    graph: Graph,
+    *,
+    ksampler_id: str,
+    noise_id: str,
+    sampler_select_id: str,
+    sigmas_id: str,
+    guider_id: str,
+    sampler_id: str,
+    split_id: str | None,
+) -> None:
+    """1つの KSampler を SamplerCustomAdvanced 一式へ置き換える (graphを破壊的に更新)。
+
+    KSampler が1ノードで担っていたものを、ComfyUI標準のノードへ分解する。
+
+        RandomNoise            <- seed
+        KSamplerSelect         <- sampler_name
+        BetaSamplingScheduler  <- steps / alpha=0.5 / beta=0.7 (= beta57)
+        CFGGuider              <- cfg / positive / negative / model
+        SamplerCustomAdvanced  <- 上の4つを束ねて sampling する
+
+    `split_id` を渡すとhires fixの2段目として組み立て、`SplitSigmasDenoise` を
+    挟んで KSampler の `denoise` に相当する部分だけを取り出す。
+    """
+    previous = graph[ksampler_id]["inputs"]
+    for node_id in (noise_id, sampler_select_id, sigmas_id, guider_id, sampler_id, split_id):
+        if node_id is not None and node_id in graph:
+            raise ValueError(f"beta57用のノードID {node_id} が既に使われている")
+
+    graph[noise_id] = {
+        "class_type": "RandomNoise",
+        "inputs": {"noise_seed": previous["seed"]},
+    }
+    graph[sampler_select_id] = {
+        "class_type": "KSamplerSelect",
+        "inputs": {"sampler_name": previous["sampler_name"]},
+    }
+    graph[sigmas_id] = {
+        "class_type": "BetaSamplingScheduler",
+        "inputs": {
+            "model": previous["model"],
+            "steps": previous["steps"],
+            "alpha": BETA57_ALPHA,
+            "beta": BETA57_BETA,
+        },
+    }
+    graph[guider_id] = {
+        "class_type": "CFGGuider",
+        "inputs": {
+            "model": previous["model"],
+            "positive": previous["positive"],
+            "negative": previous["negative"],
+            "cfg": previous["cfg"],
+        },
+    }
+    sigmas_source = [sigmas_id, 0]
+    if split_id is not None:
+        graph[split_id] = {
+            "class_type": "SplitSigmasDenoise",
+            "inputs": {"sigmas": [sigmas_id, 0], "denoise": previous["denoise"]},
+        }
+        # 出力は 0=high_sigmas / 1=low_sigmas。KSamplerのdenoiseに当たるのは後半側
+        sigmas_source = [split_id, 1]
+    graph[sampler_id] = {
+        "class_type": "SamplerCustomAdvanced",
+        "inputs": {
+            "noise": [noise_id, 0],
+            "guider": [guider_id, 0],
+            "sampler": [sampler_select_id, 0],
+            "sigmas": sigmas_source,
+            "latent_image": previous["latent_image"],
+        },
+    }
+    del graph[ksampler_id]
+
+    # KSamplerの出力を見ていたノードを、置き換え後のサンプラーへ向け直す。
+    # SamplerCustomAdvancedの出力は 0=output / 1=denoised_output で、0を使う
+    for node in graph.values():
+        for key, value in node["inputs"].items():
+            if value == [ksampler_id, 0]:
+                node["inputs"][key] = [sampler_id, 0]
+
+
+def with_beta57_sampling(graph: Graph) -> Graph:
+    """グラフ中の全 KSampler を beta57 スケジュールの SamplerCustomAdvanced へ置き換える。
+
+    KSamplerの `scheduler` 欄には beta分布のalpha / betaを渡す口が無く、
+    ComfyUI標準の `beta` (alpha=0.6 / beta=0.6) しか選べない。配布元が
+    beta57 と呼ぶ alpha=0.5 / beta=0.7 を使うには `BetaSamplingScheduler` を
+    持つグラフが要るため、テンプレートを分ける。
+
+    hires fixが増やす2段目のKSamplerも対象に含めるため、この軸は他の軸を
+    全て適用し終えた後にかける (`axes.AXIS_BUILD_ORDER` の末尾)。
+    """
+    graph = copy.deepcopy(graph)
+    if KSAMPLER not in graph:
+        raise ValueError("with_beta57_sampling は KSampler を持つグラフにのみ適用できる")
+
+    # 2段目から先に置き換える。1段目を先に消すと、2段目が参照している
+    # [KSAMPLER, 0] (hires fixの入口) の張り替え対象が二重になる
+    if HIRES_KSAMPLER in graph:
+        _beta57_stage(
+            graph,
+            ksampler_id=HIRES_KSAMPLER,
+            noise_id=BETA57_HIRES_NOISE,
+            sampler_select_id=BETA57_HIRES_SAMPLER_SELECT,
+            sigmas_id=BETA57_HIRES_SIGMAS,
+            guider_id=BETA57_HIRES_GUIDER,
+            sampler_id=BETA57_HIRES_SAMPLER,
+            split_id=BETA57_HIRES_SPLIT,
+        )
+    _beta57_stage(
+        graph,
+        ksampler_id=KSAMPLER,
+        noise_id=BETA57_NOISE,
+        sampler_select_id=BETA57_SAMPLER_SELECT,
+        sigmas_id=BETA57_SIGMAS,
+        guider_id=BETA57_GUIDER,
+        sampler_id=BETA57_SAMPLER,
+        split_id=None,
+    )
+    return graph
+
+
 #: LoRAのノードID帯はtaskごとに空き番が違う (img2imgは10/11をLoadImageと
 #: VAEEncodeで使っている)ため、他の軸と違いtask別のテーブルを引く。
 _LORA_IDS_BY_TASK: dict[Task, tuple[str, ...]] = {
@@ -500,6 +654,7 @@ AXIS_GRAPH_BUILDERS: dict[str, Callable[[Graph], Graph]] = {
     AXIS_CONTROLNET: with_controlnet,
     AXIS_CONTROLNET_RAW: with_controlnet_raw,
     AXIS_IPADAPTER: with_ipadapter,
+    AXIS_BETA57: with_beta57_sampling,
 }
 
 
@@ -550,6 +705,10 @@ def verify(name: str, base: Graph, graph: Graph) -> None:
             continue  # img2img系では意図的に外している
         if node_id == CHECKPOINT and CHECKPOINT not in graph:
             continue  # unet系ではローダーを3つに分けている
+        if node_id == KSAMPLER and KSAMPLER not in graph:
+            continue  # beta57系ではKSamplerをSamplerCustomAdvanced一式へ置き換えている
+        if node_id == CLIP_SKIP and CLIP_SKIP not in graph:
+            continue  # unet系ではCLIPSetLastLayerを通さない (条件付けが壊れるため)
         if node_id not in graph:
             raise ValueError(f"{name}: ベースのノード {node_id} が消えている")
         if graph[node_id]["class_type"] != node["class_type"]:

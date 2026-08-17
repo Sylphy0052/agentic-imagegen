@@ -360,6 +360,125 @@ CONTROL_LOADER_ROLE: Final = "control_loader"
 CONTROL_APPLY_ROLE: Final = "control_apply"
 
 
+#: beta57 (KSampler -> SamplerCustomAdvanced 一式) の役割名。
+#: 1段目と、hires fixの2段目でそれぞれ1組ずつ持つ。
+BETA57_NOISE_ROLE: Final = "beta57_noise"
+BETA57_SAMPLER_SELECT_ROLE: Final = "beta57_sampler_select"
+BETA57_SIGMAS_ROLE: Final = "beta57_sigmas"
+BETA57_GUIDER_ROLE: Final = "beta57_guider"
+BETA57_SAMPLER_ROLE: Final = "beta57_sampler"
+BETA57_HIRES_NOISE_ROLE: Final = "beta57_hires_noise"
+BETA57_HIRES_SAMPLER_SELECT_ROLE: Final = "beta57_hires_sampler_select"
+BETA57_HIRES_SIGMAS_ROLE: Final = "beta57_hires_sigmas"
+BETA57_HIRES_SPLIT_ROLE: Final = "beta57_hires_split"
+BETA57_HIRES_GUIDER_ROLE: Final = "beta57_hires_guider"
+BETA57_HIRES_SAMPLER_ROLE: Final = "beta57_hires_sampler"
+
+
+def _replace_ksampler_with_beta57(
+    nodes: dict[str, NodeRef],
+    links: list[LinkRef],
+    *,
+    ksampler_role: str,
+    noise: tuple[str, str],
+    sampler_select: tuple[str, str],
+    sigmas: tuple[str, str],
+    guider: tuple[str, str],
+    sampler: tuple[str, str],
+    split: tuple[str, str] | None,
+) -> None:
+    """1つのKSamplerを SamplerCustomAdvanced 一式のノード / リンクへ置き換える。
+
+    引数のタプルはいずれも (役割名, ノードID)。`split` を渡した場合は
+    hires fixの2段目として組み立て、`SplitSigmasDenoise` を挟んで KSampler の
+    `denoise` に相当する区間だけを取り出す。
+
+    KSamplerが1ノードで持っていた model / positive / negative / latent_image の
+    供給元を、CFGGuider・BetaSamplingScheduler・SamplerCustomAdvanced へ配り直す。
+    配り漏らすと「置き換わっているのに条件付けが効かない」状態を検出できなくなる。
+    """
+    sources = {
+        link.input_key: link.expected_role for link in links if link.source_node == ksampler_role
+    }
+    del nodes[ksampler_role]
+    nodes[noise[0]] = NodeRef(noise[1], "RandomNoise", ("noise_seed",))
+    nodes[sampler_select[0]] = NodeRef(sampler_select[1], "KSamplerSelect", ("sampler_name",))
+    nodes[sigmas[0]] = NodeRef(sigmas[1], "BetaSamplingScheduler", ("steps", "alpha", "beta"))
+    nodes[guider[0]] = NodeRef(guider[1], "CFGGuider", ("cfg",))
+    nodes[sampler[0]] = NodeRef(sampler[1], "SamplerCustomAdvanced", ())
+    if split is not None:
+        nodes[split[0]] = NodeRef(split[1], "SplitSigmasDenoise", ("denoise",))
+
+    remaining = [link for link in links if link.source_node != ksampler_role]
+    links.clear()
+    for link in remaining:
+        # KSamplerの出力を見ていた側 (hires fixの入口・VAEDecode) は
+        # 置き換え後のサンプラーを見るようになる
+        links.append(
+            LinkRef(link.source_node, link.input_key, sampler[0])
+            if link.expected_role == ksampler_role
+            else link
+        )
+
+    if "model" in sources:
+        links.append(LinkRef(guider[0], "model", sources["model"]))
+        # BetaSamplingSchedulerはsigmasを引くためにmodel_samplingを見る。
+        # ここが元のローダーを指したままだと、別のモデルのスケジュールで動く
+        links.append(LinkRef(sigmas[0], "model", sources["model"]))
+    for key in ("positive", "negative"):
+        if key in sources:
+            links.append(LinkRef(guider[0], key, sources[key]))
+    if "latent_image" in sources:
+        links.append(LinkRef(sampler[0], "latent_image", sources["latent_image"]))
+    links.append(LinkRef(sampler[0], "noise", noise[0]))
+    links.append(LinkRef(sampler[0], "guider", guider[0]))
+    links.append(LinkRef(sampler[0], "sampler", sampler_select[0]))
+    if split is None:
+        links.append(LinkRef(sampler[0], "sigmas", sigmas[0]))
+    else:
+        links.append(LinkRef(split[0], "sigmas", sigmas[0]))
+        links.append(LinkRef(sampler[0], "sigmas", split[0]))
+
+
+def _with_beta57_sampling(base: WorkflowBinding, *, name: str) -> WorkflowBinding:
+    """KSamplerを beta57 スケジュールの SamplerCustomAdvanced 一式へ置き換えたbinding。
+
+    KSamplerの `scheduler` 欄からは beta分布のalpha / betaを渡せず、ComfyUI標準の
+    `beta` (alpha=0.6 / beta=0.6) しか選べない。配布元が beta57 と呼ぶ
+    alpha=0.5 / beta=0.7 を使うにはノード構成ごと分ける必要がある。
+
+    hires fixが増やす2段目も対象にするため、この軸は他の軸を全て適用し終えた後に
+    かける (`axes.AXIS_BUILD_ORDER` の末尾)。
+    """
+    nodes = dict(base.nodes)
+    links = list(base.links)
+
+    if HIRES_KSAMPLER_ROLE in nodes:
+        _replace_ksampler_with_beta57(
+            nodes,
+            links,
+            ksampler_role=HIRES_KSAMPLER_ROLE,
+            noise=(BETA57_HIRES_NOISE_ROLE, "95"),
+            sampler_select=(BETA57_HIRES_SAMPLER_SELECT_ROLE, "96"),
+            sigmas=(BETA57_HIRES_SIGMAS_ROLE, "97"),
+            guider=(BETA57_HIRES_GUIDER_ROLE, "99"),
+            sampler=(BETA57_HIRES_SAMPLER_ROLE, "100"),
+            split=(BETA57_HIRES_SPLIT_ROLE, "98"),
+        )
+    _replace_ksampler_with_beta57(
+        nodes,
+        links,
+        ksampler_role="ksampler",
+        noise=(BETA57_NOISE_ROLE, "90"),
+        sampler_select=(BETA57_SAMPLER_SELECT_ROLE, "91"),
+        sigmas=(BETA57_SIGMAS_ROLE, "92"),
+        guider=(BETA57_GUIDER_ROLE, "93"),
+        sampler=(BETA57_SAMPLER_ROLE, "94"),
+        split=None,
+    )
+    return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
+
+
 def _build_controlnet_binding(
     base: WorkflowBinding, *, name: str, preprocess: bool
 ) -> WorkflowBinding:
@@ -484,6 +603,7 @@ AXIS_BINDING_BUILDERS: Final[dict[str, Callable[..., WorkflowBinding]]] = {
     axes.AXIS_CONTROLNET: _with_controlnet,
     axes.AXIS_CONTROLNET_RAW: _with_controlnet_raw,
     axes.AXIS_IPADAPTER: _with_ipadapter,
+    axes.AXIS_BETA57: _with_beta57_sampling,
 }
 
 _BASE_BINDINGS: Final[dict[axes.Task, WorkflowBinding]] = {
@@ -636,12 +756,7 @@ def build_workflow(
         latent["height"] = params.height
         latent["batch_size"] = params.batch_size
 
-    ksampler = inputs_of("ksampler")
-    ksampler["seed"] = seed
-    ksampler["steps"] = params.steps
-    ksampler["cfg"] = params.cfg
-    ksampler["sampler_name"] = params.sampler
-    ksampler["scheduler"] = params.scheduler
+    _inject_sampling(spec, binding, inputs_of, seed=seed)
 
     inputs_of("save_image")["filename_prefix"] = spec.output.prefix
 
@@ -653,6 +768,48 @@ def build_workflow(
     _inject_reference(spec, binding, inputs_of, reference_image_name)
 
     return workflow
+
+
+def _sigma_steps_for_denoise(steps: int, denoise: float) -> int:
+    """denoise付きで `steps` 手進めるために、スケジューラへ要求するstep数を返す。
+
+    KSamplerは denoise < 1 のとき `int(steps / denoise)` 手のスケジュールを引いて
+    後ろ `steps + 1` 個だけを使う (comfy/samplers.py の `KSampler.set_steps`)。
+    beta57テンプレートでは同じことを BetaSamplingScheduler + SplitSigmasDenoise で
+    行うため、スケジューラ側へ渡すstep数をここで揃える。
+    """
+    if denoise <= 0.0 or denoise > 0.9999:
+        return steps
+    return max(int(steps / denoise), steps)
+
+
+def _inject_sampling(
+    spec: GenerationSpec,
+    binding: WorkflowBinding,
+    inputs_of: Callable[[str], dict[str, Any]],
+    *,
+    seed: int,
+) -> None:
+    """1段目のsampling設定を注入する。
+
+    KSampler 1ノードのテンプレートと、beta57 (SamplerCustomAdvanced 一式) の
+    テンプレートで書き込み先が変わる。beta57側は scheduler をテンプレート固定の
+    beta分布 (alpha=0.5 / beta=0.7) で持つため、Specの `scheduler` は書き込まない。
+    """
+    params = spec.generation
+    if BETA57_SAMPLER_ROLE in binding.nodes:
+        inputs_of(BETA57_NOISE_ROLE)["noise_seed"] = seed
+        inputs_of(BETA57_SAMPLER_SELECT_ROLE)["sampler_name"] = params.sampler
+        inputs_of(BETA57_SIGMAS_ROLE)["steps"] = params.steps
+        inputs_of(BETA57_GUIDER_ROLE)["cfg"] = params.cfg
+        return
+
+    ksampler = inputs_of("ksampler")
+    ksampler["seed"] = seed
+    ksampler["steps"] = params.steps
+    ksampler["cfg"] = params.cfg
+    ksampler["sampler_name"] = params.sampler
+    ksampler["scheduler"] = params.scheduler
 
 
 def _inject_model(
@@ -839,10 +996,23 @@ def _inject_upscale(
         node["upscale_method"] = upscale.method
 
     params = spec.generation
+    steps = upscale.effective_steps(params.steps)
+    if BETA57_HIRES_SAMPLER_ROLE in binding.nodes:
+        # 2段目は同じseedを使う。変えると1段目の絵から離れてしまう
+        inputs_of(BETA57_HIRES_NOISE_ROLE)["noise_seed"] = seed
+        inputs_of(BETA57_HIRES_SAMPLER_SELECT_ROLE)["sampler_name"] = params.sampler
+        # KSamplerのdenoiseに当たる区間だけを SplitSigmasDenoise で取り出すため、
+        # スケジューラへは denoise で割り戻したstep数を渡す
+        inputs_of(BETA57_HIRES_SIGMAS_ROLE)["steps"] = _sigma_steps_for_denoise(
+            steps, upscale.denoise
+        )
+        inputs_of(BETA57_HIRES_SPLIT_ROLE)["denoise"] = upscale.denoise
+        inputs_of(BETA57_HIRES_GUIDER_ROLE)["cfg"] = params.cfg
+        return
+
     second = inputs_of(HIRES_KSAMPLER_ROLE)
-    # 2段目は同じseedを使う。変えると1段目の絵から離れてしまう
     second["seed"] = seed
-    second["steps"] = upscale.effective_steps(params.steps)
+    second["steps"] = steps
     second["cfg"] = params.cfg
     second["sampler_name"] = params.sampler
     second["scheduler"] = params.scheduler

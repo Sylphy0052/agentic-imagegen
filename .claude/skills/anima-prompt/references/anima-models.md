@@ -45,13 +45,76 @@ int8版はComfyUI独自の量子化形式 (`comfy_quant`) で、`UNETLoader` の
 | MiaoMiao Harem Ani | `euler` / `euler_ancestral` | `normal` | 4-5 | 30 | 記載なし |
 | CottonAnima base1 | `er_sde` | (記載なし。`simple`) | 5 | 24-30 | 記載なし |
 
-### beta57はschedulerではない
+### beta57の使い方
 
-**モデル配布元が推奨する `beta57` はKSamplerのschedulerではない。**
-`beta` schedulerのalpha=0.5 / beta=0.7を指す通称であり、指定するには `BetaSamplingScheduler`
-ノードを持つWorkflowが要る。本リポジトリのテンプレートはKSamplerベースのため使えない。
-`simple` を使う。指定できるschedulerの一覧は
+**`beta57` はKSamplerのscheduler欄からは選べないが、Specでは指定できる。**
+beta分布の alpha=0.5 / beta=0.7 を指す通称で、KSamplerが選べる `beta` は
+ComfyUI既定の alpha=0.6 / beta=0.6 に固定されている。
+
+Specへ `scheduler: beta57` と書くと、`BetaSamplingScheduler` を持つDiT系専用の
+テンプレート (`*_unet_beta57*`) へ自動で切り替わる。RES4LYFなどのカスタムノードは要らない
+(ComfyUI標準の `BetaSamplingScheduler` が alpha / beta を受け付ける)。
+
+```yaml
+generation:
+  sampler: er_sde
+  scheduler: beta57
+```
+
+- **checkpoint系 (SD1.5 / SDXL) では指定できない。** 同じ置き換えは技術的に可能だが、
+  有効性を確かめておらずテンプレートを用意していない。指定するとSpecの検証で拒否する
+- hires fixと併用できる (`*_unet_beta57_hires`)。2段目も同じスケジュールで走る
+- 低ノイズ側のstepへ配分が寄るため、背景・テクスチャ・肌の情報量が増える。
+  配布元は「写実寄り・絵画寄りの質感」に効くと書いている
+
+指定できるschedulerの一覧は
 [docs/spec-reference.md](../../../../docs/spec-reference.md#generation) を参照。
+
+### sampler / schedulerの選び方
+
+配布元とコミュニティの記載を整理したもの。**いずれも実測による裏取りは未実施。**
+
+| sampler | 傾向 |
+| --- | --- |
+| `er_sde` | 中庸。フラットな色と締まった線。汎用の既定に据える |
+| `euler_ancestral` | 線が柔らかく細くなる。cfgを上げても崩れにくい。3D寄りの背景には向かない |
+| `dpmpp_2m_sde_gpu` | `er_sde` に近いが多様性が出る |
+| `heunpp2` | `beta57` と組むと発色が濃く、まとまりが良い |
+| `uni_pc` + `ddim_uniform` | 速く安定するという報告がある |
+
+避けるものも記載がある。
+
+- **CFG++系 (`*_cfg_pp`) をcfg 4-5で使わない。** 過剰に処理されたノイズの多い出力になる。
+  使うならcfg 1.5以下
+- **`res_multistep` + `beta` はドット状のアーティファクトが出ることがある**
+- `ipndm_v` は出力が安定しないという報告がある
+
+schedulerは `simple` / `normal` / `sgm_uniform` が無難で、情報量を上げたいときに `beta57`。
+`kl_optimal` は3D寄りのテクスチャに向くという報告がある一方、
+不安定という報告もあり評価が割れている。
+
+### hires fixの目安
+
+配布元とコミュニティの記載による。**実測による裏取りは未実施。**
+
+| 項目 | 値 |
+| --- | --- |
+| 倍率 | 1.5倍まで。それ以上は1段で上げず、1.5倍 -> 目標解像度の2段に分ける |
+| denoise | 0.25-0.3 (アニメ調)。3D寄りなら0.5 |
+| steps | 15-20 |
+
+Specの既定 (`denoise` 0.5) はSD1.5系に合わせた値で、Anima系には強すぎる。
+DiT系でhires fixを使うときは `generation.upscale.denoise` を明示して下げる。
+
+```yaml
+generation:
+  upscale:
+    scale: 1.5
+    denoise: 0.3
+    steps: 16
+```
+
+WAI-ANIMAだけは配布元がhires fixのdenoise 0.35-0.5を推奨しており、他より高い。
 
 ## 品質タグ・rating・yearの体系
 
@@ -143,3 +206,6 @@ yearは `year 2025` のような明示指定と、`newest` / `recent` / `mid` / 
 - [WAI-ANIMA](https://civitai.com/models/2544636/wai-anima)
 - [MiaoMiao Harem](https://civitai.com/models/934764/miaomiao-harem)
 - [CottonAnima](https://civitai.com/models/2382223/cottonanima)
+- [About Anima + settings](https://civitai.com/articles/30357/about-anima-settings) — sampler / scheduler / hires fixの目安
+- [Optimal sampler / scheduler settings for Anima](https://huggingface.co/circlestone-labs/Anima/discussions/165) — 組み合わせの比較とhires fixの上限
+- [beta57とは何か](https://note.com/hkmclab/n/n10e506f4553d) — beta57の由来と推奨の組み合わせ

@@ -18,10 +18,11 @@ from agentic_imagegen.adapters.comfyui.workflow import (
     build_workflow,
     resolve_seed,
 )
-from agentic_imagegen.domain.models import GenerationSpec
+from agentic_imagegen.domain.models import BETA57_SCHEDULER, GenerationSpec
 from agentic_imagegen.domain.policy import display_path
 from agentic_imagegen.errors import WorkflowValidationError
 from agentic_imagegen.workflows.axes import (
+    AXIS_BETA57,
     AXIS_CONTROLNET,
     AXIS_CONTROLNET_RAW,
     AXIS_HIRES,
@@ -60,6 +61,10 @@ def resolve_workflow_name(spec: GenerationSpec) -> str:
         # 接尾辞も先頭へ置く。LoRA / ControlNet / IPAdapter との組み合わせは
         # Specのバリデーションで拒否している
         present_axes.append(AXIS_UNET)
+        if spec.generation.scheduler == BETA57_SCHEDULER:
+            # beta57 はKSamplerのscheduler欄から選べないため、
+            # SamplerCustomAdvanced + BetaSamplingScheduler のテンプレートへ切り替える
+            present_axes.append(AXIS_BETA57)
     else:
         if spec.model.uses_external_vae:
             # checkpoint同梱ではなく外部VAEを使う指定。VAELoaderもグラフ上流の

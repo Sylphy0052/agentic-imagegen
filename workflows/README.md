@@ -57,6 +57,12 @@ ComfyUIで実行するWorkflowを **API形式JSON** で置く場所。
 | `txt2img_unet_hires.json` | DiT系 + hires fix |
 | `img2img_unet.json` | DiT系のimage-to-image |
 | `img2img_unet_hires.json` | DiT系 + hires fix (img2img) |
+| `txt2img_unet_beta57.json` | DiT系 / beta57 スケジュール (KSamplerではなくSamplerCustomAdvanced) |
+| `txt2img_unet_beta57_hires.json` | DiT系 / beta57 + hires fix |
+| `txt2img_unet_beta57_hires_model.json` | DiT系 / beta57 + モデル拡大のhires fix |
+| `img2img_unet_beta57.json` | DiT系 / beta57 (img2img) |
+| `img2img_unet_beta57_hires.json` | DiT系 / beta57 + hires fix (img2img) |
+| `img2img_unet_beta57_hires_model.json` | DiT系 / beta57 + モデル拡大のhires fix (img2img) |
 | `txt2img_hires_model.json` | アップスケールモデルで拡大するhires fix |
 | `txt2img_lora_hires_model.json` | LoRA + モデル拡大のhires fix |
 | `img2img_hires_model.json` | モデル拡大のhires fix (img2img) |
@@ -208,7 +214,10 @@ txt2img.json  (手書きベース)
   ├─ *_ipadapter        MODEL の経路に IPAdapterAdvanced
   ├─ *_vae              CheckpointLoaderのVAE出力 ([node, 2]) を参照する全ノードを
   │                     VAELoader へ差し替え (checkpoint系のみ、他の軸をかけた後に適用)
-  └─ txt2img_unet       CheckpointLoader -> UNETLoader + CLIPLoader + VAELoader
+  ├─ txt2img_unet       CheckpointLoader -> UNETLoader + CLIPLoader + VAELoader
+  └─ *_beta57           KSampler -> RandomNoise + KSamplerSelect
+                        + BetaSamplingScheduler + CFGGuider + SamplerCustomAdvanced
+                        (DiT系のみ、全ての軸をかけた後に適用)
 ```
 
 `*_ipadapter` はKSamplerのMODEL入力だけを差し替えるため、positive / negativeを
@@ -244,6 +253,8 @@ allowlist (`workflows/injector.py`) の3か所はいずれもこの列挙を辿�
 | 60-62 | DiT系のローダー分割 (UNETLoader / CLIPLoader / VAELoader) |
 | 70 | clip skip (CLIPSetLastLayer、全テンプレート共通で1個) |
 | 80 | 外部VAE (VAELoader、checkpoint系のみ) |
+| 90-94 | beta57の1段目 (RandomNoise / KSamplerSelect / BetaSamplingScheduler / CFGGuider / SamplerCustomAdvanced) |
+| 95-100 | beta57の2段目 (hires fixの描き足し。98が `SplitSigmasDenoise`) |
 
 hires fixとControlNetの組み合わせ (`*_hires_controlnet`) は、hiresを重ねてからControlNetを
 かける順で合成している。この順にすると `ControlNetApplyAdvanced` が差し替えるのは1段目の
@@ -273,6 +284,30 @@ KSamplerが `CheckpointLoaderSimple` を見たまま残る。img2img では入�
 
 LoRA / ControlNet / IPAdapterとの組み合わせは作っていない (Specの検証で併用を拒否している)。
 `control_v11p_sd15_*` も `ip-adapter-plus_sd15` もSD1.5向けで、DiT系のUNetへは適用できない。
+
+`*_beta57` はDiT系向けで、`KSampler` 1ノードが担っていた sampling を
+ComfyUI標準の5ノードへ分解する。
+
+| ノードID | class_type | 役割 |
+| --- | --- | --- |
+| 90 | `RandomNoise` | noise_seed |
+| 91 | `KSamplerSelect` | sampler_name |
+| 92 | `BetaSamplingScheduler` | steps / alpha=0.5 / beta=0.7 |
+| 93 | `CFGGuider` | cfg / positive / negative / model |
+| 94 | `SamplerCustomAdvanced` | 上の4つを束ねてsamplingする |
+
+分けるのは、Anima系の配布元が推奨する `beta57` (beta分布の alpha=0.5 / beta=0.7) を
+KSamplerの `scheduler` 欄から選べないためである。KSamplerが選べる `beta` は
+ComfyUI既定の alpha=0.6 / beta=0.6 で固定されている。
+
+hires fixの2段目 (`*_beta57_hires` / `*_beta57_hires_model`) は95-100を使い、
+`SplitSigmasDenoise` (98) を挟んでKSamplerの `denoise` に相当する区間を取り出す。
+KSamplerは `denoise` < 1 のとき `int(steps / denoise)` 手のスケジュールを引いて
+後ろ `steps + 1` 個を使う実装のため、`BetaSamplingScheduler` へ渡すstep数も
+同じ式で割り戻す (注入側の `_sigma_steps_for_denoise`)。
+
+**他の軸を全て適用し終えた後にかける。** 先にかけると、hires fixが後から足す
+2段目のKSamplerだけが置き換わらずに残る。
 
 `*_vae` はcheckpoint系向けで、checkpoint同梱のVAEではなく外部VAE
 (`vae-ft-mse-840000` / `klF8Anime2VAE` など、色褪せ・眠い線を避けるために
