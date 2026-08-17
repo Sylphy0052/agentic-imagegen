@@ -8,7 +8,8 @@ CLIは引き続き残る。MCP経由で不具合が出たときに、CLIで層�
 ## 前提
 
 - `uv sync` 済み (開発環境では `mcp` がdev依存に入っている)
-- ComfyUIが起動していること ([xpu-setup.md](xpu-setup.md) / [comfyui-setup.md](comfyui-setup.md))
+- ComfyUIが起動していること ([cuda-setup.md](cuda-setup.md) / [xpu-setup.md](xpu-setup.md) /
+  [comfyui-setup.md](comfyui-setup.md))
 
 MCP依存だけを入れる場合はextrasを使う。
 

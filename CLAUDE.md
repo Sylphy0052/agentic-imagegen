@@ -64,7 +64,8 @@ txt2img / preset / LoRA / img2img / MCP Server / ControlNet / IPAdapter / hires 
 6. **output pathをユーザーへ返す** — 生成された画像のパスとseedを伝える
 
 ComfyUIが起動していない場合は `uv run imagegen health` で状態を確認し、
-[docs/comfyui-setup.md](docs/comfyui-setup.md) の手順を案内する。
+環境に応じた手順を案内する ([cuda](docs/cuda-setup.md) / [xpu](docs/xpu-setup.md) /
+[cpu](docs/comfyui-setup.md))。
 
 Specの書き方はサンプルを参照する (`specs/examples/`)。
 
@@ -187,14 +188,20 @@ scripts/comfyui-session.sh batch specs/generated/a.yaml specs/generated/b.yaml
 
 ## 所要時間に注意する
 
-CPU推論のため、生成パラメータの負荷が所要時間へ直接跳ね返る。
-SD1.5 / 512x768 / 20 stepsの実測は **XPUで約135秒、CPUで約12分**。
+CPU / XPU推論では、生成パラメータの負荷が所要時間へ直接跳ね返る。
+SD1.5 / 512x768 / 20 stepsの実測は **CUDAで約4秒、XPUで約135秒、CPUで約12分**。
 条件別の実測値と `IMAGEGEN_TIMEOUT` の目安は
 [docs/xpu-setup.mdの「所要時間とタイムアウトの目安」](docs/xpu-setup.md#所要時間とタイムアウトの目安)
 を一次情報とする。
 
-XPUが使える環境ではそちらを使う (手順: [docs/xpu-setup.md](docs/xpu-setup.md))。
-`uv run imagegen health` の `Devices:` が `xpu:0` ならXPUで動いている。
+速い順にCUDA (手順: [docs/cuda-setup.md](docs/cuda-setup.md))、
+XPU (手順: [docs/xpu-setup.md](docs/xpu-setup.md))、CPU。
+どれで動いているかは `uv run imagegen health` の `Devices:` で分かる
+(`cuda:0` / `xpu:0` / `cpu`)。
+
+`validate` が出す `Estimate:` はXPUとCPUの係数しか持たないため、
+**CUDA環境では過大に出る**。CUDA環境ではこの警告を根拠にstepsや解像度を落とさない
+([Issue #130](https://github.com/Sylphy0052/agentic-imagegen/issues/130))。
 
 ## 開発時のルール
 

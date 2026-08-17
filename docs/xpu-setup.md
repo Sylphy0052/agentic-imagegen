@@ -161,11 +161,22 @@ fp16の相対誤差は4.2e-4だった。
 | 同上 アップスケールモデル (RealESRGAN x4, 4x拡大後0.5倍へ縮小) | Intel XPU | 176.7秒 | 600 |
 | SDXL / 832x1216 / 8 steps | Intel XPU | 299.7秒 (初回) | 600 |
 | SDXL / 832x1216 / 24 steps | Intel XPU | 362.6秒 | 600 |
+| SD1.5 / 512x768 / 20 steps | CUDA | 約4秒 (初回、モデルロード込み) | 300 |
+| Anima (DiT系) / 832x1216 / 32 steps | CUDA | 15秒 (初回) / 10秒 (ロード済み) | 300 |
+| 同上 + hires fix (→1248x1824 / 2段目16 steps) | CUDA | 24秒 | 300 |
+
+CUDAの行はRTX 4070 Ti SUPER 16GB / ComfyUI 0.33.0 / torch 2.13.0+cu130 での実測
+(2026-08-17)。手順は [cuda-setup.md](cuda-setup.md)。
+**各条件1回ずつの計測** のため、係数を起こすには足りない。
 
 `imagegen validate` が出す `Estimate:` 行はこの表から起こした係数
 (Mpixel・stepあたりXPUで SD1.5 9秒 / SDXL 15秒 / DiT系 22秒、CPUはその約10倍) による概算。
 モデルのロード時間とControlNet / IPAdapterの上乗せは織り込まない。
 再計測してこの表を直したときは `src/agentic_imagegen/services/estimate.py` の係数も見直す。
+
+**CUDAの係数は持っていない。** そのためCUDA環境では `Estimate:` が大幅に過大に出る
+(上表のAnima 832x1216 / 32 stepsは実測10秒だが「XPU 約11分」と表示される)。
+[Issue #130](https://github.com/Sylphy0052/agentic-imagegen/issues/130) で扱う。
 
 SD1.5系はモデルロード済み (2回目以降) の値。初回はモデルロードの分だけ上乗せされる。
 Anima系はSD1.5系より1stepあたりが重く、配布元推奨の832x1216 / 32 stepsはさらに伸びる。
