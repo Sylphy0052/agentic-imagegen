@@ -43,30 +43,23 @@ PIXELS_PER_MEGAPIXEL = 1_000_000
 DEVICE_LABELS: dict[DeviceName, str] = {"cuda": "CUDA", "xpu": "XPU", "cpu": "CPU"}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Estimate:
     """実行基盤ごとの見積り。"""
 
     family: ModelFamily
     #: Mpixel・stepで表した仕事量。batchとhires fixの2段目を含む。
     units: float
-    #: 基盤ごとの秒数。
-    seconds: dict[DeviceName, float]
+    cuda_seconds: float
+    xpu_seconds: float
+    cpu_seconds: float
 
     def for_device(self, device: DeviceName) -> float:
-        return self.seconds[device]
-
-    @property
-    def cuda_seconds(self) -> float:
-        return self.seconds["cuda"]
-
-    @property
-    def xpu_seconds(self) -> float:
-        return self.seconds["xpu"]
-
-    @property
-    def cpu_seconds(self) -> float:
-        return self.seconds["cpu"]
+        return {
+            "cuda": self.cuda_seconds,
+            "xpu": self.xpu_seconds,
+            "cpu": self.cpu_seconds,
+        }[device]
 
 
 def estimate_duration(spec: GenerationSpec) -> Estimate | None:
@@ -83,11 +76,9 @@ def estimate_duration(spec: GenerationSpec) -> Estimate | None:
     return Estimate(
         family=family,
         units=units,
-        seconds={
-            "cuda": units * CUDA_SECONDS_PER_UNIT[family],
-            "xpu": xpu,
-            "cpu": xpu * CPU_RATIO,
-        },
+        cuda_seconds=units * CUDA_SECONDS_PER_UNIT[family],
+        xpu_seconds=xpu,
+        cpu_seconds=xpu * CPU_RATIO,
     )
 
 
