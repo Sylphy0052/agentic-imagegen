@@ -53,11 +53,13 @@ style presetを系統ごとに分けているのはこのため。
 - ComfyUIへ実在するSDXL checkpointは `animagineXL40_v40.safetensors` と
   `shiratakimixXL_v20.safetensors` (2026-08-17に配置)。`AnythingXL_xl.safetensors`
   は現在の環境には無いため、使うなら `~/ComfyUI/models/checkpoints/` へ置く
-- **`animagineXL40_v40.safetensors` は現状まともに生成できない。** 解像度・サンプラー・
-  preset・外部VAEのいずれを振っても格子状の抽象画にしかならない。ファイル破損・
-  fp16のNaN・text encoderの欠落はいずれも切り分け済みで、原因は未特定
+- **Animagine XL 4.0は現状まともに生成できない。** 解像度・サンプラー・preset・
+  外部VAEのいずれを振っても格子状の抽象画にしかならず、配布元のOpt版
+  (`animagineXL40_v40Opt.safetensors`) でも同じ。ファイル破損・fp16のNaN・
+  text encoderの欠落・ComfyUIのオフロード機能はいずれも切り分け済みで、原因は未特定
   ([Issue #135](https://github.com/Sylphy0052/agentic-imagegen/issues/135))。
-  Animagine XL系を使うなら、この件が片付くまでは `shiratakimixXL_v20` か
+  **この件が片付くまで `sdxl-animagine` は使わない。** 代わりに
+  `shiratakimixXL_v20` (`sdxl-shiratakimix`) か
   `novaAnimeXL_ilV190` (`sdxl-illustrious`) を選ぶ
 
 ## hires fix
