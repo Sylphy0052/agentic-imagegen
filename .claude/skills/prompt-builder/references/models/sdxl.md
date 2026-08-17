@@ -20,9 +20,12 @@ Illustriousを土台にしたモデル (novaAnimeXL / hassakuXL / waiNSFWIllustr
 - **タグはDanbooruに実在する表記を使う。** 学習データが少ないタグはLoRAなしでは効かない。
   キャラクタ名もDanbooruの表記順に従う
   (確認手順は [common.md](../common.md#タグの実在を確認する))
-- **配布元はclip skip 2を推奨する。** style presetが持つため、preset経由なら
-  Spec側へ書かなくてよい
-  ([model.clip_skip](../../../../../docs/spec-reference.md#modelclip_skip))
+- **clip skipはモデルによって扱いが違う。** Animagine XL 4.0とShiratakiMix XLは
+  配布元 (HuggingFace / civitai) が値に言及しておらず (2026-08-17に確認)、
+  `sdxl-animagine` / `sdxl-shiratakimix` も持たない。既定のまま使う。
+  clip skip 2はIllustrious系の推奨で ([illustrious.md](illustrious.md))、
+  AnythingXLは `sdxl-illustrious` を使うためそちら経由でclip skip 2が付く。
+  根拠のない系統へ広げない
 
 ## モデルごとの推奨設定
 
@@ -31,7 +34,7 @@ style presetを系統ごとに分けているのはこのため。
 
 | モデル | sampler / scheduler | cfg | steps | 品質タグの語彙 | style preset |
 | --- | --- | --- | --- | --- | --- |
-| Animagine XL 4.0 | `euler_ancestral` / `normal` | 5-6 | 25 | `masterpiece, high score, great score, absurdres` | `sdxl-animagine` |
+| Animagine XL 4.0 | `euler_ancestral` / `normal` | 4-7 (5を推奨) | 25-28 (28を推奨) | `masterpiece, high score, great score, absurdres` | `sdxl-animagine` |
 | AnythingXL | `euler_ancestral` / `normal` | 5-7 | 25-30 | Illustrious系と同じ | `sdxl-illustrious` |
 | ShiratakiMix XL | `dpmpp_3m_sde` / `karras` | 7.5 (3-8) | 20以上 | Illustrious系と同じ | `sdxl-shiratakimix` |
 
@@ -48,9 +51,17 @@ style presetを系統ごとに分けているのはこのため。
   steps 8で流すと収束せず、ほぼ真っ白な画像になる (2026-08-13にXPUで確認)。
   steps 24では正常に生成できる。動作確認のためにstepsを落とす場合は
   `sdxl-illustrious` (`euler_ancestral`) を使う
-- ComfyUIへ実在するSDXL checkpointは `AnythingXL_xl.safetensors`。
-  animagineXL / shiratakimixXLは未配置のため、使う前に
-  `~/ComfyUI/models/checkpoints/` へ置く
+- ComfyUIへ実在するSDXL checkpointは `animagineXL40_v40.safetensors` と
+  `shiratakimixXL_v20.safetensors` (2026-08-17に配置)。`AnythingXL_xl.safetensors`
+  は現在の環境には無いため、使うなら `~/ComfyUI/models/checkpoints/` へ置く
+- **Animagine XL 4.0は現状まともに生成できない。** 解像度・サンプラー・preset・
+  外部VAEのいずれを振っても格子状の抽象画にしかならず、配布元のOpt版
+  (`animagineXL40_v40Opt.safetensors`) でも同じ。ファイル破損・fp16のNaN・
+  text encoderの欠落・ComfyUIのオフロード機能はいずれも切り分け済みで、原因は未特定
+  ([Issue #135](https://github.com/Sylphy0052/agentic-imagegen/issues/135))。
+  **この件が片付くまで `sdxl-animagine` は使わない。** 代わりに
+  `shiratakimixXL_v20` (`sdxl-shiratakimix`) か
+  `novaAnimeXL_ilV190` (`sdxl-illustrious`) を選ぶ
 
 ## hires fix
 
