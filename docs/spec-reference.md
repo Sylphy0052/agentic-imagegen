@@ -180,7 +180,7 @@ SD1.5系は配置済みのcheckpointごとに1つ用意してある。SDXL系は
 | `sd15-perfectdeliberate` | `perfectdeliberate_v20` | `dpmpp_2m` / `karras` | 6.5 | 30 | clip_skip 2 + 外部VAE |
 | `sd15-wai-illustrious` | `waiIllustriousSD15_v1` | `dpmpp_2m` / `karras` | 6.0 | 28 | clip_skip 2 |
 | `sdxl-illustrious` | SDXL (Illustrious系 / AnythingXL) | `euler_ancestral` / `normal` | 7.0 | 30 | clip_skip 2 |
-| `sdxl-animagine` | SDXL (Animagine XL系) | `euler_ancestral` / `normal` | 6.0 | 25 | - |
+| `sdxl-animagine` | SDXL (Animagine XL系) | `euler_ancestral` / `normal` | 5.0 | 28 | - |
 | `sdxl-shiratakimix` | SDXL (ShiratakiMix XL系) | `dpmpp_3m_sde` / `karras` | 7.5 | 28 | - |
 | `anima-base` | `hassakuAnima_v13_int8` (DiT系) | `er_sde` / `simple` | 4.5 | 32 | - |
 | `anima-wai` | `waiANIMA_v10Base10` (DiT系) | `euler_ancestral` / `normal` | 4.5 | 25 | - |
@@ -219,7 +219,10 @@ checkpointを決めていない段階の既定は `sd15-hassaku` (対応するch
 
 SDXL向けの3つはcheckpointのfine-tune系統で選ぶ。系統ごとの違いは
 [models/sdxl.md](../.claude/skills/prompt-builder/references/models/sdxl.md#モデルごとの推奨設定) を参照。
-`sdxl-animagine` / `sdxl-shiratakimix` に対応するcheckpointは未配置。
+
+**clip skipを持つのは`sdxl-illustrious`だけ。** Illustrious系の配布元はclip skip 2を
+推奨するが、Animagine XL 4.0とShiratakiMix XLは配布元が値に言及していないため
+既定のまま使う (2026-08-17に確認)。
 
 ## generation
 

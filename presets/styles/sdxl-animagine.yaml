@@ -2,15 +2,19 @@
 # Illustrious系とは品質タグの語彙もcfg / stepsの適正値も違うため、別のstyleとして分ける。
 # 解像度とseedは再現性に直結するため、styleでは指定せずSpec側に任せる。
 #
-# 配布元の推奨はcfg 5-6 / steps 25 / euler_ancestral。cfgを7以上にすると線が焼き付く。
+# 配布元 (HuggingFace cagliostrolab/animagine-xl-4.0) の推奨は
+# cfg 4-7 (5を推奨) / steps 25-28 (28を推奨) / euler_ancestral。
+# cfgを7以上にすると線が焼き付く。
 # 品質タグは `high score, great score` 系の語彙を使う。これはDanbooruタグではなく
 # Animagine XL 4.0が学習時に付与した品質ラベルのため、post_countでは判定しない。
 # Illustrious系の `masterpiece, best quality` とは学習語彙が異なるため流用しない。
 #
+# clip skipは書かない。配布元 (HuggingFace / civitai) は値に言及しておらず、
+# 2を当てる根拠がないため既定のまま使う。clip skip 2の推奨はIllustrious系の
+# ものであり、この系統へ広げない (2026-08-17に配布元の記載を確認)。
+#
 # extra fingers はDanbooruに実在しないため extra digits へ置き換えている
 # (確認手順は .claude/skills/prompt-builder/references/common.md)。
-#
-# 対象のcheckpointは ~/ComfyUI/models/checkpoints/ へ未配置。使う前に配置する。
 
 description: Animagine XL系の推奨設定。scoreタグ系の品質語彙を使う
 
@@ -27,5 +31,5 @@ prompt:
 generation:
   sampler: euler_ancestral
   scheduler: normal
-  cfg: 6.0
-  steps: 25
+  cfg: 5.0
+  steps: 28
