@@ -20,12 +20,12 @@ Illustriousを土台にしたモデル (novaAnimeXL / hassakuXL / waiNSFWIllustr
 - **タグはDanbooruに実在する表記を使う。** 学習データが少ないタグはLoRAなしでは効かない。
   キャラクタ名もDanbooruの表記順に従う
   (確認手順は [common.md](../common.md#タグの実在を確認する))
-- **clip skipはモデルによって扱いが違う。** Animagine XL 4.0とShiratakiMix XLは
-  配布元 (HuggingFace / civitai) が値に言及しておらず (2026-08-17に確認)、
-  `sdxl-animagine` / `sdxl-shiratakimix` も持たない。既定のまま使う。
-  clip skip 2はIllustrious系の推奨で ([illustrious.md](illustrious.md))、
-  AnythingXLは `sdxl-illustrious` を使うためそちら経由でclip skip 2が付く。
-  根拠のない系統へ広げない
+- **clip skip 2を必ず指定する。** SDXLはtext encoderの penultimate layer (-2) で
+  学習されている。指定しないとworkflowの `CLIPSetLastLayer` が -1 (最終層) を読み、
+  conditioningが崩れる。Animagine XL 4.0では低周波の塊しか出なくなり、
+  clip skip 2で正常に戻る (2026-08-17に実機で特定。[Issue #135](https://github.com/Sylphy0052/agentic-imagegen/issues/135))。
+  配布元が値に言及していなくても、SDXLの学習前提として要る。
+  `sdxl-animagine` / `sdxl-illustrious` が持つ
 
 ## モデルごとの推奨設定
 
@@ -54,18 +54,14 @@ style presetを系統ごとに分けているのはこのため。
 - ComfyUIへ実在するSDXL checkpointは `animagineXL40_v40.safetensors` と
   `shiratakimixXL_v20.safetensors` (2026-08-17に配置)。`AnythingXL_xl.safetensors`
   は現在の環境には無いため、使うなら `~/ComfyUI/models/checkpoints/` へ置く
-- **Animagine XL 4.0はComfyUIバックエンドでは生成できない。** 解像度・サンプラー・
-  preset・外部VAE・dtype (fp16 / bf16 / fp32) のいずれを振っても解像せず、
-  配布元のOpt版でも同じ。**同じファイル・同じSpec・同じseedをdiffusers
-  バックエンドで回すと正常に出る**ため、checkpointにもpresetの値にも問題はなく、
-  ComfyUI側の問題として切り分けてある
-  ([Issue #135](https://github.com/Sylphy0052/agentic-imagegen/issues/135))。
-  回避策は2つ。
-  - Animagine XL 4.0でなくてよいなら `shiratakimixXL_v20`
-    (`sdxl-shiratakimix`) か `novaAnimeXL_ilV190` (`sdxl-illustrious`) を選ぶ
-  - Animagine XL 4.0が要るなら diffusersバックエンドで回す
-    ([diffusers-backend.md](../../../../../docs/diffusers-backend.md))。
-    ControlNet / IPAdapter / hires fix / 外部VAEは使えなくなる
+- **Animagine XL 4.0が破綻して見えるのはclip skipの指定漏れである。**
+  clip skipを指定しないと `CLIPSetLastLayer` が -1 (最終層) を読み、
+  解像度・サンプラー・preset・外部VAE・dtype (fp16 / bf16 / fp32) の
+  どれを振っても低周波の塊にしかならない。配布元のOpt版でも同じ。
+  `sdxl-animagine` (clip skip 2) を当てれば同一seedで正常に生成できる
+  ([Issue #135](https://github.com/Sylphy0052/agentic-imagegen/issues/135)。
+  2026-08-17に実機で特定)。checkpointは配布元の正規ファイルで、
+  重み (NaN / Inf 0件、diffusers形式との値一致) にも問題はない
 
 ## hires fix
 

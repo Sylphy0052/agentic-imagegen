@@ -39,6 +39,7 @@ EXTERNAL_VAE = "vaeKlF8Anime2_klF8Anime2VAE.safetensors"
 MODEL_CELLS: dict[str, dict[str, object]] = {
     "clip_skip 2 + 外部VAE": {"clip_skip": 2, "vae": EXTERNAL_VAE},
     "clip_skip 2": {"clip_skip": 2},
+    "clip_skip 1": {"clip_skip": 1},
     "-": {},
 }
 

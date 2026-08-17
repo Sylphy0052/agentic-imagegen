@@ -876,15 +876,23 @@ def _inject_clip_skip(
 ) -> None:
     """CLIPSetLastLayerへclip skipの値を注入する。
 
-    未指定 (None) の場合はテンプレートの既定値 (stop_at_clip_layer=-1、ComfyUI既定と
-    同値の素通し) をそのまま使う。これにより model.clip_skip 未指定時の出力は
-    現状と完全に一致する。
+    未指定 (None) の場合はCLIPSetLastLayerを結線から外し、CLIPTextEncodeが
+    上流のCLIPを直接受けるようにする。テンプレートの既定値 -1 は「素通し」ではなく
+    最終層の指定であり、SDXLが学習に使う penultimate layer とは別の層を読ませる
+    (Animagine XL 4.0はこれで破綻する。Issue #135)。どの層が正しいかはモデルの
+    系統で変わるため、指定がないならComfyUIの既定へ委ねる。
+
+    迂回先は CLIPSetLastLayer が受けていた上流をそのまま使う。LoRAを挟む場合は
+    チェーンの最終段が入っているため、_inject_loras の後に呼ぶ必要がある。
     """
     if CLIP_SKIP_ROLE not in binding.nodes:
         return
 
     clip_skip = spec.model.clip_skip
     if clip_skip is None:
+        upstream = inputs_of(CLIP_SKIP_ROLE)["clip"]
+        for role in ("positive_prompt", "negative_prompt"):
+            inputs_of(role)["clip"] = list(upstream)
         return
 
     inputs_of(CLIP_SKIP_ROLE)["stop_at_clip_layer"] = -clip_skip

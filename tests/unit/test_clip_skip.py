@@ -111,13 +111,50 @@ def test_only_clip_skip_is_rejected_with_separate_loaders() -> None:
 # --- adapter: build_workflowでの注入 -----------------------------------------
 
 
-def test_unspecified_clip_skip_keeps_template_default() -> None:
-    """未指定時は出力が現状 (clip skip 1相当) と完全に一致する。"""
+def test_unspecified_clip_skip_bypasses_clip_set_last_layer() -> None:
+    """未指定時は CLIPSetLastLayer を迂回し、ComfyUI既定の層を使わせる。
+
+    テンプレートの既定値 -1 は「素通し」ではなく最終層の指定であり、
+    SDXLが学習に使う penultimate layer とは別の層を読ませてしまう
+    (Animagine XL 4.0はこれで破綻する。Issue #135)。
+    どの層を使うかはモデルの系統で違うため、指定がないならComfyUIへ委ねる。
+    """
     template = load_workflow_template("txt2img")
 
     workflow = build_workflow(template, GenerationSpec.model_validate(_spec_dict()), seed=1)
 
-    assert workflow["70"]["inputs"]["stop_at_clip_layer"] == -1
+    # CLIPTextEncodeはCLIPSetLastLayer (70) ではなくcheckpoint (4) のCLIP出力を受ける
+    assert workflow["6"]["inputs"]["clip"] == ["4", 1]
+    assert workflow["7"]["inputs"]["clip"] == ["4", 1]
+
+
+def test_unspecified_clip_skip_bypasses_to_lora_tail() -> None:
+    """LoRAを挟む場合、迂回先はLoRAチェーンの最終段になる。"""
+    template = load_workflow_template("txt2img_lora")
+    spec = GenerationSpec.model_validate(
+        _spec_dict(
+            model={
+                "checkpoint": "v1-5-pruned-emaonly.safetensors",
+                "loras": [{"name": "add_detail.safetensors"}],
+            }
+        )
+    )
+
+    workflow = build_workflow(template, spec, seed=1, binding=TXT2IMG_LORA_BINDING)
+
+    assert workflow["6"]["inputs"]["clip"] == ["12", 1]
+    assert workflow["7"]["inputs"]["clip"] == ["12", 1]
+
+
+def test_specified_clip_skip_keeps_clip_set_last_layer_in_path() -> None:
+    """指定があるときは従来どおり CLIPSetLastLayer を通す。"""
+    template = load_workflow_template("txt2img")
+    spec = GenerationSpec.model_validate(_spec_dict(model={"clip_skip": 2}))
+
+    workflow = build_workflow(template, spec, seed=1)
+
+    assert workflow["6"]["inputs"]["clip"] == ["70", 0]
+    assert workflow["7"]["inputs"]["clip"] == ["70", 0]
 
 
 def test_clip_skip_two_is_injected() -> None:
