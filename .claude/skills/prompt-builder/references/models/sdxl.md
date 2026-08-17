@@ -54,14 +54,18 @@ style presetを系統ごとに分けているのはこのため。
 - ComfyUIへ実在するSDXL checkpointは `animagineXL40_v40.safetensors` と
   `shiratakimixXL_v20.safetensors` (2026-08-17に配置)。`AnythingXL_xl.safetensors`
   は現在の環境には無いため、使うなら `~/ComfyUI/models/checkpoints/` へ置く
-- **Animagine XL 4.0は現状まともに生成できない。** 解像度・サンプラー・preset・
-  外部VAEのいずれを振っても格子状の抽象画にしかならず、配布元のOpt版
-  (`animagineXL40_v40Opt.safetensors`) でも同じ。ファイル破損・fp16のNaN・
-  text encoderの欠落・ComfyUIのオフロード機能はいずれも切り分け済みで、原因は未特定
+- **Animagine XL 4.0はComfyUIバックエンドでは生成できない。** 解像度・サンプラー・
+  preset・外部VAE・dtype (fp16 / bf16 / fp32) のいずれを振っても解像せず、
+  配布元のOpt版でも同じ。**同じファイル・同じSpec・同じseedをdiffusers
+  バックエンドで回すと正常に出る**ため、checkpointにもpresetの値にも問題はなく、
+  ComfyUI側の問題として切り分けてある
   ([Issue #135](https://github.com/Sylphy0052/agentic-imagegen/issues/135))。
-  **この件が片付くまで `sdxl-animagine` は使わない。** 代わりに
-  `shiratakimixXL_v20` (`sdxl-shiratakimix`) か
-  `novaAnimeXL_ilV190` (`sdxl-illustrious`) を選ぶ
+  回避策は2つ。
+  - Animagine XL 4.0でなくてよいなら `shiratakimixXL_v20`
+    (`sdxl-shiratakimix`) か `novaAnimeXL_ilV190` (`sdxl-illustrious`) を選ぶ
+  - Animagine XL 4.0が要るなら diffusersバックエンドで回す
+    ([diffusers-backend.md](../../../../../docs/diffusers-backend.md))。
+    ControlNet / IPAdapter / hires fix / 外部VAEは使えなくなる
 
 ## hires fix
 
