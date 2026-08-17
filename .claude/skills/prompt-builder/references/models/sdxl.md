@@ -20,11 +20,12 @@ Illustriousを土台にしたモデル (novaAnimeXL / hassakuXL / waiNSFWIllustr
 - **タグはDanbooruに実在する表記を使う。** 学習データが少ないタグはLoRAなしでは効かない。
   キャラクタ名もDanbooruの表記順に従う
   (確認手順は [common.md](../common.md#タグの実在を確認する))
-- **clip skipは配布元が値を示していない。** Animagine XL 4.0とShiratakiMix XLは
-  HuggingFace / civitaiのいずれにも記載がなく (2026-08-17に確認)、
+- **clip skipはモデルによって扱いが違う。** Animagine XL 4.0とShiratakiMix XLは
+  配布元 (HuggingFace / civitai) が値に言及しておらず (2026-08-17に確認)、
   `sdxl-animagine` / `sdxl-shiratakimix` も持たない。既定のまま使う。
-  clip skip 2はIllustrious系の推奨であり、この系統へ広げない
-  ([illustrious.md](illustrious.md))
+  clip skip 2はIllustrious系の推奨で ([illustrious.md](illustrious.md))、
+  AnythingXLは `sdxl-illustrious` を使うためそちら経由でclip skip 2が付く。
+  根拠のない系統へ広げない
 
 ## モデルごとの推奨設定
 
