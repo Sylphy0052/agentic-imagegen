@@ -180,8 +180,8 @@ SD1.5系は配置済みのcheckpointごとに1つ用意してある。SDXL系は
 | `sd15-perfectdeliberate` | `perfectdeliberate_v20` | `dpmpp_2m` / `karras` | 6.5 | 30 | clip_skip 2 + 外部VAE |
 | `sd15-wai-illustrious` | `waiIllustriousSD15_v1` | `dpmpp_2m` / `karras` | 6.0 | 28 | clip_skip 2 |
 | `sdxl-illustrious` | SDXL (Illustrious系 / AnythingXL) | `euler_ancestral` / `normal` | 7.0 | 30 | clip_skip 2 |
-| `sdxl-animagine` | SDXL (Animagine XL系) | `euler_ancestral` / `normal` | 5.0 | 28 | - |
-| `sdxl-shiratakimix` | SDXL (ShiratakiMix XL系) | `dpmpp_3m_sde` / `karras` | 7.5 | 28 | - |
+| `sdxl-animagine` | SDXL (Animagine XL系) | `euler_ancestral` / `normal` | 5.0 | 28 | clip_skip 2 |
+| `sdxl-shiratakimix` | SDXL (ShiratakiMix XL系) | `dpmpp_3m_sde` / `karras` | 7.5 | 28 | clip_skip 1 |
 | `anima-base` | `hassakuAnima_v13_int8` (DiT系) | `er_sde` / `simple` | 4.5 | 32 | - |
 | `anima-wai` | `waiANIMA_v10Base10` (DiT系) | `euler_ancestral` / `normal` | 4.5 | 25 | - |
 | `anima-miaomiao` | `miaomiaoHarem_aniAnimeColoring10` (DiT系) | `euler` / `normal` | 4.5 | 30 | - |
@@ -220,9 +220,16 @@ checkpointを決めていない段階の既定は `sd15-hassaku` (対応するch
 SDXL向けの3つはcheckpointのfine-tune系統で選ぶ。系統ごとの違いは
 [models/sdxl.md](../.claude/skills/prompt-builder/references/models/sdxl.md#モデルごとの推奨設定) を参照。
 
-**clip skipを持つのは`sdxl-illustrious`だけ。** Illustrious系の配布元はclip skip 2を
-推奨するが、Animagine XL 4.0とShiratakiMix XLは配布元が値に言及していないため
-既定のまま使う (2026-08-17に確認)。
+**SDXL向けの3つはいずれもclip skipを持つ。** SDXLはtext encoderの
+penultimate layerで学習されているため、Illustrious系とAnimagine XL 4.0は
+clip skip 2が要る (Animagine XL 4.0は指定しないと破綻する。
+[Issue #135](https://github.com/Sylphy0052/agentic-imagegen/issues/135))。
+ShiratakiMix XLだけは最終層 (clip skip 1) の方が結果がよく、clip skip 2にすると
+彩度が飽和する (2026-08-17に同一seedで比較)。省略とは意味が違うため明示する。
+
+`clip_skip`を指定しないSpecでは`CLIPSetLastLayer`を結線から外し、どの層を使うかを
+ComfyUIの既定へ委ねる (SDXLではpenultimate、SD1.5では最終層)。
+`clip_skip: 1`はこれとは違い、最終層を明示的に指定する。
 
 ## generation
 

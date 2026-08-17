@@ -9,9 +9,11 @@
 # Animagine XL 4.0が学習時に付与した品質ラベルのため、post_countでは判定しない。
 # Illustrious系の `masterpiece, best quality` とは学習語彙が異なるため流用しない。
 #
-# clip skipは書かない。配布元 (HuggingFace / civitai) は値に言及しておらず、
-# 2を当てる根拠がないため既定のまま使う。clip skip 2の推奨はIllustrious系の
-# ものであり、この系統へ広げない (2026-08-17に配布元の記載を確認)。
+# clip skip 2 は必須。配布元は値に言及していないが、SDXLはtext encoderの
+# penultimate layer (-2) で学習されているため、clip skipを指定しないと
+# workflowの CLIPSetLastLayer が -1 (最終層) を読み、conditioningが崩れて
+# 低周波の塊しか出なくなる (Issue #135。2026-08-17に実機で特定)。
+# clip skip 2 を入れると同一seedで正常に生成できる。
 #
 # extra fingers はDanbooruに実在しないため extra digits へ置き換えている
 # (確認手順は .claude/skills/prompt-builder/references/common.md)。
@@ -33,3 +35,6 @@ generation:
   scheduler: normal
   cfg: 5.0
   steps: 28
+
+model:
+  clip_skip: 2

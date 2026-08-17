@@ -8,8 +8,12 @@
 # ただし2026-08-17に確認した時点では、civitai (マージレシピのみ) にも
 # HuggingFace (Vsukiyaki/ShiratakiMix-XL) にもこの記載は見当たらず、裏を取れていない。
 #
-# clip skipは書かない。配布元は値に言及しておらず、2を当てる根拠がない。
-# clip skip 2の推奨はIllustrious系のものであり、この系統へ広げない。
+# clip skip 1 を明示する。SDXLは本来 penultimate layer を前提とし、
+# Animagine XL 4.0はclip skip 2が無いと破綻する (Issue #135) が、
+# このモデルは最終層 (clip skip 1) の方が結果がよい。clip skip 2にすると彩度が飽和し、
+# 肌がオレンジへ転んで影が不自然になる (2026-08-17に同一seedで比較)。
+# 指定を省くとComfyUI既定 (SDXLでは penultimate) になり clip skip 2 と同じ絵になるため、
+# 省略ではなく明示する。マージ元の系統で最適が割れるので、モデルごとに実測して決める。
 #
 # SDE系のサンプラーはstepsを削ると収束せず、steps 8ではほぼ真っ白な画像になる。
 # 動作確認のために負荷を落とす場合は sdxl-illustrious を使う。
@@ -33,3 +37,6 @@ generation:
   scheduler: karras
   cfg: 7.5
   steps: 28
+
+model:
+  clip_skip: 1
