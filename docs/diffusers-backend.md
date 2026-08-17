@@ -34,7 +34,9 @@ uv pip install --index-url https://download.pytorch.org/whl/cu130 \
   --reinstall torch torchvision
 ```
 
-`--reinstall` が要る。同じバージョン番号の `+xpu` が入っていると入れ替わらない。
+`--reinstall` を付ける。同じバージョン番号のビルド違いはスキップされるため
+(XPU版へ入れ替えるときにも同じことが起きる。
+[xpu-setup.mdの手順2](xpu-setup.md#2-pytorchをxpu版へ差し替える))。
 入れ替わったことは次で確かめる (`cuda: True` になる)。
 
 ```bash
