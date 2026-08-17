@@ -114,6 +114,9 @@ DEFAULT_CONTROLNET = "control_v11p_sd15_canny_fp16.safetensors"
 DEFAULT_IPADAPTER = "ip-adapter-plus_sd15.safetensors"
 DEFAULT_CLIP_VISION = "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors"
 DEFAULT_UPSCALE_MODEL = "RealESRGAN_x4plus_anime_6B.pth"
+#: DiT系テンプレートのLoRAの既定値。SD1.5向けのLoRAはDiT系のUNetへ当たらないため、
+#: `DEFAULT_LORA` をそのまま置くとテンプレート単体で見たときに誤解を招く。
+DEFAULT_UNET_LORA = "anima_context_detailer_base10.safetensors"
 DEFAULT_UNET = "hassakuAnima_v13_int8.safetensors"
 DEFAULT_TEXT_ENCODER = "qwen_3_06b_base.safetensors"
 DEFAULT_VAE = "qwen_image_vae.safetensors"
@@ -245,7 +248,7 @@ def with_lora_chain(graph: Graph, node_ids: tuple[str, ...]) -> Graph:
         graph[node_id] = {
             "class_type": "LoraLoader",
             "inputs": {
-                "lora_name": DEFAULT_LORA,
+                "lora_name": DEFAULT_UNET_LORA if separate else DEFAULT_LORA,
                 "strength_model": 1.0,
                 "strength_clip": 1.0,
                 "model": model_source,

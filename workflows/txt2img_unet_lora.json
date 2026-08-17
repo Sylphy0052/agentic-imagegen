@@ -80,7 +80,7 @@
   "10": {
     "class_type": "LoraLoader",
     "inputs": {
-      "lora_name": "add_detail.safetensors",
+      "lora_name": "anima_context_detailer_base10.safetensors",
       "strength_model": 1.0,
       "strength_clip": 1.0,
       "model": [
@@ -96,7 +96,7 @@
   "11": {
     "class_type": "LoraLoader",
     "inputs": {
-      "lora_name": "add_detail.safetensors",
+      "lora_name": "anima_context_detailer_base10.safetensors",
       "strength_model": 1.0,
       "strength_clip": 1.0,
       "model": [
@@ -112,7 +112,7 @@
   "12": {
     "class_type": "LoraLoader",
     "inputs": {
-      "lora_name": "add_detail.safetensors",
+      "lora_name": "anima_context_detailer_base10.safetensors",
       "strength_model": 1.0,
       "strength_clip": 1.0,
       "model": [
