@@ -125,9 +125,11 @@ Anima系 (DiT) は組み立ての手順そのものが違うため、
   負荷を下げたいときだけ汎用の `anime-soft` (steps 20の下描き向け) へ落とす
   (一覧は [presets](docs/spec-reference.md#presets))
 - **併用できない組み合わせがある。** hires fixとIPAdapter、DiT系モデルと
-  LoRA / ControlNet / IPAdapterは指定するとその場で拒否される。
+  ControlNet / IPAdapter / clip_skipは指定するとその場で拒否される。
   hires fixとControlNetは併用できる (ControlNetが効くのは1段目だけ)。
-  DiT系モデルはimg2img / hires fixと併用できる。
+  DiT系モデルはLoRA / img2img / hires fixと併用できる。
+  **DiT系にはそのDiT系向けに学習されたLoRAだけが当たる** (SD1.5 / SDXL向けを
+  指定しても効かない。配布元のbaseModelがAnimaのものを使う)。
   一覧は [組み合わせの可否](docs/spec-reference.md#組み合わせの可否)
 - **読める日本語が要求されたら生成に任せず `text` で合成する。**
   SD1.5 / SDXL系のモデルは日本語をほぼ描けない

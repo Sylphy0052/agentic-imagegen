@@ -116,6 +116,27 @@ generation:
 
 WAI-ANIMAだけは配布元がhires fixのdenoise 0.35-0.5を推奨しており、他より高い。
 
+### LoRA
+
+**Anima系はLoRAと併用できる** (Issue #39)。`model.loras` へ書く形はSD1.5 / SDXLと同じ。
+
+```yaml
+model:
+  unet: hassakuAnima_v13_int8.safetensors
+  clip: qwen_3_06b_base.safetensors
+  vae: qwen_image_vae.safetensors
+  loras:
+    - name: anima_context_detailer_base10.safetensors
+      strength_model: 1.0
+```
+
+- **baseModelがAnimaのLoRAだけが当たる。** SD1.5 / SDXL向けのLoRAを指定しても
+  キーが一致せず、エラーも警告も出ないまま何も起きない。
+  civitaiでは `baseModel=Anima` で絞り込める
+- Anima向けのLoRAはUNet側のキーしか持たないものが多い。その場合 `strength_clip` は
+  効かない (指定してもエラーにはしない)
+- hires fix・beta57とも併用できる
+
 ## 品質タグ・rating・yearの体系
 
 品質タグには2つの系統がある。混ぜて盛らない。

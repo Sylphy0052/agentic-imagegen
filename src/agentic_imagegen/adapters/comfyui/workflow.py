@@ -170,9 +170,15 @@ _LORA_INPUTS: Final = ("lora_name", "strength_model", "strength_clip")
 def _with_lora_chain(base: WorkflowBinding, *, name: str, first_node_id: int) -> WorkflowBinding:
     """既存のbindingに LoraLoader 3段を挟んだbindingを組み立てる。
 
-    checkpoint -> lora_1 -> lora_2 -> lora_3 -> KSampler / CLIPTextEncode の順で
-    繋がっていることまで検証する。1段でも迂回していればLoRAが効かないため、
+    <MODELの供給元> -> lora_1 -> lora_2 -> lora_3 -> KSampler / CLIP側の受け手
+    の順で繋がっていることまで検証する。1段でも迂回していればLoRAが効かないため、
     構造検証で落とす。
+
+    供給元と受け手はcheckpoint系とDiT系で違う。
+
+    - checkpoint系: MODELもCLIPも `checkpoint` の出力。CLIP側の受け手は `clip_skip`
+    - DiT系: MODELは `unet_loader`、CLIPは `clip_loader` と別ノードから来る。
+      `clip_skip` を通さないため、受け手はCLIPTextEncodeの2つ
 
     ノードIDはテンプレートごとに空き番が違うため first_node_id で受ける
     (img2imgは10/11をLoadImageとVAEEncodeで使っている)。
@@ -181,21 +187,28 @@ def _with_lora_chain(base: WorkflowBinding, *, name: str, first_node_id: int) ->
     for index, role in enumerate(LORA_SLOT_ROLES):
         nodes[role] = NodeRef(str(first_node_id + index), "LoraLoader", _LORA_INPUTS)
 
-    # KSamplerのmodelとclip_skipの供給元はLoRAの最終段から来るようになるため、
-    # 元のリンクを差し替える。CLIPTextEncodeは変わらずclip_skip経由のまま。
+    separate = UNET_LOADER_ROLE in base.nodes
+    model_source = UNET_LOADER_ROLE if separate else "checkpoint"
+    clip_source = CLIP_LOADER_ROLE if separate else "checkpoint"
+    clip_consumers = ("positive_prompt", "negative_prompt") if separate else (CLIP_SKIP_ROLE,)
+
+    # KSamplerのmodelとCLIP側の受け手はLoRAの最終段から来るようになるため、
+    # 元のリンクを差し替える。
     links = [
         link
         for link in base.links
         if link.input_key != "model"
-        and not (link.source_node == CLIP_SKIP_ROLE and link.input_key == "clip")
+        and not (link.source_node in clip_consumers and link.input_key == "clip")
     ]
-    upstream = "checkpoint"
+    upstream_model = model_source
+    upstream_clip = clip_source
     for role in LORA_SLOT_ROLES:
-        links.append(LinkRef(role, "model", upstream))
-        links.append(LinkRef(role, "clip", upstream))
-        upstream = role
-    links.append(LinkRef("ksampler", "model", upstream))
-    links.append(LinkRef(CLIP_SKIP_ROLE, "clip", upstream))
+        links.append(LinkRef(role, "model", upstream_model))
+        links.append(LinkRef(role, "clip", upstream_clip))
+        upstream_model = role
+        upstream_clip = role
+    links.append(LinkRef("ksampler", "model", upstream_model))
+    links.extend(LinkRef(consumer, "clip", upstream_clip) for consumer in clip_consumers)
 
     return WorkflowBinding(name=name, nodes=nodes, links=tuple(links))
 

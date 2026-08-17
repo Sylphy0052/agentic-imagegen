@@ -795,7 +795,7 @@ outputs/
 | **ControlNet** | 可 | 可 | 可 | - | 可 | 可 | 可 | 可 |
 | **IPAdapter** | 可 | 可 | **不可** | 可 | - | 可 | 可 | 可 |
 | **外部VAE (checkpoint+vae)** | 可 | 可 | 可 | 可 | 可 | - | 可 | 可 |
-| **DiT系 (unet/clip/vae)** | **不可** | 可 | 可 | **不可** | **不可** | **不可** | 可 | **不可** |
+| **DiT系 (unet/clip/vae)** | 可 | 可 | 可 | **不可** | **不可** | **不可** | 可 | **不可** |
 | **clip_skip** | 可 | 可 | 可 | 可 | 可 | 可 | 可 | - |
 
 `text`は生成後の後処理のため、どの構成とも併用できる。
@@ -808,6 +808,12 @@ outputs/
 **外部VAEは`checkpoint`と組み合わせる指定 (`checkpoint` + `vae`) のため、
 `checkpoint`を持たないDiT系 (unet/clip/vae) では意味を持たず併用できない。**
 DiT系は`vae`が3点セットの必須項目として既に外部VAEを使っている。
+
+**DiT系のLoRAはそのDiT系向けに学習されたものだけが当たる。** SD1.5 / SDXL向けの
+LoRAをDiT系のUNetへ指定しても効かない (ComfyUIはキーが一致しないまま素通しする)。
+配布元のbaseModelがAnimaになっているものを使う。
+DiT系向けのLoRAはUNet側のキーしか持たないことが多く、その場合`strength_clip`は
+効かない (指定してもエラーにはしない。SD1.5 / SDXLでも同じ扱い)。
 
 **hires fixとIPAdapterの両方が要る場合は2段に分ける。** 1段目でIPAdapterを効かせて
 生成し、その出力を入力にした2段目の`img2img` + `upscale`で解像度を上げる。
@@ -823,7 +829,9 @@ Specとしては正しくても生成の直前に拒否される
 不可の組み合わせを指定した場合はSpecの検証時 (exit code 2) に拒否する。理由と着手条件は
 [Issue #38](https://github.com/Sylphy0052/agentic-imagegen/issues/38) (hires fixとIPAdapterの併用) と
 [Issue #39](https://github.com/Sylphy0052/agentic-imagegen/issues/39)
-(DiT系とLoRA / ControlNet / IPAdapterの併用) にまとめてある。
+(DiT系とControlNet / IPAdapter / clip_skipの併用) にまとめてある。
+DiT系のControlNetは実在するが、いずれもLLLite / RefLatents形式で
+ComfyUI標準の`ControlNetLoader`では読めず、カスタムノードが要る。
 
 ## Workflowテンプレートの決まり方
 

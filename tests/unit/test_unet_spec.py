@@ -66,14 +66,17 @@ def test_rejects_partial_separate_loaders(missing: str) -> None:
         GenerationSpec.model_validate(_spec(model=payload))
 
 
-def test_rejects_loras_with_separate_loaders() -> None:
+def test_accepts_loras_with_separate_loaders() -> None:
+    """DiT系向けのLoRAが出回ったため通す (Issue #39)。結線は test_dit_lora.py が見る。"""
     payload = {
         **SEPARATE_MODEL,
-        "loras": [{"name": "add_detail.safetensors"}],
+        "loras": [{"name": "anima_context_detailer_base10.safetensors"}],
     }
 
-    with pytest.raises(ValidationError, match="LoRA"):
-        GenerationSpec.model_validate(_spec(model=payload))
+    spec = GenerationSpec.model_validate(_spec(model=payload))
+
+    assert resolve_workflow_name(spec) == "txt2img_unet_lora"
+    assert "txt2img_unet_lora" in ALLOWED_WORKFLOWS
 
 
 def test_accepts_img2img_with_separate_loaders() -> None:
