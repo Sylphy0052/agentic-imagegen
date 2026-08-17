@@ -23,6 +23,29 @@ torch / diffusers は既定ではインストールしない。extraで明示的
 uv sync --extra diffusers
 ```
 
+**NVIDIA GPU (CUDA) の環境ではこれだけでは足りない。** `pyproject.toml` の
+`tool.uv.sources` がtorchを `pytorch-xpu` index へ固定しているため、入るのは
+XPU版 (`2.13.0+xpu`) になる。CUDA環境では `torch.cuda.is_available()` が `False` に
+なり、`_select_device()` がCPUへ落ちる (SDXLをCPUで回すと現実的な時間に収まらない)。
+torchだけCUDA版へ入れ直す。
+
+```bash
+uv pip install --index-url https://download.pytorch.org/whl/cu130 \
+  --reinstall torch torchvision
+```
+
+`--reinstall` を付ける。同じバージョン番号のビルド違いはスキップされるため
+(XPU版へ入れ替えるときにも同じことが起きる。
+[xpu-setup.mdの手順2](xpu-setup.md#2-pytorchをxpu版へ差し替える))。
+入れ替わったことは次で確かめる (`cuda: True` になる)。
+
+```bash
+uv run python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+```
+
+extraの構成をCUDA向けへ分ける件は
+[Issue #135](https://github.com/Sylphy0052/agentic-imagegen/issues/135) で触れている。
+
 モデルはComfyUIのディレクトリ構成をそのまま読む。`IMAGEGEN_MODELS_ROOT` に
 その親ディレクトリを指定する。
 
