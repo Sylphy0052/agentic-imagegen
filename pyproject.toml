@@ -100,6 +100,13 @@ plugins = ["pydantic.mypy"]
 module = "tests.*"
 disallow_untyped_defs = false
 
+# torch / diffusers / safetensors は [diffusers] extra にしか無い。
+# extraを入れていない環境でも `mypy src` が通るようにする。
+# 型注釈を Any へ潰す方向では直さないため、対象は import 解決だけに絞る。
+[[tool.mypy.overrides]]
+module = ["torch.*", "diffusers.*", "safetensors.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers --strict-config"

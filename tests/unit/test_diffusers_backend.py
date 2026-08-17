@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -20,6 +21,15 @@ from agentic_imagegen.adapters.diffusers.backend import DiffusersBackend, reject
 from agentic_imagegen.config import Settings
 from agentic_imagegen.domain.models import GenerationSpec
 from agentic_imagegen.errors import GenerationFailed, InvalidGenerationSpec
+
+#: torchは `[diffusers]` extra にしか無い (数GBあるため既定では入れない)。
+#: Pipelineの実行まで進むテストは実装側の実行時 `import torch` を踏むため、
+#: extraを入れていない環境では外す。LoRAファイルの不在やSpecの検証で手前で
+#: 弾かれるテストはtorchが無くても意味を持つため、そちらには付けない。
+requires_torch = pytest.mark.skipif(
+    importlib.util.find_spec("torch") is None,
+    reason="torchが無い環境。`uv sync --extra diffusers` で入る",
+)
 
 BASE_SPEC: dict[str, Any] = {
     "version": "1",
@@ -180,6 +190,7 @@ class TestRejectUnsupported:
         assert "IMAGEGEN_BACKEND=comfyui" in str(exc.value)
 
 
+@requires_torch
 class TestExecute:
     @pytest.mark.asyncio
     async def test_returns_png_bytes(
@@ -295,6 +306,7 @@ class TestDerivePipeline:
         assert recorded["torch_dtype"] == "float16"
 
 
+@requires_torch
 class TestDeviceMemory:
     """デバイス側のメモリを生成のたびに返すこと。
 
@@ -336,6 +348,7 @@ class TestDeviceMemory:
 
 
 class TestLoras:
+    @requires_torch
     @pytest.mark.asyncio
     async def test_loras_are_loaded_with_weights(
         self, settings: Settings, pipeline: FakePipeline, tmp_path: Path
@@ -353,6 +366,7 @@ class TestLoras:
         assert pipeline.loaded_loras == [("add_detail.safetensors", "lora0")]
         assert pipeline.adapters == (["lora0"], [0.8])
 
+    @requires_torch
     @pytest.mark.asyncio
     async def test_previous_loras_are_unloaded(
         self, settings: Settings, pipeline: FakePipeline, tmp_path: Path
@@ -382,6 +396,7 @@ class TestLoras:
 
         assert "absent.safetensors" in str(exc.value)
 
+    @requires_torch
     @pytest.mark.asyncio
     async def test_text_encoder_lora_is_rejected(
         self, settings: Settings, pipeline: FakePipeline, tmp_path: Path
@@ -411,6 +426,7 @@ class TestLoras:
         assert pipeline.loaded_loras == []
 
 
+@requires_torch
 class TestImg2Img:
     @pytest.mark.asyncio
     async def test_source_image_and_strength_are_passed(
