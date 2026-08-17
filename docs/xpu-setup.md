@@ -178,7 +178,8 @@ CUDAの行はRTX 4070 Ti SUPER 16GB / ComfyUI 0.33.0 / torch 2.13.0+cu130 での
 (上表のAnima 832x1216 / 32 stepsは実測10秒だが「XPU 約11分」と表示される)。
 [Issue #130](https://github.com/Sylphy0052/agentic-imagegen/issues/130) で扱う。
 
-SD1.5系はモデルロード済み (2回目以降) の値。初回はモデルロードの分だけ上乗せされる。
+Intel XPUのSD1.5系はモデルロード済み (2回目以降) の値。初回はモデルロードの分だけ上乗せされる
+(CUDAの行はロードを含むかどうかを行ごとに書いてある)。
 Anima系はSD1.5系より1stepあたりが重く、配布元推奨の832x1216 / 32 stepsはさらに伸びる。
 SDXL系はモデルのロードだけで数分かかるため、初回とロード済みの差がSD1.5系より大きい。
 配布元推奨のsteps 30やhires fixとの併用は未計測。
