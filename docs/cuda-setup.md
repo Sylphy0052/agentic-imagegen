@@ -110,10 +110,25 @@ CUDAの行もそこにまとめてある。
 
 既定の `IMAGEGEN_TIMEOUT` (300秒) で足りなかった条件は今のところ無い。
 
-`imagegen validate` が出す `Estimate:` 行はXPUとCPUの係数から起こしたもので、
-**CUDA環境では大幅に過大に出る** (Anima 832x1216 / 32 stepsで「XPU 約11分」と出るが実測10秒)。
-CUDAの係数を持たせる件は
-[Issue #130](https://github.com/Sylphy0052/agentic-imagegen/issues/130) で扱う。
+`imagegen validate` はComfyUIへ接続しないため、どの基盤で動くかを知れない。
+**`IMAGEGEN_DEVICE=cuda` を宣言しておく。**
+
+```bash
+export IMAGEGEN_DEVICE=cuda
+```
+
+宣言するとCUDAの見積りだけを出し、`IMAGEGEN_TIMEOUT` を超える警告もCUDAで判定する。
+未設定のままだと3基盤を併記し、警告はXPUを物差しにするため、
+このマシンでは出る必要のない警告が出続ける。
+
+```text
+# 未設定
+Estimate: CUDA 約10秒 / XPU 約12分 / CPU 約121分
+warning: XPUでも約12分かかる見込みで、IMAGEGEN_TIMEOUT (300秒) を超えます
+
+# IMAGEGEN_DEVICE=cuda
+Estimate: CUDA 約10秒
+```
 
 ## VRAMの目安
 

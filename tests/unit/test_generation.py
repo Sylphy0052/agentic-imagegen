@@ -155,6 +155,18 @@ async def test_generate_writes_metadata(tmp_path: Path) -> None:
     assert metadata["created_at"]
 
 
+async def test_generate_records_duration(tmp_path: Path) -> None:
+    """見積り係数を起こし直せるよう、実測秒をmetadataへ残す。"""
+    backend = FakeBackend(images=_images(1))
+
+    result = await generate(_spec(), _settings(tmp_path), backend=backend, project_root=tmp_path)
+
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert isinstance(metadata["duration_seconds"], float)
+    assert metadata["duration_seconds"] >= 0.0
+
+
 async def test_generate_relays_backend_info_verbatim(tmp_path: Path) -> None:
     """backend.execute() が返した info をそのままmetadataへ展開する。
 

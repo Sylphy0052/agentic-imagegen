@@ -199,9 +199,9 @@ XPU (手順: [docs/xpu-setup.md](docs/xpu-setup.md))、CPU。
 どれで動いているかは `uv run imagegen health` の `Devices:` で分かる
 (`cuda:0` / `xpu:0` / `cpu`)。
 
-`validate` が出す `Estimate:` はXPUとCPUの係数しか持たないため、
-**CUDA環境では過大に出る**。CUDA環境ではこの警告を根拠にstepsや解像度を落とさない
-([Issue #130](https://github.com/Sylphy0052/agentic-imagegen/issues/130))。
+`validate` が出す `Estimate:` は3基盤を併記する。`IMAGEGEN_DEVICE` を宣言しておくと
+その基盤だけを出し、`IMAGEGEN_TIMEOUT` を超える警告もその基盤で判定する。
+未設定のときの警告はXPUを物差しにするため、CUDA環境では過大に出る。
 
 ## 開発時のルール
 
@@ -279,6 +279,7 @@ uv run mypy src
 | `IMAGEGEN_REGISTRY_ROOT` | `registry` | キャラクタ台帳の探索ルート |
 | `IMAGEGEN_MAX_SOURCE_BYTES` | 33554432 | img2imgの入力画像の上限バイト数 |
 | `IMAGEGEN_FONTS_ROOT` | `fonts` | テキスト合成に使うフォントの探索ルート |
+| `IMAGEGEN_DEVICE` | (なし) | `validate` の所要時間見積に使う基盤 (`cuda` / `xpu` / `cpu`)。生成の挙動は変えない。未設定なら3基盤を併記する |
 
 秘密情報は扱わないため、環境変数ファイルは必須ではない。
 
