@@ -16,6 +16,9 @@
 #   IMAGEGEN_TIMEOUT  生成のタイムアウト秒 (既定: 2400)
 #   COMFYUI_BOOT_TIMEOUT  起動待ちの上限秒 (既定: 300)
 #   COMFYUI_LOG_DIR   起動ログの置き場 (既定: ~/.cache/imagegen-logs)
+#   COMFYUI_EXTRA_ARGS  ComfyUIへ渡す追加の起動引数 (既定: なし)
+#                       モデルのdtypeを切り替えて破綻を切り分けるときに使う
+#                       (例: COMFYUI_EXTRA_ARGS="--bf16-unet")
 #
 # 出力を head などパイプの読み手が先に閉じるコマンドへ繋がない。
 # SIGPIPEで落ちてもComfyUIを残さないようにはしてあるが、途中経過が切れて
@@ -71,7 +74,13 @@ start_comfyui() {
     local log="${COMFYUI_LOG_DIR}/comfyui.log"
     echo "[comfyui-session] starting ComfyUI (log: ${log})" >&2
 
-    (cd "$COMFYUI_HOME" && exec ./.venv/bin/python main.py --listen 127.0.0.1 --port 8188) \
+    local extra_args=()
+    if [ -n "${COMFYUI_EXTRA_ARGS:-}" ]; then
+        read -r -a extra_args <<< "$COMFYUI_EXTRA_ARGS"
+        echo "[comfyui-session] extra args: ${extra_args[*]}" >&2
+    fi
+
+    (cd "$COMFYUI_HOME" && exec ./.venv/bin/python main.py --listen 127.0.0.1 --port 8188 "${extra_args[@]}") \
         > "$log" 2>&1 < /dev/null &
     COMFYUI_PID=$!
     trap stop_comfyui EXIT INT TERM HUP PIPE
