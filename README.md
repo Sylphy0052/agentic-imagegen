@@ -40,7 +40,7 @@ batch、日本語テキスト合成、DiT系モデル (Anima) 対応まで一通
 | [CLAUDE.md](CLAUDE.md) | Claude Codeがこのリポジトリを操作するときのルール。環境変数・exit code |
 | [.claude/skills/imagegen/SKILL.md](.claude/skills/imagegen/SKILL.md) | 画像生成要求を受けてから結果を返すまでの手順 |
 | [docs/diffusers-backend.md](docs/diffusers-backend.md) | ComfyUIを使わずdiffusersで直接生成する場合の設定と対応範囲 |
-| [docs/](docs/) | 環境構築 ([xpu](docs/xpu-setup.md) / [cpu](docs/comfyui-setup.md) / [mcp](docs/mcp-setup.md) / [fonts](docs/fonts-setup.md)) とモデル別の [プロンプト指針](docs/prompting-guide.md) |
+| [docs/](docs/) | 環境構築 ([cuda](docs/cuda-setup.md) / [xpu](docs/xpu-setup.md) / [cpu](docs/comfyui-setup.md) / [mcp](docs/mcp-setup.md) / [fonts](docs/fonts-setup.md)) とモデル別の [プロンプト指針](docs/prompting-guide.md) |
 | [workflows/README.md](workflows/README.md) | Workflowテンプレートの一覧と作り方 |
 
 ## 必要環境
@@ -49,8 +49,8 @@ batch、日本語テキスト合成、DiT系モデル (Anima) 対応まで一通
 - [uv](https://docs.astral.sh/uv/)
 - ComfyUI (別途セットアップ)
 
-GPUはIntel Arc内蔵GPU (XPU) での動作を確認している。NVIDIA GPUがなくてもCPU推論で動くが、
-XPUのほうがおよそ5倍速い (SD1.5 / 512x768 / 20 stepsで約135秒 対 約12分)。
+NVIDIA GPU (CUDA) / Intel Arc内蔵GPU (XPU) / CPUの3構成で動作を確認している。
+SD1.5 / 512x768 / 20 stepsの実測はCUDAで約4秒、XPUで約135秒、CPUで約12分。
 条件別の実測値は
 [docs/xpu-setup.mdの「所要時間とタイムアウトの目安」](docs/xpu-setup.md#所要時間とタイムアウトの目安)。
 
@@ -64,6 +64,7 @@ uv sync
 
 ## ComfyUIの起動
 
+- NVIDIA GPU (CUDA) を使う場合: [docs/cuda-setup.md](docs/cuda-setup.md)
 - Intel GPU (XPU) を使う場合: [docs/xpu-setup.md](docs/xpu-setup.md)
 - CPU推論で動かす場合: [docs/comfyui-setup.md](docs/comfyui-setup.md)
 

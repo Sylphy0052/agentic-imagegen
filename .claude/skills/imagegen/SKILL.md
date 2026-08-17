@@ -58,7 +58,9 @@ uv run imagegen catalog
 
 生成は `scripts/comfyui-session.sh` 経由で行うため、事前の手動起動は要らない
 (スクリプトが起動し、生成し、停止する)。手で立ち上げてデバッグしたいときだけ次を使う
-(起動しない場合は [docs/xpu-setup.md](../../../docs/xpu-setup.md) を案内する)。
+(起動しない場合は環境に応じて [docs/cuda-setup.md](../../../docs/cuda-setup.md) /
+[docs/xpu-setup.md](../../../docs/xpu-setup.md) /
+[docs/comfyui-setup.md](../../../docs/comfyui-setup.md) を案内する)。
 
 ```bash
 cd ~/ComfyUI && ./.venv/bin/python main.py --listen 127.0.0.1 --port 8188
@@ -255,8 +257,10 @@ uv run imagegen validate specs/generated/<name>.yaml
 scripts/comfyui-session.sh generate specs/generated/<name>.yaml
 ```
 
-所要時間はSD1.5 / 512x768 / 20 stepsで **XPU約135秒、CPU約12分**。
-`IMAGEGEN_TIMEOUT` はXPUなら300、CPUなら1200を目安にする。条件別の実測値は
+所要時間はSD1.5 / 512x768 / 20 stepsで **CUDA約4秒、XPU約135秒、CPU約12分**。
+`IMAGEGEN_TIMEOUT` はCUDA / XPUなら300、CPUなら1200を目安にする。
+`validate` の `Estimate:` はCUDAの係数を持たないため、CUDA環境では過大に出る
+(それを根拠にstepsや解像度を落とさない)。条件別の実測値は
 [docs/xpu-setup.mdの「所要時間とタイムアウトの目安」](../../../docs/xpu-setup.md#所要時間とタイムアウトの目安)
 を参照。長くかかる場合はバックグラウンド実行にして、完了を待ってから報告する。
 
