@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from functools import partial
@@ -83,7 +84,11 @@ async def generate(
     directory = _prepare_directory(spec, settings, project_root)
 
     resolved_timeout = timeout if timeout is not None else float(settings.timeout_seconds)
+    # 見積り係数 (services/estimate.py) を起こし直すための実測値。
+    # バックエンドへの投入から出力の取得までを測る。テキスト合成は含めない。
+    started = time.monotonic()
     output = await backend.execute(spec, project_root=project_root, timeout=resolved_timeout)
+    elapsed = time.monotonic() - started
 
     directory.mkdir(parents=True, exist_ok=True)
     files = _save_images(directory, output.images, output.suffixes)
@@ -96,6 +101,7 @@ async def generate(
         seed=output.seed,
         files=files,
         info=output.info,
+        duration_seconds=elapsed,
     )
 
     text_files, text_info, text_error = _compose_text_layers(spec, files, settings, project_root)
@@ -229,6 +235,7 @@ def _write_metadata(
     seed: int,
     files: tuple[Path, ...],
     info: dict[str, Any],
+    duration_seconds: float,
     text_info: dict[str, Any] | None,
 ) -> Path:
     metadata = {
@@ -237,6 +244,9 @@ def _write_metadata(
         "workflow": info.get("workflow"),
         "workflow_hash": info.get("workflow_hash"),
         "created_at": datetime.now().astimezone().isoformat(),
+        # 投入から出力取得までの実測秒。モデルのロードを含む場合があるため、
+        # 係数を起こすときは同じモデルで2回目以降の値を使う
+        "duration_seconds": round(duration_seconds, 2),
         "resolved_seed": seed,
         "backend": info.get("backend"),
         "spec": spec.model_dump(mode="json"),

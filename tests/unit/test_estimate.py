@@ -98,6 +98,56 @@ class TestMeasuredCases:
         assert estimate.cpu_seconds == pytest.approx(720.0, rel=TOLERANCE)
 
 
+class TestMeasuredCudaCases:
+    """docs/xpu-setup.md のCUDA実測 (RTX 4070 Ti SUPER) を再現できること。
+
+    いずれもモデルロード済み・同条件2本の平均。hires fixありは1 unitあたりが
+    1割ほど重く出るため、系統ごとに1つの係数で両方を許容幅へ収めている。
+    """
+
+    def test_sd15(self) -> None:
+        """SD1.5 / 512x768 / 20 steps は1.27秒。"""
+        assert _estimate().cuda_seconds == pytest.approx(1.27, rel=TOLERANCE)
+
+    def test_sd15_hires_fix(self) -> None:
+        """512x768 -> 768x1152 (2段目8 steps) は2.80秒。"""
+        estimate = _estimate(generation={"upscale": {"scale": 1.5, "steps": 8}})
+
+        assert estimate.cuda_seconds == pytest.approx(2.80, rel=TOLERANCE)
+
+    def test_sdxl(self) -> None:
+        """SDXL / 832x1216 / 24 steps は5.47秒。"""
+        estimate = _estimate(
+            model={"checkpoint": SDXL},
+            generation={"width": 832, "height": 1216, "steps": 24},
+        )
+
+        assert estimate.cuda_seconds == pytest.approx(5.47, rel=TOLERANCE)
+
+    def test_dit(self) -> None:
+        """Anima / 832x1216 / 32 steps は9.62秒。"""
+        estimate = _estimate(
+            model={"unet": ANIMA, "clip": "qwen3.safetensors", "vae": "anima_vae.safetensors"},
+            generation={"width": 832, "height": 1216, "steps": 32},
+        )
+
+        assert estimate.cuda_seconds == pytest.approx(9.62, rel=TOLERANCE)
+
+    def test_dit_hires_fix(self) -> None:
+        """Anima 832x1216 -> 1248x1824 (2段目16 steps) は24.27秒。"""
+        estimate = _estimate(
+            model={"unet": ANIMA, "clip": "qwen3.safetensors", "vae": "anima_vae.safetensors"},
+            generation={
+                "width": 832,
+                "height": 1216,
+                "steps": 32,
+                "upscale": {"scale": 1.5, "steps": 16},
+            },
+        )
+
+        assert estimate.cuda_seconds == pytest.approx(24.27, rel=TOLERANCE)
+
+
 class TestScaling:
     def test_batch_multiplies(self) -> None:
         single = _estimate()

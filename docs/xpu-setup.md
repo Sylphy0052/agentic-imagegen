@@ -161,22 +161,36 @@ fp16の相対誤差は4.2e-4だった。
 | 同上 アップスケールモデル (RealESRGAN x4, 4x拡大後0.5倍へ縮小) | Intel XPU | 176.7秒 | 600 |
 | SDXL / 832x1216 / 8 steps | Intel XPU | 299.7秒 (初回) | 600 |
 | SDXL / 832x1216 / 24 steps | Intel XPU | 362.6秒 | 600 |
-| SD1.5 / 512x768 / 20 steps | CUDA | 約4秒 (初回、モデルロード込み) | 300 |
-| Anima (DiT系) / 832x1216 / 32 steps | CUDA | 15秒 (初回) / 10秒 (ロード済み) | 300 |
-| 同上 + hires fix (→1248x1824 / 2段目16 steps) | CUDA | 24秒 | 300 |
+| SD1.5 / 512x768 / 20 steps | CUDA | 1.3秒 | 300 |
+| SD1.5 / 512x768 -> 768x1152 (hires fix, 2段目8 steps) | CUDA | 2.8秒 | 300 |
+| SDXL / 832x1216 / 24 steps | CUDA | 5.5秒 | 300 |
+| Anima (DiT系) / 832x1216 / 32 steps | CUDA | 9.6秒 | 300 |
+| 同上 + hires fix (→1248x1824 / 2段目16 steps) | CUDA | 24.3秒 | 300 |
 
 CUDAの行はRTX 4070 Ti SUPER 16GB / ComfyUI 0.33.0 / torch 2.13.0+cu130 での実測
 (2026-08-17)。手順は [cuda-setup.md](cuda-setup.md)。
-**各条件1回ずつの計測** のため、係数を起こすには足りない。
+いずれも**モデルロード済みで、seedだけを変えた2本の平均**。
+モデルロードを含む初回は SD1.5で3.6秒、SDXLで13.4秒、Anima系で13.6秒だった。
 
-`imagegen validate` が出す `Estimate:` 行はこの表から起こした係数
-(Mpixel・stepあたりXPUで SD1.5 9秒 / SDXL 15秒 / DiT系 22秒、CPUはその約10倍) による概算。
-モデルのロード時間とControlNet / IPAdapterの上乗せは織り込まない。
-再計測してこの表を直したときは `src/agentic_imagegen/services/estimate.py` の係数も見直す。
+計測は `metadata.json` の `duration_seconds` (投入から出力取得までの実測秒) から採る。
+同じseed・同じ解像度で2回流すとComfyUI側がノード出力をキャッシュするため、
+seedを振らないと計測にならない。
 
-**CUDAの係数は持っていない。** そのためCUDA環境では `Estimate:` が大幅に過大に出る
-(上表のAnima 832x1216 / 32 stepsは実測10秒だが「XPU 約11分」と表示される)。
-[Issue #130](https://github.com/Sylphy0052/agentic-imagegen/issues/130) で扱う。
+`imagegen validate` が出す `Estimate:` 行はこの表から起こした係数による概算。
+
+| 実行基盤 | SD1.5 | SDXL | DiT系 |
+| --- | --- | --- | --- |
+| CUDA | 0.17秒 | 0.23秒 | 0.32秒 |
+| Intel XPU | 9秒 | 15秒 | 22秒 |
+| CPU | XPUの約10倍 | 同左 | 同左 |
+
+いずれもMpixel・stepあたり。モデルのロード時間とControlNet / IPAdapterの上乗せは
+織り込まない。再計測してこの表を直したときは
+`src/agentic_imagegen/services/estimate.py` の係数も見直す。
+
+どの基盤で動くかはvalidateの時点では分からない (ComfyUIへ接続しないため)。
+`IMAGEGEN_DEVICE` を宣言しておくとその基盤だけを出し、タイムアウトの警告も
+その基盤で判定する。未設定なら3基盤を併記し、警告は従来どおりXPUを物差しにする。
 
 Intel XPUのSD1.5系はモデルロード済み (2回目以降) の値。初回はモデルロードの分だけ上乗せされる
 (CUDAの行はロードを含むかどうかを行ごとに書いてある)。

@@ -259,8 +259,9 @@ scripts/comfyui-session.sh generate specs/generated/<name>.yaml
 
 所要時間はSD1.5 / 512x768 / 20 stepsで **CUDA約4秒、XPU約135秒、CPU約12分**。
 `IMAGEGEN_TIMEOUT` はCUDA / XPUなら300、CPUなら1200を目安にする。
-`validate` の `Estimate:` はCUDAの係数を持たないため、CUDA環境では過大に出る
-(それを根拠にstepsや解像度を落とさない)。条件別の実測値は
+`validate` の `Estimate:` は `IMAGEGEN_DEVICE` が未設定だと3基盤を併記し、
+タイムアウトの警告はXPUを物差しにする。CUDA環境でその警告を根拠に
+stepsや解像度を落とさない。条件別の実測値は
 [docs/xpu-setup.mdの「所要時間とタイムアウトの目安」](../../../docs/xpu-setup.md#所要時間とタイムアウトの目安)
 を参照。長くかかる場合はバックグラウンド実行にして、完了を待ってから報告する。
 

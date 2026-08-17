@@ -38,7 +38,12 @@ from agentic_imagegen.services.batch import BatchItem, BatchOutcome, expand_seed
 from agentic_imagegen.services.catalog import CATALOG_KINDS, collect_catalog
 from agentic_imagegen.services.characters import collect_characters, load_character
 from agentic_imagegen.services.compose import compose_text
-from agentic_imagegen.services.estimate import estimate_duration, format_duration
+from agentic_imagegen.services.estimate import (
+    DEVICE_LABELS,
+    estimate_duration,
+    format_duration,
+    format_estimate,
+)
 from agentic_imagegen.services.generation import TEXT_SUFFIX, generate, resolve_fonts_root
 from agentic_imagegen.services.history import DEFAULT_LIMIT, collect_history
 from agentic_imagegen.services.preset_advice import style_warnings
@@ -277,11 +282,9 @@ def validate(spec_path: SpecArgument, verbose: VerboseOption = False) -> None:
 
         estimate = estimate_duration(spec)
         if estimate is not None:
-            # validateはComfyUIへ接続しないため、どちらの実行基盤で動くかは分からない。
-            typer.echo(
-                f"Estimate: XPU {format_duration(estimate.xpu_seconds)} / "
-                f"CPU {format_duration(estimate.cpu_seconds)}"
-            )
+            # validateはComfyUIへ接続しないため、どの実行基盤で動くかは分からない。
+            # IMAGEGEN_DEVICE で宣言されていればそれに従い、無ければ全基盤を併記する。
+            typer.echo(f"Estimate: {format_estimate(estimate, settings.device)}")
 
         # 助言は検証結果ではない。exit codeは変えず、stdoutの検証結果とも混ぜない。
         advice = style_warnings(
@@ -289,12 +292,19 @@ def validate(spec_path: SpecArgument, verbose: VerboseOption = False) -> None:
             presets_root=_resolve_root(settings.presets_root, Path.cwd()),
             project_root=Path.cwd(),
         )
-        if estimate is not None and estimate.xpu_seconds > settings.timeout_seconds:
-            advice += (
-                f"XPUでも{format_duration(estimate.xpu_seconds)}かかる見込みで、"
-                f"IMAGEGEN_TIMEOUT ({settings.timeout_seconds}秒) を超えます。"
-                "steps・解像度・batch_sizeを下げるか、IMAGEGEN_TIMEOUTを延ばしてください",
-            )
+        if estimate is not None:
+            # 基盤が分からないときは、宣言があったときと同じ基準では判定できない。
+            # 速いほうで判定すると遅い基盤で見落とし、遅いほうで判定するとCUDAで
+            # 出っぱなしになるため、従来どおり中間のXPUを既定の物差しにする。
+            device = settings.device or "xpu"
+            seconds = estimate.for_device(device)
+            if seconds > settings.timeout_seconds:
+                label = DEVICE_LABELS[device]
+                advice += (
+                    f"{label}でも{format_duration(seconds)}かかる見込みで、"
+                    f"IMAGEGEN_TIMEOUT ({settings.timeout_seconds}秒) を超えます。"
+                    "steps・解像度・batch_sizeを下げるか、IMAGEGEN_TIMEOUTを延ばしてください",
+                )
         for warning in advice:
             typer.echo(f"warning: {warning}", err=True)
 

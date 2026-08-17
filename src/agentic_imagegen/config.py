@@ -53,6 +53,12 @@ BACKEND_NAMES: Final[tuple[BackendName, ...]] = ("comfyui", "diffusers")
 
 DEFAULT_BACKEND: Final[BackendName] = "comfyui"
 
+#: 所要時間の見積りに使う実行基盤。生成の挙動は変えず、`validate` の表示だけに効く。
+DeviceName = Literal["cuda", "xpu", "cpu"]
+
+#: DeviceName の実体。Literalの型引数からは実行時の集合を作れないため別に持つ。
+DEVICE_NAMES: Final[tuple[DeviceName, ...]] = ("cuda", "xpu", "cpu")
+
 
 def _backend(key: str, default: BackendName) -> BackendName:
     """どのバックエンドで生成するかを読む。
@@ -73,6 +79,27 @@ def _backend(key: str, default: BackendName) -> BackendName:
         )
     # 上のinで絞り込み済みだが、型としては str のままなのでここで確定させる
     return "diffusers" if value == "diffusers" else "comfyui"
+
+
+def _device(key: str) -> DeviceName | None:
+    """見積りに使う実行基盤を読む。未設定は「分からない」を意味する。
+
+    知らない値を既定へ落とすと、宣言したつもりの基盤と違う見積りが出る。
+    バックエンド名と同じく、綴り違いはその場で弾く。
+    """
+    raw = os.environ.get(key)
+    if raw is None:
+        return None
+    value = raw.strip().lower()
+    if not value:
+        return None
+    if value not in DEVICE_NAMES:
+        allowed = " / ".join(DEVICE_NAMES)
+        raise InvalidConfiguration(
+            f"{key} には {allowed} のいずれかを指定してください (指定値: {raw!r})"
+        )
+    # 上のinで絞り込み済みだが、型としては str のままなのでここで確定させる
+    return next(name for name in DEVICE_NAMES if name == value)
 
 
 def _optional_path(key: str) -> Path | None:
@@ -145,6 +172,10 @@ class Settings:
     #: モデルファイルの探索ルート (配下に checkpoints / loras が並ぶ想定)。
     #: ComfyUIバックエンドはComfyUI側が解決するため使わない。未設定を許す。
     models_root: Path | None = None
+    #: 所要時間の見積りに使う実行基盤。`validate` はComfyUIへ接続せず、
+    #: どこで動くかを知れないため、宣言があればそれを使う。未設定なら全基盤を併記する。
+    #: 生成そのものの挙動は変えない (実際のデバイスはComfyUIが選ぶ)。
+    device: DeviceName | None = None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -189,7 +220,8 @@ class Settings:
             registry_root=Path(registry_root),
             backend=_backend("IMAGEGEN_BACKEND", DEFAULT_BACKEND),
             models_root=_optional_path("IMAGEGEN_MODELS_ROOT"),
+            device=_device("IMAGEGEN_DEVICE"),
         )
 
 
-__all__ = ["BACKEND_NAMES", "BackendName", "Settings"]
+__all__ = ["BACKEND_NAMES", "DEVICE_NAMES", "BackendName", "DeviceName", "Settings"]
